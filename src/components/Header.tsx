@@ -4,15 +4,16 @@ import React from "react";
 import Image from "next/image";
 import { Button } from "./ui/button";
 import ThemeSwitcher from "./ThemeSwitcher";
-import { LuCoins, LuLogOut, LuMenu } from "react-icons/lu";
+import { LuCoins, LuMenu } from "react-icons/lu";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from "./ui/dialog";
+import { useSession } from "next-auth/react";
+import LogoutButton from "./LogoutButton";
 
 type HeaderProps = {
     userName?: string;
     userEmail?: string;
     userAvatarUrl?: string;
     userCredits?: number;
-    onLogout?: () => void;
     showThemeSwitch?: boolean;
 };
 
@@ -21,10 +22,13 @@ export default function Header({
     userEmail = "usuario@example.com",
     userAvatarUrl,
     userCredits = 0,
-    onLogout,
     showThemeSwitch = true,
 }: HeaderProps) {
-    const displayInitial = (userName?.[0] || "U").toUpperCase();
+    const { data: session } = useSession();
+    const nameToShow = (session?.user?.name ?? userName) || "Usuário";
+    const emailToShow = session?.user?.email ?? userEmail;
+    const avatarToShow = session?.user?.image ?? userAvatarUrl;
+    const displayInitial = (nameToShow?.[0] || "U").toUpperCase();
 
     return (
         <header className="w-full bg-background border-b border-border/40 shadow-sm fixed top-0 z-50">
@@ -53,10 +57,10 @@ export default function Header({
 
                         <div className="hidden sm:flex items-center gap-3">
                             <div className="relative inline-flex h-9 w-9 items-center justify-center rounded-full bg-muted overflow-hidden">
-                                {userAvatarUrl ? (
+                                {avatarToShow ? (
                                     <Image
-                                        src={userAvatarUrl}
-                                        alt={userName}
+                                        src={avatarToShow}
+                                        alt={nameToShow}
                                         className="h-full w-full object-cover"
                                         referrerPolicy="no-referrer"
                                         width={36}
@@ -69,8 +73,8 @@ export default function Header({
                                 )}
                             </div>
                             <div className="hidden sm:block">
-                                <p className="text-sm font-medium text-foreground">{userName}</p>
-                                <p className="text-xs text-muted-foreground">{userEmail}</p>
+                                <p className="text-sm font-medium text-foreground">{nameToShow}</p>
+                                <p className="text-xs text-muted-foreground">{emailToShow}</p>
                             </div>
                         </div>
 
@@ -80,17 +84,7 @@ export default function Header({
                             </div>
                         )}
 
-                        <div className="hidden sm:flex">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => onLogout?.()}
-                                className="text-muted-foreground hover:text-foreground"
-                            >
-                                <LuLogOut className="h-4 w-4 mr-2" />
-                                Sair
-                            </Button>
-                        </div>
+                        <LogoutButton />
 
                         {/* Mobile dropdown trigger */}
                         <div className="sm:hidden">
@@ -124,10 +118,10 @@ export default function Header({
 
                                     <div className="mt-4 flex items-center gap-3">
                                         <div className="relative inline-flex h-10 w-10 items-center justify-center rounded-full bg-muted overflow-hidden">
-                                            {userAvatarUrl ? (
+                                            {avatarToShow ? (
                                                 <Image
-                                                    src={userAvatarUrl}
-                                                    alt={userName}
+                                                    src={avatarToShow}
+                                                    alt={nameToShow}
                                                     className="h-full w-full object-cover"
                                                     referrerPolicy="no-referrer"
                                                     width={40}
@@ -140,8 +134,8 @@ export default function Header({
                                             )}
                                         </div>
                                         <div>
-                                            <p className="text-sm font-medium text-foreground">{userName}</p>
-                                            <p className="text-xs text-muted-foreground">{userEmail}</p>
+                                            <p className="text-sm font-medium text-foreground">{nameToShow}</p>
+                                            <p className="text-xs text-muted-foreground">{emailToShow}</p>
                                         </div>
                                     </div>
 
@@ -151,15 +145,7 @@ export default function Header({
                                                 <ThemeSwitcher />
                                             </div>
                                         )}
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => onLogout?.()}
-                                            className="text-muted-foreground hover:text-foreground"
-                                        >
-                                            <LuLogOut className="h-4 w-4 mr-2" />
-                                            Sair
-                                        </Button>
+                                        <LogoutButton mobile />
                                     </div>
                                 </DialogContent>
                             </Dialog>
@@ -170,3 +156,4 @@ export default function Header({
         </header>
     );
 }
+
