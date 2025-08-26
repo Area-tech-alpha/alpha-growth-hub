@@ -2,6 +2,9 @@
 
 import React from "react";
 import { buttonVariants } from "@/components/ui/button";
+import CreditosPanel from "@/components/dashboard/CreditosPanel";
+import LeiloesPanel from "@/components/dashboard/LeiloesPanel";
+import MeusLeadsPanel from "@/components/dashboard/MeusLeadsPanel";
 import { CiCreditCard1 } from "react-icons/ci";
 import { IoMdTrendingUp } from "react-icons/io";
 import { FiShoppingBag } from "react-icons/fi";
@@ -60,28 +63,19 @@ export default function Home() {
       <section className="mt-6">
         {activeTab === "creditos" && (
           <div role="tabpanel" aria-labelledby="tab-creditos" className="grid gap-4">
-            <div className="rounded-lg border bg-card text-card-foreground p-6">
-              <h2 className="text-lg font-semibold">Créditos</h2>
-              <p className="text-sm text-muted-foreground mt-1">Resumo dos seus créditos e opções de compra.</p>
-            </div>
+            <CreditosPanel />
           </div>
         )}
 
         {activeTab === "leiloes" && (
           <div role="tabpanel" aria-labelledby="tab-leiloes" className="grid gap-4">
-            <div className="rounded-lg border bg-card text-card-foreground p-6">
-              <h2 className="text-lg font-semibold">Leilões</h2>
-              <p className="text-sm text-muted-foreground mt-1">Listagem e filtros de leilões.</p>
-            </div>
+            <LeiloesPanel />
           </div>
         )}
 
         {activeTab === "meus-leads" && (
           <div role="tabpanel" aria-labelledby="tab-meus-leads" className="grid gap-4">
-            <div className="rounded-lg border bg-card text-card-foreground p-6">
-              <h2 className="text-lg font-semibold">Meus Leads</h2>
-              <p className="text-sm text-muted-foreground mt-1">Seus leads salvos e histórico.</p>
-            </div>
+            <MeusLeadsPanel />
           </div>
         )}
       </section>
