@@ -32,13 +32,13 @@ export const PurchasedLeadCard = ({ lead, purchaseDate, purchasePrice }: Purchas
 
     return (
         <Card className="hover:shadow-lg transition-all duration-200 border border-border bg-card text-card-foreground">
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-2">
                 <div className="flex justify-between items-start">
                     <div className="flex-1">
-                        <CardTitle className="text-lg font-bold text-yellow-600 mb-2">
+                        <CardTitle className="text-lg font-bold text-yellow-600 mb-1">
                             {lead.title}
                         </CardTitle>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                             <MapPin className="h-4 w-4" />
                             {lead.location}
                         </div>
@@ -49,7 +49,7 @@ export const PurchasedLeadCard = ({ lead, purchaseDate, purchasePrice }: Purchas
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 mt-1">
                     <Badge variant="secondary">{lead.channel}</Badge>
                     <div className="ml-auto text-xs text-muted-foreground">
                         <Clock className="h-3 w-3 inline mr-1" />
@@ -58,14 +58,14 @@ export const PurchasedLeadCard = ({ lead, purchaseDate, purchasePrice }: Purchas
                 </div>
             </CardHeader>
 
-            <CardContent className="space-y-4">
-                <div className="space-y-3 p-4 bg-yellow-50 dark:bg-transparent rounded-lg border border-yellow-200 dark:border-yellow-700">
-                    <h4 className="font-semibold text-yellow-900 dark:text-yellow-200 text-sm mb-3 flex items-center gap-2">
+            <CardContent className="space-y-3">
+                <div className="space-y-2.5 p-3 bg-yellow-50 dark:bg-transparent rounded-lg border border-yellow-200 dark:border-yellow-700">
+                    <h4 className="font-semibold text-yellow-900 dark:text-yellow-200 text-sm mb-2 flex items-center gap-2">
                         <Badge className="bg-yellow-600 text-black dark:text-yellow-50">COMPRADO</Badge>
                         Informações Completas do Lead
                     </h4>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                         <div className="flex items-center gap-3 p-2 bg-white dark:bg-background rounded border border-border">
                             <DollarSign className="h-4 w-4 text-yellow-600 flex-shrink-0" />
                             <div>
@@ -99,20 +99,20 @@ export const PurchasedLeadCard = ({ lead, purchaseDate, purchasePrice }: Purchas
                         </div>
                     </div>
 
-                    <div className="pt-3 border-t border-yellow-200">
+                    <div className="pt-2 border-t border-yellow-200">
                         <h5 className="font-semibold text-yellow-900 dark:text-yellow-200 text-sm mb-2">Dados de Contato</h5>
-                        <div className="grid grid-cols-1 gap-3">
-                            <div className="flex items-center gap-3 p-3 bg-white dark:bg-background rounded border border-yellow-300 dark:border-yellow-700/60">
+                        <div className="grid grid-cols-1 gap-2.5">
+                            <div className="flex items-center gap-3 p-2.5 bg-white dark:bg-background rounded border border-yellow-300 dark:border-yellow-700/60">
                                 <div className="text-yellow-600 font-medium text-sm">Nome:</div>
                                 <div className="font-semibold text-foreground break-words">{lead.contactName}</div>
                             </div>
 
-                            <div className="flex items-center gap-3 p-3 bg-white dark:bg-background rounded border border-yellow-300 dark:border-yellow-700/60">
+                            <div className="flex items-center gap-3 p-2.5 bg-white dark:bg-background rounded border border-yellow-300 dark:border-yellow-700/60">
                                 <Phone className="h-4 w-4 text-yellow-600 flex-shrink-0" />
                                 <div className="font-semibold text-foreground break-all">{lead.phone}</div>
                             </div>
 
-                            <div className="flex items-center gap-3 p-3 bg-white dark:bg-background rounded border border-yellow-300 dark:border-yellow-700/60">
+                            <div className="flex items-center gap-3 p-2.5 bg-white dark:bg-background rounded border border-yellow-300 dark:border-yellow-700/60">
                                 <Mail className="h-4 w-4 text-yellow-600 flex-shrink-0" />
                                 <div className="font-semibold text-foreground break-all [overflow-wrap:anywhere]">{lead.email}</div>
                             </div>
