@@ -14,8 +14,8 @@ export default function Dashboard() {
     return (
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <Tabs defaultValue="creditos" className="w-full">
-                <TabsList className="sticky top-16 bg-background/80 backdrop-blur-sm z-40 pb-3">
-                    <div className="flex items-center gap-2">
+                <TabsList className="pb-3 px-4 mt-2 w-full justify-center sm:justify-start">
+                    <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-start [--tab-row-gap:0.5rem]">
                         <TabsTrigger value="creditos" className={buttonVariants({ variant: "outline", size: "sm", className: "rounded-full" })}>
                             <CiCreditCard1 className="size-4" />
                             Créditos
