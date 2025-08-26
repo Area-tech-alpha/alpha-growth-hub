@@ -44,9 +44,9 @@ export default function ThemeSwitcher() {
                         })}
                     >
                         {theme === "light" ? (
-                            <FaSun className="text-primary size-4" />
+                            <FaSun className="text-icon-color size-4" />
                         ) : (
-                            <FaMoon className="text-primary size-4" />
+                            <FaMoon className="text-icon-color size-4" />
                         )}
                     </div>
                 </div>
