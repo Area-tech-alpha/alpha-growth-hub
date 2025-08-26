@@ -1,88 +1,170 @@
 "use client";
 
-import ThemeSwitcher from "./ThemeSwitcher";
-import {
-    NavigationMenu,
-    NavigationMenuItem,
-    NavigationMenuList,
-    navigationMenuTriggerStyle,
-} from "./ui/navigation-menu";
-import React, { useState } from "react";
-import { cn } from "@/lib/utils";
-import { Button } from "./ui/button";
-import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from "./ui/dialog";
-import { Menu } from "lucide-react";
+import React from "react";
 import Image from "next/image";
+import { Button } from "./ui/button";
+import ThemeSwitcher from "./ThemeSwitcher";
+import { LuCoins, LuLogOut, LuMenu } from "react-icons/lu";
+import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from "./ui/dialog";
 
-export default function Header() {
+type HeaderProps = {
+    userName?: string;
+    userEmail?: string;
+    userAvatarUrl?: string;
+    userCredits?: number;
+    onLogout?: () => void;
+    showThemeSwitch?: boolean;
+};
 
-    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-    const handleMobileLinkClick = () => {
-        setIsMobileMenuOpen(false);
-    };
-
-    const navItems = ["home", "projects", "about", "experience", "education", "contact"];
+export default function Header({
+    userName = "Usuário",
+    userEmail = "usuario@example.com",
+    userAvatarUrl,
+    userCredits = 0,
+    onLogout,
+    showThemeSwitch = true,
+}: HeaderProps) {
+    const displayInitial = (userName?.[0] || "U").toUpperCase();
 
     return (
-        <header className="w-full py-5 px-6 border-b border-border/40 bg-background/95 backdrop-blur-sm fixed top-0 z-50 transition-all duration-200">
-            <div className="container mx-auto flex items-center justify-between">
-                <div className="flex-1">
-                    <a href="#home" className="relative group flex items-center">
-                        <Image
-                            src="https://assessorialpha.com/wp-content/uploads/2023/04/01-61.png"
-                            alt="Alpha Assessoria Logo"
-                            width={120}
-                            height={40}
-                            className="h-auto"
-                            priority
-                        />
-                    </a>
-                </div>
-
-                <NavigationMenu className="hidden md:flex">
-                    <NavigationMenuList>
-                        {navItems.map((item) => (
-                            <NavigationMenuItem key={item}>
-                                <a href={`#${item}`} className={cn(navigationMenuTriggerStyle(), "text-foreground hover:text-primary transition-colors")}>
-                                    {item}
-                                </a>
-                            </NavigationMenuItem>
-                        ))}
-                    </NavigationMenuList>
-                </NavigationMenu>
-
-                <div className="flex-1 flex items-center justify-end gap-4">
-                    <div className="hidden md:flex items-center gap-4">
-                        <ThemeSwitcher />
+        <header className="w-full bg-background border-b border-border/40 shadow-sm fixed top-0 z-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex justify-between items-center h-16">
+                    <div className="flex items-center space-x-3">
+                        <a href="#home" className="relative group flex items-center">
+                            <Image
+                                src="https://assessorialpha.com/wp-content/uploads/2023/04/01-61.png"
+                                alt="Alpha Assessoria Logo"
+                                width={120}
+                                height={40}
+                                className="h-auto"
+                                priority
+                            />
+                        </a>
                     </div>
 
-                    <Dialog open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-                        <DialogTrigger asChild className="md:hidden">
-                            <Button variant="outline" size="icon">
-                                <Menu className="h-6 w-6" />
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="w-full h-full flex flex-col items-center justify-center">
-                            <DialogTitle className="sr-only">Navegação Principal</DialogTitle>
-                            <DialogDescription className="sr-only">Uma lista de links para navegar no site.</DialogDescription>
-                            <nav className="flex flex-col items-center gap-8">
-                                {navItems.map((item) => (
-                                    <a
-                                        key={item}
-                                        href={`#${item}`}
-                                        onClick={() => handleMobileLinkClick()}
-                                        className="text-2xl font-semibold text-foreground hover:text-primary transition-colors"
-                                    >
-                                        {item}
-                                    </a>
-                                ))}
-                            </nav>
-                            <div className="absolute top-8 right-8 flex items-center gap-4">
+                    <div className="flex items-center space-x-3 sm:space-x-4">
+                        <div className="flex items-center gap-2 bg-yellow-50 dark:bg-yellow-900/20 px-3 py-1 rounded-lg border border-yellow-200 dark:border-yellow-700">
+                            <LuCoins className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                            <span className="font-semibold text-yellow-900 dark:text-yellow-200">
+                                {userCredits.toLocaleString()} <span className="max-[375px]:sr-only">créditos</span>
+                            </span>
+                        </div>
+
+                        <div className="hidden sm:flex items-center gap-3">
+                            <div className="relative inline-flex h-9 w-9 items-center justify-center rounded-full bg-muted overflow-hidden">
+                                {userAvatarUrl ? (
+                                    <Image
+                                        src={userAvatarUrl}
+                                        alt={userName}
+                                        className="h-full w-full object-cover"
+                                        referrerPolicy="no-referrer"
+                                        width={36}
+                                        height={36}
+                                    />
+                                ) : (
+                                    <span className="text-sm font-medium text-foreground">
+                                        {displayInitial}
+                                    </span>
+                                )}
+                            </div>
+                            <div className="hidden sm:block">
+                                <p className="text-sm font-medium text-foreground">{userName}</p>
+                                <p className="text-xs text-muted-foreground">{userEmail}</p>
+                            </div>
+                        </div>
+
+                        {showThemeSwitch && (
+                            <div className="hidden md:flex items-center">
                                 <ThemeSwitcher />
                             </div>
-                        </DialogContent>
-                    </Dialog>
+                        )}
+
+                        <div className="hidden sm:flex">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => onLogout?.()}
+                                className="text-muted-foreground hover:text-foreground"
+                            >
+                                <LuLogOut className="h-4 w-4 mr-2" />
+                                Sair
+                            </Button>
+                        </div>
+
+                        {/* Mobile dropdown trigger */}
+                        <div className="sm:hidden">
+                            <Dialog>
+                                <DialogTrigger asChild>
+                                    <Button variant="outline" size="icon" aria-label="Abrir menu">
+                                        <LuMenu className="h-5 w-5" />
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="w-full max-w-[calc(100%-3rem)] sm:max-w-sm p-4" showCloseButton>
+                                    <DialogTitle className="sr-only">Menu</DialogTitle>
+                                    <DialogDescription className="sr-only">Ações do usuário</DialogDescription>
+                                    <div className="flex items-center justify-between pb-3 border-b pr-10">
+                                        <a href="#home" className="relative group flex items-center">
+                                            <Image
+                                                src="https://assessorialpha.com/wp-content/uploads/2023/04/01-61.png"
+                                                alt="Alpha Assessoria Logo"
+                                                width={110}
+                                                height={36}
+                                                className="h-auto"
+                                                priority
+                                            />
+                                        </a>
+                                        <div className="flex items-center gap-2 bg-yellow-50 dark:bg-yellow-900/20 px-3 py-1 rounded-lg border border-yellow-200 dark:border-yellow-700">
+                                            <LuCoins className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                                            <span className="font-semibold text-yellow-900 dark:text-yellow-200">
+                                                {userCredits.toLocaleString()} <span className="max-[375px]:sr-only">créditos</span>
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-4 flex items-center gap-3">
+                                        <div className="relative inline-flex h-10 w-10 items-center justify-center rounded-full bg-muted overflow-hidden">
+                                            {userAvatarUrl ? (
+                                                <Image
+                                                    src={userAvatarUrl}
+                                                    alt={userName}
+                                                    className="h-full w-full object-cover"
+                                                    referrerPolicy="no-referrer"
+                                                    width={40}
+                                                    height={40}
+                                                />
+                                            ) : (
+                                                <span className="text-sm font-medium text-foreground">
+                                                    {displayInitial}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium text-foreground">{userName}</p>
+                                            <p className="text-xs text-muted-foreground">{userEmail}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-4 flex items-center justify-between">
+                                        {showThemeSwitch && (
+                                            <div>
+                                                <ThemeSwitcher />
+                                            </div>
+                                        )}
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => onLogout?.()}
+                                            className="text-muted-foreground hover:text-foreground"
+                                        >
+                                            <LuLogOut className="h-4 w-4 mr-2" />
+                                            Sair
+                                        </Button>
+                                    </div>
+                                </DialogContent>
+                            </Dialog>
+                        </div>
+                    </div>
                 </div>
             </div>
         </header>
