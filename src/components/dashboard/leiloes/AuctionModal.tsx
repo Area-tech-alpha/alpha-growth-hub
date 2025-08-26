@@ -35,13 +35,11 @@ export const AuctionModal = ({ lead, onClose, user }: AuctionModalProps) => {
                     const lastBid = bids[0];
                     if (lastBid && lastBid.userId === (user.id || 'current-user')) {
                         setHasWon(true);
-                        toast({
-                            title: "Parabéns! Você ganhou o leilão!",
+                        toast.success("Parabéns! Você ganhou o leilão!", {
                             description: "Agora você tem acesso a todas as informações do lead.",
                         });
                     } else {
-                        toast({
-                            title: "Leilão Encerrado!",
+                        toast("Leilão Encerrado!", {
                             description: `O leilão para "${lead.title}" foi finalizado.`,
                         });
                     }
@@ -104,28 +102,22 @@ export const AuctionModal = ({ lead, onClose, user }: AuctionModalProps) => {
         const amount = parseFloat(bidAmount);
 
         if (!amount || amount <= currentBid) {
-            toast({
-                title: "Lance inválido",
+            toast.error("Lance inválido", {
                 description: `Seu lance deve ser maior que R$ ${currentBid}`,
-                variant: "destructive",
             });
             return;
         }
 
         if (amount < lead.minimumBid) {
-            toast({
-                title: "Lance muito baixo",
+            toast.error("Lance muito baixo", {
                 description: `O lance mínimo é R$ ${lead.minimumBid}`,
-                variant: "destructive",
             });
             return;
         }
 
         if (amount > userCredits) {
-            toast({
-                title: "Créditos insuficientes",
+            toast.error("Créditos insuficientes", {
                 description: `Você precisa de pelo menos ${amount} créditos para este lance.`,
-                variant: "destructive",
             });
             return;
         }
@@ -148,8 +140,7 @@ export const AuctionModal = ({ lead, onClose, user }: AuctionModalProps) => {
             setBidAmount('');
             setIsSubmitting(false);
 
-            toast({
-                title: "Lance realizado com sucesso!",
+            toast.success("Lance realizado com sucesso!", {
                 description: `Seu lance de R$ ${amount} foi registrado. ${amount} créditos foram descontados.`,
             });
         }, 1000);
