@@ -23,8 +23,8 @@ export async function POST(request: Request) {
 
         const checkoutData = {
             billingTypes: ['CREDIT_CARD', 'PIX'],
-            chargeType: 'DETACHED',
-            name: customerName,
+            chargeTypes: ['DETACHED'],
+            name: customerName.substring(0, 30),
             dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             externalReference: externalReference,
             callback: {
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
             },
             items: [
                 {
-                    name: `Créditos para Alpha Lead Broker`,
+                    name: `Créditos Alpha Lead Broker`,
                     description: `Compra de ${credits.toLocaleString()} créditos`,
                     quantity: 1,
                     value: amount
