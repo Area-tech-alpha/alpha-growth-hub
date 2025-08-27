@@ -4,7 +4,7 @@ import GoogleProvider from "next-auth/providers/google"
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
-const TWO_HOURS_IN_SECONDS = 60;
+const TWENTY_FOUR_HOURS_IN_SECONDS = 24 * 60 * 60;
 
 if (!googleClientId || !googleClientSecret) {
     throw new Error("As variáveis de ambiente GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET devem ser definidas");
@@ -22,10 +22,10 @@ const handler = NextAuth({
     },
     session: {
         strategy: 'jwt',
-        maxAge: TWO_HOURS_IN_SECONDS,
+        maxAge: TWENTY_FOUR_HOURS_IN_SECONDS,
     },
     jwt: {
-        maxAge: TWO_HOURS_IN_SECONDS,
+        maxAge: TWENTY_FOUR_HOURS_IN_SECONDS,
     },
     callbacks: {
         async signIn({ user }) {
