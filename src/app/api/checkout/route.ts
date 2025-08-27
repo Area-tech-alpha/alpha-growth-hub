@@ -30,6 +30,7 @@ export async function POST(request: Request) {
             callback: {
                 successUrl: `${SITE_URL}/obrigado?status=success&checkoutId=${internalCheckoutId}`,
                 cancelUrl: `${SITE_URL}/comprar-creditos?status=cancelled`,
+                expireUrl: `${SITE_URL}/comprar-creditos?status=expired`,
                 autoRedirect: true,
             },
             items: [
