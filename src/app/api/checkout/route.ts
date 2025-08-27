@@ -4,6 +4,7 @@ import { memoryStore } from '@/lib/memory-store';
 
 const ASAAS_API_URL = process.env.ASAAS_API_URL!;
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY!;
+const SITE_URL = process.env.NEXTAUTH_URL!;
 
 export async function POST(request: Request) {
     try {
@@ -21,20 +22,27 @@ export async function POST(request: Request) {
         const externalReference = `${internalCheckoutId}|${customerEmail}`;
 
         const checkoutData = {
-            billingType: 'UNDEFINED',
+            billingTypes: ['CREDIT_CARD', 'PIX'],
             chargeType: 'DETACHED',
             name: customerName,
-            value: amount,
             dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            description: `Compra de ${credits.toLocaleString()} créditos para Alpha Lead Broker`,
             externalReference: externalReference,
             callback: {
-                successUrl: `https://assessorialpha.com/obrigado?status=success&checkoutId=${internalCheckoutId}`,
+                successUrl: `${SITE_URL}/obrigado?status=success&checkoutId=${internalCheckoutId}`,
+                cancelUrl: `${SITE_URL}/comprar-creditos?status=cancelled`,
                 autoRedirect: true,
             },
+            items: [
+                {
+                    name: `Créditos para Alpha Lead Broker`,
+                    description: `Compra de ${credits.toLocaleString()} créditos`,
+                    quantity: 1,
+                    value: amount
+                }
+            ]
         };
 
-        const response = await fetch(`${ASAAS_API_URL}/payments`, {
+        const response = await fetch(`${ASAAS_API_URL}/checkouts`, {
             method: 'POST',
             headers: {
                 'accept': 'application/json',
@@ -44,14 +52,10 @@ export async function POST(request: Request) {
             body: JSON.stringify(checkoutData),
         });
 
-        console.log('asaas api url', ASAAS_API_URL);
-        console.log('asaas api key', Boolean(ASAAS_API_KEY));
-        console.log('response', response.headers);
-
         if (!response.ok) {
             const errorData = await response.json();
             console.error('Erro da API Asaas:', errorData);
-            return NextResponse.json({ error: 'Falha ao criar cobrança no Asaas', details: errorData }, { status: response.status });
+            return NextResponse.json({ error: 'Falha ao criar checkout no Asaas', details: errorData }, { status: response.status });
         }
 
         const asaasResponse = await response.json();
@@ -62,7 +66,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({
             success: true,
-            checkoutUrl: asaasResponse.invoiceUrl,
+            checkoutUrl: asaasResponse.link,
             checkoutId: internalCheckoutId,
             amount: amount,
             credits: credits,
