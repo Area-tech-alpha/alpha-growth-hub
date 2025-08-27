@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { LuCoins } from "react-icons/lu";
@@ -8,24 +9,59 @@ import { LuCoins } from "react-icons/lu";
 type CreditosPanelProps = {
     currentCredits?: number;
     defaultAmount?: number;
-    onBuy?: (amount: number) => void;
 };
 
 export default function CreditosPanel({
     currentCredits = 0,
     defaultAmount = 50,
-    onBuy,
 }: CreditosPanelProps) {
+    const { data: session } = useSession();
     const [amount, setAmount] = React.useState<number>(defaultAmount);
+    const [loading, setLoading] = React.useState(false);
+    const [error, setError] = React.useState<string | null>(null);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = Number(e.target.value);
         if (Number.isNaN(value)) return;
-        setAmount(Math.max(1, Math.floor(value)));
+        setAmount(Math.max(10, Math.floor(value)));
     };
 
-    const handleBuy = () => {
-        onBuy?.(amount);
+    const handleBuy = async () => {
+        if (!session?.user?.email || !session?.user?.name) {
+            setError('Você precisa estar logado para comprar créditos.');
+            return;
+        }
+        setLoading(true);
+        setError(null);
+
+        try {
+            const response = await fetch('/api/checkout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    amount: Number(amount),
+                    customerEmail: session.user.email,
+                    customerName: session.user.name,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Falha ao iniciar o checkout.');
+            }
+
+            if (data.checkoutUrl) {
+                window.location.href = data.checkoutUrl;
+            }
+
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'Ocorreu um erro desconhecido';
+            setError(errorMessage);
+            setLoading(false);
+        }
     };
 
     return (
@@ -54,7 +90,8 @@ export default function CreditosPanel({
                             <input
                                 id="valor"
                                 type="number"
-                                min={1}
+                                min={10}
+                                max={50000}
                                 step={1}
                                 value={amount}
                                 onChange={handleChange}
@@ -63,19 +100,22 @@ export default function CreditosPanel({
                             />
                         </div>
                         <p id="valor-help" className="text-xs text-muted-foreground">
-                            Você receberá <span className="font-medium">{amount.toLocaleString("pt-BR")} créditos</span>
+                            Você receberá <span className="font-medium">{(amount * 2).toLocaleString("pt-BR")} créditos</span>
                         </p>
-                        <p className="text-xs text-muted-foreground">R$ 1,00 = 1 crédito</p>
                     </div>
+                    {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+                    {!session && <p className="text-xs text-center mt-2 text-muted-foreground">Faça login para poder comprar.</p>}
                 </CardContent>
                 <CardFooter>
-                    <Button onClick={handleBuy} className="w-full bg-yellow-500 hover:bg-yellow-500/90 text-yellow-950">
-                        Comprar créditos
+                    <Button
+                        onClick={handleBuy}
+                        className="w-full bg-yellow-500 hover:bg-yellow-500/90 text-yellow-950"
+                        disabled={loading || !session}
+                    >
+                        {loading ? 'Processando...' : 'Comprar créditos'}
                     </Button>
                 </CardFooter>
             </Card>
         </div>
     );
 }
-
-
