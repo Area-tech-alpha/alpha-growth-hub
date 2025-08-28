@@ -1,36 +1,27 @@
 export interface Lead {
     id: string;
-    title: string;
+    name: string;
     description: string;
-    category: string;
-    value: number;
+    status: 'hot' | 'warm' | 'cold';
+    expires_at: string;
     location: string;
-    timeLeft: number;
-    currentBid: number;
-    minimumBid: number;
-    bidders: number;
-    status: 'active' | 'ending_soon' | 'closed';
-    tags: string[];
-
+    channel: string;
     revenue: number;
     marketingInvestment: number;
     companyName: string;
     contactName: string;
     phone: string;
     email: string;
-    niche: string;
-    channel: string;
-
     maskedCompanyName: string;
+    niche: string;
     maskedContactName: string;
     maskedPhone: string;
     maskedEmail: string;
-
-    contact?: {
-        name: string;
-        phone?: string;
-        email?: string;
-    };
+    currentBid: number;
+    bidders: number;
+    category: string;
+    tags: string[];
+    [key: string]: unknown;
 }
 
 export interface PurchasedLead {
