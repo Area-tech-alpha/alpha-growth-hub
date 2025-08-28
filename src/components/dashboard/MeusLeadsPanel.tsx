@@ -1,92 +1,50 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
+import { createClient } from "@/utils/supabase/client";
 import { FiShoppingBag } from "react-icons/fi";
 import { PurchasedLeadCard } from "./leads/PurchasedLeadCard";
-import { PurchasedLead } from "./leads/types";
+import type { Lead } from "./leads/types";
 
-const mockPurchasedLeads: PurchasedLead[] = [
-    {
-        lead: {
-            id: '4',
-            name: 'Lead Empréstimo Empresarial',
-            description: 'Empresa de médio porte buscando empréstimo de R$ 2M para expansão',
-            category: 'Financiamento',
-            value: 1200,
-            location: 'São Paulo - SP',
-            timeLeft: 0,
-            currentBid: 250,
-            minimumBid: 100,
-            bidders: 12,
-            status: 'hot',
-            expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-            tags: ['Empréstimo', 'Médio Porte', 'Expansão'],
+const supabase = createClient();
 
-            revenue: 5200000,
-            marketingInvestment: 85000,
-            companyName: 'Indústria Beta Equipamentos Ltda',
-            contactName: 'Carlos Eduardo Mendes',
-            phone: '(11) 94567-1234',
-            email: 'carlos.mendes@industriabeta.com.br',
-            niche: 'Indústria',
-            channel: 'Google Ads',
+export default function MeusLeadsPanel({ initialPurchasedLeads }: { initialPurchasedLeads: Lead[] }) {
+    const { data: session } = useSession();
+    const [purchasedLeads, setPurchasedLeads] = useState(initialPurchasedLeads);
 
-            maskedCompanyName: 'Indústria **** Equipamentos Ltda',
-            maskedContactName: 'Carlos ******* Mendes',
-            maskedPhone: '(11) ****-1234',
-            maskedEmail: 'c****@*****.com.br',
+    useEffect(() => {
+        if (!session?.user?.id) return;
 
-            contact: {
-                name: 'Carlos Eduardo Mendes',
-                phone: '(11) 94567-1234',
-                email: 'carlos.mendes@industriabeta.com.br'
-            }
-        },
-        purchaseDate: new Date(2024, 11, 8, 14, 30),
-        purchasePrice: 250
-    },
-    {
-        lead: {
-            id: '5',
-            name: 'Lead Seguro Residencial',
-            description: 'Família interessada em seguro residencial para casa de R$ 1,2M',
-            category: 'Seguros',
-            value: 400,
-            location: 'Rio de Janeiro - RJ',
-            timeLeft: 0,
-            currentBid: 75,
-            minimumBid: 40,
-            bidders: 6,
-            status: 'warm',
-            expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-            tags: ['Residencial', 'Família', 'Alto Valor'],
+        const channel = supabase
+            .channel('purchased-leads-channel')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'leads',
+                    filter: `owner_id=eq.${session.user.id}`
+                },
+                (payload) => {
+                    console.log('Você comprou um novo lead!', payload.new);
+                    const newPurchasedLead = payload.new as Lead;
 
-            revenue: 320000,
-            marketingInvestment: 22000,
-            companyName: 'Gamma Consultoria Familiar',
-            contactName: 'Patricia Ferreira Lima',
-            phone: '(21) 97788-9900',
-            email: 'patricia.lima@gammaconsult.com.br',
-            niche: 'Consultoria',
-            channel: 'Meta Ads',
+                    setPurchasedLeads(prevLeads => {
+                        if (prevLeads.some(lead => lead.id === newPurchasedLead.id)) {
+                            return prevLeads;
+                        }
+                        return [newPurchasedLead, ...prevLeads];
+                    });
+                }
+            )
+            .subscribe();
 
-            maskedCompanyName: 'Gamma ********** Familiar',
-            maskedContactName: 'Patricia ******** Lima',
-            maskedPhone: '(21) ****-9900',
-            maskedEmail: 'p****@*****.com.br',
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [session?.user?.id]);
 
-            contact: {
-                name: 'Patricia Ferreira Lima',
-                phone: '(21) 97788-9900',
-                email: 'patricia.lima@gammaconsult.com.br'
-            }
-        },
-        purchaseDate: new Date(2024, 11, 7, 16, 45),
-        purchasePrice: 75
-    }
-];
-
-export default function MeusLeadsPanel() {
     return (
         <>
             <div className="flex items-center justify-between">
@@ -95,18 +53,18 @@ export default function MeusLeadsPanel() {
                     <p className="text-muted-foreground">Leads que você adquiriu nos leilões com informações completas</p>
                 </div>
                 <div className="text-right">
-                    <div className="text-2xl font-bold text-yellow-600">{mockPurchasedLeads.length}</div>
+                    <div className="text-2xl font-bold text-yellow-600">{purchasedLeads.length}</div>
                     <div className="text-sm text-muted-foreground">leads comprados</div>
                 </div>
             </div>
-            {mockPurchasedLeads.length > 0 ? (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {mockPurchasedLeads.map((mockPurchasedLead) => (
+            {purchasedLeads.length > 0 ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                    {purchasedLeads.map((purchasedLead) => (
                         <PurchasedLeadCard
-                            key={mockPurchasedLead.lead.id}
-                            lead={mockPurchasedLead.lead}
-                            purchaseDate={mockPurchasedLead.purchaseDate}
-                            purchasePrice={mockPurchasedLead.purchasePrice}
+                            key={purchasedLead.id}
+                            lead={purchasedLead}
+                            purchaseDate={new Date((purchasedLead.updated_at as string) || purchasedLead.expires_at)}
+                            purchasePrice={purchasedLead.currentBid}
                         />
                     ))}
                 </div>
@@ -120,5 +78,3 @@ export default function MeusLeadsPanel() {
         </>
     );
 }
-
-

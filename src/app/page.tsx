@@ -1,25 +1,45 @@
 import Dashboard from "@/components/dashboard/Dashboard";
 import { createClient } from "@/utils/supabase/server";
 import { sortLeads } from "@/lib/sortLeads";
+import { auth } from "../../auth";
 import type { Lead as AuctionLead } from "@/components/dashboard/leads/types";
 
 export default async function Home() {
+  const session = await auth();
   const supabase = await createClient();
 
-  const { data: initialLeads, error } = await supabase
+  const { data: auctionLeads, error: auctionError } = await supabase
     .from('leads')
     .select('*')
+    .is('owner_id', null)
     .gt('expires_at', new Date().toISOString());
 
-  if (error) {
-    console.error("Erro ao buscar leads iniciais:", error.message);
+  if (auctionError) {
+    console.error("Erro ao buscar leilões:", auctionError.message);
   }
 
-  const sortedInitialLeads: AuctionLead[] = sortLeads((initialLeads as unknown as AuctionLead[]) || []);
+  const sortedAuctionLeads = sortLeads(auctionLeads || []);
+
+
+  let purchasedLeads: AuctionLead[] = [];
+  if (session?.user?.id) {
+    const { data: ownedLeads, error: purchasedError } = await supabase
+      .from('leads')
+      .select('*')
+      .eq('owner_id', session.user.id);
+
+    if (purchasedError) {
+      console.error("Erro ao buscar leads comprados:", purchasedError.message);
+    }
+    purchasedLeads = ownedLeads || [];
+  }
 
   return (
     <>
-      <Dashboard initialLeads={sortedInitialLeads} />
+      <Dashboard
+        initialLeads={sortedAuctionLeads as AuctionLead[]}
+        initialPurchasedLeads={purchasedLeads}
+      />
     </>
   );
 }

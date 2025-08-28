@@ -10,10 +10,16 @@ import { IoMdTrendingUp } from "react-icons/io";
 import { FiShoppingBag } from "react-icons/fi";
 import type { Lead as AuctionLead } from "./leads/types";
 
-export default function Dashboard({ initialLeads }: { initialLeads: AuctionLead[] }) {
+export default function Dashboard({
+    initialLeads,
+    initialPurchasedLeads
+}: {
+    initialLeads: AuctionLead[],
+    initialPurchasedLeads: AuctionLead[]
+}) {
     return (
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <Tabs defaultValue="creditos" className="w-full">
+            <Tabs defaultValue="leiloes" className="w-full">
                 <TabsList className="pb-3 px-4 mt-2 w-full justify-center sm:justify-start">
                     <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-start [--tab-row-gap:0.5rem]">
                         <TabsTrigger value="creditos" className="flex items-center gap-2">
@@ -34,7 +40,7 @@ export default function Dashboard({ initialLeads }: { initialLeads: AuctionLead[
                     <CreditosPanel />
                 </TabsContent>
                 <TabsContent value="meus-leads">
-                    <MeusLeadsPanel />
+                    <MeusLeadsPanel initialPurchasedLeads={initialPurchasedLeads} />
                 </TabsContent>
                 <TabsContent value="leiloes">
                     <LeiloesPanel initialLeads={initialLeads} />
