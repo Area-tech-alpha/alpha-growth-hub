@@ -1,6 +1,6 @@
 // auth.ts
 
-import NextAuth from "next-auth"
+import { type NextAuthOptions } from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { PrismaClient } from "@prisma/client"
@@ -16,7 +16,7 @@ if (!googleClientId || !googleClientSecret) {
 
 const TWENTY_FOUR_HOURS_IN_SECONDS = 24 * 60 * 60;
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const authOptions: NextAuthOptions = {
     adapter: PrismaAdapter(prisma),
     providers: [
         GoogleProvider({
@@ -55,4 +55,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             return session;
         }
     },
-})
+};

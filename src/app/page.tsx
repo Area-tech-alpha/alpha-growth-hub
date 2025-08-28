@@ -1,11 +1,12 @@
 import Dashboard from "@/components/dashboard/Dashboard";
 import { createClient } from "@/utils/supabase/server";
 import { sortLeads } from "@/lib/sortLeads";
-import { auth } from "../../auth";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "../../auth";
 import type { Lead as AuctionLead } from "@/components/dashboard/leads/types";
 
 export default async function Home() {
-  const session = await auth();
+  const session = await getServerSession(authOptions);
   const supabase = await createClient();
 
   const { data: auctionLeads, error: auctionError } = await supabase
@@ -17,9 +18,7 @@ export default async function Home() {
   if (auctionError) {
     console.error("Erro ao buscar leilões:", auctionError.message);
   }
-
   const sortedAuctionLeads = sortLeads(auctionLeads || []);
-
 
   let purchasedLeads: AuctionLead[] = [];
   if (session?.user?.id) {
@@ -31,7 +30,7 @@ export default async function Home() {
     if (purchasedError) {
       console.error("Erro ao buscar leads comprados:", purchasedError.message);
     }
-    purchasedLeads = ownedLeads || [];
+    purchasedLeads = (ownedLeads as AuctionLead[]) || [];
   }
 
   return (
