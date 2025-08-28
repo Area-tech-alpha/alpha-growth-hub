@@ -9,7 +9,7 @@ const mockPurchasedLeads: PurchasedLead[] = [
     {
         lead: {
             id: '4',
-            title: 'Lead Empréstimo Empresarial',
+            name: 'Lead Empréstimo Empresarial',
             description: 'Empresa de médio porte buscando empréstimo de R$ 2M para expansão',
             category: 'Financiamento',
             value: 1200,
@@ -18,7 +18,8 @@ const mockPurchasedLeads: PurchasedLead[] = [
             currentBid: 250,
             minimumBid: 100,
             bidders: 12,
-            status: 'closed',
+            status: 'hot',
+            expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
             tags: ['Empréstimo', 'Médio Porte', 'Expansão'],
 
             revenue: 5200000,
@@ -47,7 +48,7 @@ const mockPurchasedLeads: PurchasedLead[] = [
     {
         lead: {
             id: '5',
-            title: 'Lead Seguro Residencial',
+            name: 'Lead Seguro Residencial',
             description: 'Família interessada em seguro residencial para casa de R$ 1,2M',
             category: 'Seguros',
             value: 400,
@@ -56,7 +57,8 @@ const mockPurchasedLeads: PurchasedLead[] = [
             currentBid: 75,
             minimumBid: 40,
             bidders: 6,
-            status: 'closed',
+            status: 'warm',
+            expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
             tags: ['Residencial', 'Família', 'Alto Valor'],
 
             revenue: 320000,

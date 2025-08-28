@@ -36,7 +36,7 @@ export const PurchasedLeadCard = ({ lead, purchaseDate, purchasePrice }: Purchas
                 <div className="flex justify-between items-start">
                     <div className="flex-1">
                         <CardTitle className="text-lg font-bold text-yellow-600 mb-1">
-                            {lead.title}
+                            {lead.name}
                         </CardTitle>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
                             <MapPin className="h-4 w-4" />

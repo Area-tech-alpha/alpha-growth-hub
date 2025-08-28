@@ -8,11 +8,12 @@ import { Clock, TrendingUp, Users } from "lucide-react";
 import { LeadCard } from "./leiloes/LeadCard";
 import { AuctionModal } from "./leiloes/AuctionModal";
 import type { Lead as AuctionLead } from "./leads/types";
+import { mockLeads } from "@/lib/mockLeads";
 
 const supabase = createClient();
 
 export default function LeiloesPanel({ initialLeads }: { initialLeads: AuctionLead[] }) {
-    const [activeLeads, setActiveLeads] = useState<AuctionLead[]>(initialLeads);
+    const [activeLeads, setActiveLeads] = useState<AuctionLead[]>(mockLeads);
     const [selectedLead, setSelectedLead] = useState<AuctionLead | null>(null);
 
     useEffect(() => {

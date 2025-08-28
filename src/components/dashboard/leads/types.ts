@@ -2,7 +2,7 @@ export interface Lead {
     id: string;
     name: string;
     description: string;
-    status: 'hot' | 'warm' | 'cold';
+    status: 'hot' | 'warm' | 'cold' | 'closed';
     expires_at: string;
     location: string;
     channel: string;
