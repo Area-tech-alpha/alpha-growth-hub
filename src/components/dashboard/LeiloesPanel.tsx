@@ -5,7 +5,7 @@ import { Clock, TrendingUp, Users } from "lucide-react";
 import { LeadCard } from "./leiloes/LeadCard";
 import { AuctionModal } from "./leiloes/AuctionModal";
 import type { Lead as AuctionLead } from "./leads/types";
-import type { AuctionRecord, AuctionRow, AuctionWithLead, LeadForAuction } from "./leiloes/types";
+import type { AuctionRecord, AuctionRow, AuctionWithLead, LeadForAuction, Bid } from "./leiloes/types";
 
 // Tipagem para um Leilão que inclui os dados do Lead aninhados
 type AuctionWithLeadLocal = AuctionWithLead;
@@ -28,6 +28,50 @@ export default function LeiloesPanel({ initialAuctions }: { initialAuctions: Auc
         return normalized
     });
     const [selectedAuction, setSelectedAuction] = useState<AuctionWithLeadLocal | null>(null);
+    const [bidsByAuction, setBidsByAuction] = useState<Record<string, Bid[]>>({});
+
+    useEffect(() => {
+        // Prefetch bids for visible auctions to avoid delay in modal
+        async function prefetchBids() {
+            try {
+                const auctionIds = activeAuctions.map(a => a.id);
+                console.log('[LeiloesPanel] Prefetching bids for auctions:', auctionIds)
+                const results = await Promise.all(auctionIds.map(async (auctionId, idx) => {
+                    const leadId = activeAuctions[idx]?.leads?.id;
+                    const { data, error } = await supabase
+                        .from('bids')
+                        .select('*')
+                        .eq('auction_id', auctionId)
+                        .order('created_at', { ascending: false });
+                    if (error) {
+                        console.error('[LeiloesPanel] Prefetch bids error:', { auctionId, error: error.message })
+                        return [auctionId, [] as Bid[]] as const;
+                    }
+                    const mapped: Bid[] = (data || []).map((row: { id: string; user_id: string; amount: number | string; created_at: string }) => ({
+                        id: row.id,
+                        leadId: leadId,
+                        userId: row.user_id,
+                        userName: row.user_id?.slice(0, 8) || 'Participante',
+                        amount: typeof row.amount === 'string' ? parseFloat(row.amount) : row.amount,
+                        timestamp: new Date(row.created_at)
+                    }));
+                    return [auctionId, mapped] as const;
+                }));
+                const map: Record<string, Bid[]> = {};
+                for (const [auctionId, list] of results) {
+                    map[auctionId] = list;
+                }
+                setBidsByAuction(map);
+                console.log('[LeiloesPanel] Prefetched bids counts:', Object.fromEntries(Object.entries(map).map(([k, v]) => [k, v.length])))
+            } catch (e) {
+                console.error('[LeiloesPanel] Prefetch bids unexpected error:', e)
+            }
+        }
+        if (activeAuctions.length > 0) {
+            prefetchBids();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeAuctions.length]);
 
     useEffect(() => {
         console.log('[LeiloesPanel] Subscribing to realtime auctions...')
@@ -131,6 +175,20 @@ export default function LeiloesPanel({ initialAuctions }: { initialAuctions: Auc
                         const updated = { ...a, leads: { ...a.leads, currentBid: nextCurrent, bidders: nextBidders } };
                         return updated;
                     }));
+                    setBidsByAuction(prev => {
+                        const amount = typeof bid.amount === 'string' ? parseFloat(bid.amount) : bid.amount;
+                        const newBid: Bid = {
+                            id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+                            leadId: activeAuctions.find(a => a.id === bid.auction_id)?.leads?.id || '',
+                            userId: bid.user_id,
+                            userName: bid.user_id?.slice(0, 8) || 'Participante',
+                            amount,
+                            timestamp: new Date()
+                        };
+                        const list = prev[bid.auction_id] || [];
+                        if (list.some(b => b.id === newBid.id)) return prev;
+                        return { ...prev, [bid.auction_id]: [newBid, ...list] };
+                    });
                 }
             )
             .subscribe((status) => {
@@ -186,6 +244,7 @@ export default function LeiloesPanel({ initialAuctions }: { initialAuctions: Auc
                     auctionId={selectedAuction.id}
                     lead={selectedAuction.leads} // Passa o lead do leilão selecionado
                     user={user}
+                    initialBids={bidsByAuction[selectedAuction.id]}
                     onClose={() => setSelectedAuction(null)}
                 />
             )}

@@ -18,16 +18,17 @@ interface AuctionModalProps {
     lead: Lead;
     onClose: () => void;
     user: { id?: string; name: string };
+    initialBids?: Bid[];
 }
 
 const supabase = createClient();
 
-export const AuctionModal = ({ auctionId, lead, onClose, user }: AuctionModalProps) => {
+export const AuctionModal = ({ auctionId, lead, onClose, user, initialBids }: AuctionModalProps) => {
     const [isAuctionActive, setIsAuctionActive] = useState(new Date(lead.expires_at).getTime() > Date.now());
     const [bidAmount, setBidAmount] = useState('');
     const [currentBid, setCurrentBid] = useState(lead.currentBid);
     const [bidders, setBidders] = useState(lead.bidders);
-    const [bids, setBids] = useState<Bid[]>([]);
+    const [bids, setBids] = useState<Bid[]>(initialBids || []);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [hasWon, setHasWon] = useState(false);
     const [userCredits] = useState(1500);
@@ -47,44 +48,16 @@ export const AuctionModal = ({ auctionId, lead, onClose, user }: AuctionModalPro
         }
     };
 
-    // Load existing bids and subscribe to realtime INSERTs
+    // Subscribe to realtime INSERTs (no initial fetch if already provided)
     useEffect(() => {
         let isMounted = true;
 
-        async function loadBids() {
-            console.log('[AuctionModal] Loading bids for auction:', auctionId)
-            const { data, error } = await supabase
-                .from('bids')
-                .select('*')
-                .eq('auction_id', auctionId)
-                .order('created_at', { ascending: false });
-            if (error) {
-                console.error('[AuctionModal] Error loading bids:', error.message)
-                return;
-            }
-            const mapped: Bid[] = (data || []).map((row: {
-                id: string;
-                user_id: string;
-                amount: number | string;
-                created_at: string;
-            }) => ({
-                id: row.id,
-                leadId: lead.id,
-                userId: row.user_id,
-                userName: row.user_id?.slice(0, 8) || 'Participante',
-                amount: typeof row.amount === 'string' ? parseFloat(row.amount) : row.amount,
-                timestamp: new Date(row.created_at)
-            }));
-            if (!isMounted) return;
-            setBids(mapped);
-            console.log('[AuctionModal] Loaded bids count:', mapped.length)
-            // Keep UI counters in sync
-            const top = mapped[0]?.amount ?? lead.currentBid;
+        // Sync counters with provided initial bids
+        if (initialBids && initialBids.length > 0) {
+            const top = initialBids[0]?.amount ?? lead.currentBid;
             setCurrentBid(top);
-            setBidders(mapped.length);
+            setBidders(initialBids.length);
         }
-
-        loadBids();
 
         const channel = supabase
             .channel(`bids-auction-${auctionId}`)
@@ -120,7 +93,7 @@ export const AuctionModal = ({ auctionId, lead, onClose, user }: AuctionModalPro
             console.log('[AuctionModal] Unsubscribing bids channel:', `bids-auction-${auctionId}`)
             supabase.removeChannel(channel);
         };
-    }, [auctionId, lead.id, lead.currentBid]);
+    }, [auctionId, lead.id, lead.currentBid, initialBids?.length]);
 
     const formatCurrency = (value: number) => {
         return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
