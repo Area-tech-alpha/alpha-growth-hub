@@ -8,14 +8,14 @@ import MeusLeadsPanel from "@/components/dashboard/MeusLeadsPanel";
 import { CiCreditCard1 } from "react-icons/ci";
 import { IoMdTrendingUp } from "react-icons/io";
 import { FiShoppingBag } from "react-icons/fi";
-import type { Lead as AuctionLead } from "./leads/types";
+import type { AuctionRecord, LeadForAuction } from "./leiloes/types";
 
 export default function Dashboard({
-    initialLeads,
+    initialAuctions,
     initialPurchasedLeads
 }: {
-    initialLeads: AuctionLead[],
-    initialPurchasedLeads: AuctionLead[]
+    initialAuctions: AuctionRecord[],
+    initialPurchasedLeads: LeadForAuction[]
 }) {
     return (
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -43,7 +43,7 @@ export default function Dashboard({
                     <MeusLeadsPanel initialPurchasedLeads={initialPurchasedLeads} />
                 </TabsContent>
                 <TabsContent value="leiloes">
-                    <LeiloesPanel initialLeads={initialLeads} />
+                    <LeiloesPanel initialAuctions={initialAuctions} />
                 </TabsContent>
             </Tabs>
         </div>

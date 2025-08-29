@@ -1,6 +1,5 @@
 import Dashboard from "@/components/dashboard/Dashboard";
 import { createClient } from "@/utils/supabase/server";
-import { sortLeads } from "@/lib/sortLeads";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../auth";
 import type { Lead as AuctionLead } from "@/components/dashboard/leads/types";
@@ -9,16 +8,17 @@ export default async function Home() {
   const session = await getServerSession(authOptions);
   const supabase = await createClient();
 
-  const { data: auctionLeads, error: auctionError } = await supabase
-    .from('leads')
-    .select('*')
-    .is('owner_id', null)
-    .gt('expires_at', new Date().toISOString());
+  const { data: initialAuctions, error: auctionError } = await supabase
+    .from('auctions')
+    .select('*, leads(*)')
+    .eq('status', 'open')
+    .gt('expired_at', new Date().toISOString());
 
   if (auctionError) {
-    console.error("Erro ao buscar leilões:", auctionError.message);
+    console.error("[Home] Erro ao buscar leilões:", auctionError.message);
+  } else {
+    console.log('[Home] initialAuctions count:', initialAuctions?.length ?? 0)
   }
-  const sortedAuctionLeads = sortLeads(auctionLeads || []);
 
   let purchasedLeads: AuctionLead[] = [];
   if (session?.user?.id) {
@@ -28,7 +28,7 @@ export default async function Home() {
       .eq('owner_id', session.user.id);
 
     if (purchasedError) {
-      console.error("Erro ao buscar leads comprados:", purchasedError.message);
+      console.error("[Home] Erro ao buscar leads comprados:", purchasedError.message);
     }
     purchasedLeads = (ownedLeads as AuctionLead[]) || [];
   }
@@ -36,7 +36,7 @@ export default async function Home() {
   return (
     <>
       <Dashboard
-        initialLeads={sortedAuctionLeads as AuctionLead[]}
+        initialAuctions={initialAuctions || []}
         initialPurchasedLeads={purchasedLeads}
       />
     </>
