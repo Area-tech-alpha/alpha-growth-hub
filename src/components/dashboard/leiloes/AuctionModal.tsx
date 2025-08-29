@@ -33,9 +33,17 @@ import { AuctionWithLead, BidWithUserName } from "@/lib/custom-types";
 import { Decimal } from "@prisma/client/runtime/library";
 
 interface AuctionModalProps {
+<<<<<<< HEAD
   auction: AuctionWithLead;
   userCredits: number;
   onClose: () => void;
+=======
+    auctionId: string;
+    lead: Lead;
+    onClose: () => void;
+    user: { id?: string; name: string };
+    initialBids?: Bid[];
+>>>>>>> main
 }
 
 export const AuctionModal = ({
@@ -46,11 +54,23 @@ export const AuctionModal = ({
   const { data: session } = useSession();
   const queryClient = useQueryClient();
 
+<<<<<<< HEAD
   const [isAuctionActive, setIsAuctionActive] = useState(
     new Date(auction.expiredAt).getTime() > Date.now()
   );
   const [bidAmount, setBidAmount] = useState("");
   const [hasWon, setHasWon] = useState(false);
+=======
+export const AuctionModal = ({ auctionId, lead, onClose, user, initialBids }: AuctionModalProps) => {
+    const [isAuctionActive, setIsAuctionActive] = useState(new Date(lead.expires_at).getTime() > Date.now());
+    const [bidAmount, setBidAmount] = useState('');
+    const [currentBid, setCurrentBid] = useState(lead.currentBid);
+    const [bidders, setBidders] = useState(lead.bidders);
+    const [bids, setBids] = useState<Bid[]>(initialBids || []);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [hasWon, setHasWon] = useState(false);
+    const [userCredits] = useState(1500);
+>>>>>>> main
 
   const formatCurrency = (value: number | Decimal | undefined) => {
     if (value === undefined) return "N/A";
@@ -61,6 +81,7 @@ export const AuctionModal = ({
     }).format(numericValue);
   };
 
+<<<<<<< HEAD
   const { data: bids = [], isLoading: isLoadingBids } = useQuery<
     BidWithUserName[]
   >({
@@ -114,6 +135,54 @@ export const AuctionModal = ({
     }
     placeBid(amount);
   };
+=======
+    // Subscribe to realtime INSERTs (no initial fetch if already provided)
+    useEffect(() => {
+        let isMounted = true;
+
+        // Sync counters with provided initial bids
+        if (initialBids && initialBids.length > 0) {
+            const top = initialBids[0]?.amount ?? lead.currentBid;
+            setCurrentBid(top);
+            setBidders(initialBids.length);
+        }
+
+        const channel = supabase
+            .channel(`bids-auction-${auctionId}`)
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'bids', filter: `auction_id=eq.${auctionId}` },
+                (payload: { new: { id: string; user_id: string; amount: number | string; created_at: string } }) => {
+                    const row = payload.new;
+                    console.log('[AuctionModal][Realtime][INSERT] bid:', row)
+                    const amount = typeof row.amount === 'string' ? parseFloat(row.amount) : row.amount;
+                    const bid: Bid = {
+                        id: row.id,
+                        leadId: lead.id,
+                        userId: row.user_id,
+                        userName: row.user_id?.slice(0, 8) || 'Participante',
+                        amount,
+                        timestamp: new Date(row.created_at)
+                    };
+                    setBids(prev => {
+                        if (prev.some(b => b.id === bid.id)) return prev;
+                        return [bid, ...prev];
+                    });
+                    setCurrentBid(prev => Math.max(prev, amount || 0));
+                    setBidders(prev => prev + 1);
+                }
+            )
+            .subscribe((status) => {
+                console.log('[AuctionModal] channel status:', status)
+            });
+
+        return () => {
+            isMounted = false;
+            console.log('[AuctionModal] Unsubscribing bids channel:', `bids-auction-${auctionId}`)
+            supabase.removeChannel(channel);
+        };
+    }, [auctionId, lead.id, lead.currentBid, initialBids?.length]);
+>>>>>>> main
 
   const leadData = auction.leads;
 

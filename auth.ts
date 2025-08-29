@@ -64,12 +64,17 @@ export const authOptions: NextAuthOptions = {
     events: {
         // Garante que o usuário de aplicação (tabela `users`) exista no primeiro login
         async signIn({ user }) {
+            console.log('[NextAuth][events.signIn] signIn', user)
             try {
                 if (!user?.id) return;
                 // Usa SQL para não depender dos tipos gerados
                 await prisma.$executeRawUnsafe(
-                    'insert into public.users (id) values ($1) on conflict (id) do nothing',
-                    user.id
+                    'insert into public.users (id, name, email, email_verified, avatar_url) values ($1, $2, $3, $4, $5) on conflict (id) do update set name = coalesce(excluded.name, public.users.name), email = coalesce(excluded.email, public.users.email), email_verified = coalesce(excluded.email_verified, public.users.email_verified), avatar_url = coalesce(excluded.avatar_url, public.users.avatar_url)',
+                    user.id,
+                    user.name ?? null,
+                    user.email ?? null,
+                    null,
+                    user.image ?? null
                 );
             } catch (err) {
                 console.error('[NextAuth][events.signIn] upsert users failed:', err);
