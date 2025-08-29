@@ -1,4 +1,4 @@
-import { MapPin, Eye, Building, User, Phone, Mail, Target, Megaphone, DollarSign } from 'lucide-react';
+import { MapPin, Eye, Building, User, Phone, Mail, Target, Megaphone, DollarSign, Hash } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -34,6 +34,10 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
                         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                             <MapPin className="h-4 w-4" />
                             {lead.location}
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                            <Hash className="h-3 w-3" />
+                            <span>ID do Leilão: {lead.id}</span>
                         </div>
                     </div>
                     <CountdownTimer expiresAt={lead.expires_at} onExpire={onExpire} />

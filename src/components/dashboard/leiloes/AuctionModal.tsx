@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { createClient } from '@/utils/supabase/client';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,12 +14,15 @@ import { Bid } from './types';
 import { toast } from 'sonner';
 
 interface AuctionModalProps {
+    auctionId: string;
     lead: Lead;
     onClose: () => void;
     user: { id?: string; name: string };
 }
 
-export const AuctionModal = ({ lead, onClose, user }: AuctionModalProps) => {
+const supabase = createClient();
+
+export const AuctionModal = ({ auctionId, lead, onClose, user }: AuctionModalProps) => {
     const [isAuctionActive, setIsAuctionActive] = useState(new Date(lead.expires_at).getTime() > Date.now());
     const [bidAmount, setBidAmount] = useState('');
     const [currentBid, setCurrentBid] = useState(lead.currentBid);
@@ -43,14 +47,80 @@ export const AuctionModal = ({ lead, onClose, user }: AuctionModalProps) => {
         }
     };
 
+    // Load existing bids and subscribe to realtime INSERTs
     useEffect(() => {
-        const mockBids: Bid[] = [
-            { id: '1', leadId: lead.id, userId: 'user1', userName: 'Carlos M.', amount: currentBid, timestamp: new Date(Date.now() - 120000) },
-            { id: '2', leadId: lead.id, userId: 'user2', userName: 'Ana S.', amount: currentBid - 15, timestamp: new Date(Date.now() - 300000) },
-            { id: '3', leadId: lead.id, userId: 'user3', userName: 'João P.', amount: currentBid - 30, timestamp: new Date(Date.now() - 480000) }
-        ];
-        setBids(mockBids);
-    }, [lead.id, currentBid]);
+        let isMounted = true;
+
+        async function loadBids() {
+            console.log('[AuctionModal] Loading bids for auction:', auctionId)
+            const { data, error } = await supabase
+                .from('bids')
+                .select('*')
+                .eq('auction_id', auctionId)
+                .order('created_at', { ascending: false });
+            if (error) {
+                console.error('[AuctionModal] Error loading bids:', error.message)
+                return;
+            }
+            const mapped: Bid[] = (data || []).map((row: {
+                id: string;
+                user_id: string;
+                amount: number | string;
+                created_at: string;
+            }) => ({
+                id: row.id,
+                leadId: lead.id,
+                userId: row.user_id,
+                userName: row.user_id?.slice(0, 8) || 'Participante',
+                amount: typeof row.amount === 'string' ? parseFloat(row.amount) : row.amount,
+                timestamp: new Date(row.created_at)
+            }));
+            if (!isMounted) return;
+            setBids(mapped);
+            console.log('[AuctionModal] Loaded bids count:', mapped.length)
+            // Keep UI counters in sync
+            const top = mapped[0]?.amount ?? lead.currentBid;
+            setCurrentBid(top);
+            setBidders(mapped.length);
+        }
+
+        loadBids();
+
+        const channel = supabase
+            .channel(`bids-auction-${auctionId}`)
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'bids', filter: `auction_id=eq.${auctionId}` },
+                (payload: { new: { id: string; user_id: string; amount: number | string; created_at: string } }) => {
+                    const row = payload.new;
+                    console.log('[AuctionModal][Realtime][INSERT] bid:', row)
+                    const amount = typeof row.amount === 'string' ? parseFloat(row.amount) : row.amount;
+                    const bid: Bid = {
+                        id: row.id,
+                        leadId: lead.id,
+                        userId: row.user_id,
+                        userName: row.user_id?.slice(0, 8) || 'Participante',
+                        amount,
+                        timestamp: new Date(row.created_at)
+                    };
+                    setBids(prev => {
+                        if (prev.some(b => b.id === bid.id)) return prev;
+                        return [bid, ...prev];
+                    });
+                    setCurrentBid(prev => Math.max(prev, amount || 0));
+                    setBidders(prev => prev + 1);
+                }
+            )
+            .subscribe((status) => {
+                console.log('[AuctionModal] channel status:', status)
+            });
+
+        return () => {
+            isMounted = false;
+            console.log('[AuctionModal] Unsubscribing bids channel:', `bids-auction-${auctionId}`)
+            supabase.removeChannel(channel);
+        };
+    }, [auctionId, lead.id, lead.currentBid]);
 
     const formatCurrency = (value: number) => {
         return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
@@ -71,15 +141,44 @@ export const AuctionModal = ({ lead, onClose, user }: AuctionModalProps) => {
             return;
         }
         setIsSubmitting(true);
-        setTimeout(() => {
-            const newBid: Bid = { id: Date.now().toString(), leadId: lead.id, userId: user.id || 'current-user', userName: user.name, amount: amount, timestamp: new Date() };
-            setBids(prev => [newBid, ...prev]);
-            setCurrentBid(amount);
+        try {
+            const insertPayload: { auction_id: string; user_id: string; amount: number } = {
+                auction_id: auctionId,
+                user_id: user.id || 'current-user',
+                amount
+            };
+            const { data, error } = await supabase
+                .from('bids')
+                .insert(insertPayload)
+                .select()
+                .single();
+            if (error) {
+                throw error;
+            }
+            const row = data as unknown as { id: string; user_id: string; amount: number | string; created_at: string };
+            const newBid: Bid = {
+                id: row.id,
+                leadId: lead.id,
+                userId: row.user_id,
+                userName: user.name,
+                amount: typeof row.amount === 'string' ? parseFloat(row.amount) : row.amount,
+                timestamp: new Date(row.created_at)
+            };
+            setBids(prev => {
+                if (prev.some(b => b.id === newBid.id)) return prev;
+                return [newBid, ...prev];
+            });
+            setCurrentBid(newBid.amount);
             setBidders(prev => prev + 1);
             setBidAmount('');
-            setIsSubmitting(false);
             toast.success("Lance realizado com sucesso!", { description: `Seu lance de ${formatCurrency(amount)} foi registrado.` });
-        }, 1000);
+        } catch (e) {
+            const message = (e as { message?: string })?.message || String(e)
+            console.error('[AuctionModal] Insert bid error:', message)
+            toast.error('Falha ao enviar lance', { description: message || 'Tente novamente.' })
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (

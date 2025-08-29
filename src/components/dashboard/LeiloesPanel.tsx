@@ -112,6 +112,27 @@ export default function LeiloesPanel({ initialAuctions }: { initialAuctions: Auc
                     });
                 }
             )
+            // BIDS: update list stats when new bids arrive
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'bids'
+                },
+                (payload) => {
+                    const bid = payload.new as { auction_id: string; amount: number | string; user_id: string };
+                    console.log('[Realtime][INSERT] bids payload:', bid)
+                    setActiveAuctions(prev => prev.map(a => {
+                        if (a.id !== bid.auction_id) return a;
+                        const amount = typeof bid.amount === 'string' ? parseFloat(bid.amount) : bid.amount;
+                        const nextCurrent = Math.max(a.leads.currentBid || 0, amount || 0);
+                        const nextBidders = (a.leads.bidders || 0) + 1;
+                        const updated = { ...a, leads: { ...a.leads, currentBid: nextCurrent, bidders: nextBidders } };
+                        return updated;
+                    }));
+                }
+            )
             .subscribe((status) => {
                 console.log('[Realtime] channel status:', status)
             });
@@ -162,6 +183,7 @@ export default function LeiloesPanel({ initialAuctions }: { initialAuctions: Auc
             )}
             {selectedAuction && (
                 <AuctionModal
+                    auctionId={selectedAuction.id}
                     lead={selectedAuction.leads} // Passa o lead do leilão selecionado
                     user={user}
                     onClose={() => setSelectedAuction(null)}
