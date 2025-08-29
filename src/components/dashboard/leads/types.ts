@@ -1,31 +1,39 @@
+export interface UserProfile {
+  id: string;
+  name: string | null;
+  email: string | null;
+  creditBalance: number;
+}
+
 export interface Lead {
-    id: string;
-    name: string;
-    description: string;
-    status: 'hot' | 'warm' | 'cold' | 'closed';
-    expires_at: string;
-    location: string;
-    channel: string;
-    revenue: number;
-    marketingInvestment: number;
-    companyName: string;
-    contactName: string;
-    phone: string;
-    email: string;
-    maskedCompanyName: string;
-    niche: string;
-    maskedContactName: string;
-    maskedPhone: string;
-    maskedEmail: string;
-    currentBid: number;
-    bidders: number;
-    category: string;
-    tags: string[];
-    [key: string]: unknown;
+  id: string;
+  name: string;
+  description: string;
+  companyName: string;
+  contactName: string;
+  revenue: number;
+  marketingInvestment: number;
+  location: string;
+  segment: string;
+}
+
+export interface Auction {
+  auctionId: string;
+  minimumBid: number;
+  currentBid: number;
+  expiredAt: string;
+  lead: Lead;
 }
 
 export interface PurchasedLead {
-    lead: Lead;
-    purchaseDate: Date;
-    purchasePrice: number;
+  purchaseDate: string;
+  purchasePrice: number;
+  lead: Lead;
+}
+export interface Bid {
+  id: string;
+  userId: string;
+  userName: string;
+  amount: number;
+  createdAt: string;
 }

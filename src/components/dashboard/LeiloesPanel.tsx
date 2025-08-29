@@ -1,119 +1,74 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { createClient } from "@/utils/supabase/client";
-import { sortLeads } from "@/lib/sortLeads";
-import StatsCards from "./leiloes/statsCards";
-import { Clock, TrendingUp, Users } from "lucide-react";
-import { LeadCard } from "./leiloes/LeadCard";
+import React, { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { fetchActiveAuctions } from "@/lib/api";
+import type { Auction } from "@/lib/types";
 import { AuctionModal } from "./leiloes/AuctionModal";
-import type { Lead as AuctionLead } from "./leads/types";
-import { mockLeads } from "@/lib/mockLeads";
-import { toast } from "sonner";
-
-const supabase = createClient();
-
+import { LeadCard } from "./leiloes/LeadCard";
+import { Skeleton } from "@/components/ui/skeleton";
 export default function LeiloesPanel({
-  initialLeads,
+  userCredits,
+  initialAuctions,
 }: {
-  initialLeads: AuctionLead[];
+  userCredits: number;
+  initialAuctions: Auction[];
 }) {
-  const [activeLeads, setActiveLeads] = useState<AuctionLead[]>(mockLeads);
-  const [selectedLead, setSelectedLead] = useState<AuctionLead | null>(null);
+  const [selectedAuction, setSelectedAuction] = useState<Auction | null>(null);
 
-  useEffect(() => {
-    const channel = supabase
-      .channel("realtime-leads")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "leads",
-        },
-        (payload: { new: AuctionLead }) => {
-          console.log("Novo lead recebido!", payload.new);
-          const newLead = payload.new as AuctionLead;
+  const {
+    data: activeAuctions,
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: ["activeAuctions"],
+    queryFn: fetchActiveAuctions,
+    initialData: initialAuctions,
+  });
 
-          toast.info("Novo leilão na área! 🔥", {
-            description: `O lead "${newLead.name}" foi listado para leilão.`,
-          });
-
-          setActiveLeads((prevLeads) => sortLeads([...prevLeads, newLead]));
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  const handleExpire = (leadId: string) => {
-    setActiveLeads((prevLeads) =>
-      prevLeads.filter((lead) => lead.id !== leadId)
+  if (isLoading && !initialAuctions) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <Skeleton className="h-96 w-full rounded-lg" />
+        <Skeleton className="h-96 w-full rounded-lg" />
+        <Skeleton className="h-96 w-full rounded-lg" />
+      </div>
     );
-  };
+  }
 
-  const user = { id: "current-user", name: "Você" };
-
-  const totalValue = activeLeads.reduce(
-    (sum, lead) => sum + ((lead.value as number) || 0),
-    0
-  );
-  const activeAuctions = activeLeads.length;
-  const totalBidders = activeLeads.reduce(
-    (sum, lead) => sum + ((lead.bidders as number) || 0),
-    0
-  );
+  if (isError) {
+    return (
+      <div className="text-center py-10 text-red-500">
+        Falha ao carregar os leilões.
+      </div>
+    );
+  }
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatsCards
-          title="Leilões Ativos"
-          icon={<Clock className="h-4 w-4 text-muted-foreground" />}
-          contentTitle={activeAuctions.toString()}
-          contentDescription="leads disponíveis agora"
-        />
-        <StatsCards
-          title="Valor Total"
-          icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
-          contentTitle={totalValue.toLocaleString("pt-BR")}
-          contentDescription="em leads disponíveis"
-        />
-        <StatsCards
-          title="Participantes"
-          icon={<Users className="h-4 w-4 text-muted-foreground" />}
-          contentTitle={totalBidders.toString()}
-          contentDescription="lances realizados"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mt-6">
-        {activeLeads.map((lead) => (
-          <LeadCard
-            key={lead.id}
-            lead={lead}
-            onExpire={() => handleExpire(lead.id)}
-            onSelect={() => setSelectedLead(lead)}
-          />
-        ))}
-      </div>
-
-      {activeLeads.length === 0 && (
-        <div className="text-center py-12 col-span-full">
-          <div className="text-gray-400 text-lg mb-2">
-            Nenhum lead encontrado
-          </div>
-          <p className="text-gray-500">Aguarde novos leilões</p>
+      {activeAuctions && activeAuctions.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {activeAuctions.map((auction) => (
+            <LeadCard
+              key={auction.auctionId}
+              auction={auction}
+              onSelect={() => setSelectedAuction(auction)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12 border-2 border-dashed rounded-lg">
+          <p className="text-muted-foreground">
+            Nenhum leilão ativo no momento.
+          </p>
         </div>
       )}
-      {selectedLead && (
+
+      {selectedAuction && (
         <AuctionModal
-          lead={selectedLead}
-          user={user}
-          onClose={() => setSelectedLead(null)}
+          auction={selectedAuction}
+          userCredits={userCredits}
+          onClose={() => setSelectedAuction(null)}
         />
       )}
     </>
