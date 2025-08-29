@@ -36,11 +36,12 @@ export const authOptions: NextAuthOptions = {
     },
     callbacks: {
         async signIn({ user }) {
-            if (user.email && user.email.endsWith('@assessorialpha.com')) {
-                return true;
-            } else {
+            // Permite somente emails do domínio. Ajuste se necessário.
+            if (!user.email || !user.email.endsWith('@assessorialpha.com')) {
+                console.warn('[NextAuth] signIn blocked: invalid domain for', user.email)
                 return false;
             }
+            return true;
         },
         async jwt({ token, user }) {
             if (user) {
@@ -53,6 +54,26 @@ export const authOptions: NextAuthOptions = {
                 session.user.id = token.id as string;
             }
             return session;
-        }
+        },
+        async redirect({ url, baseUrl }) {
+            // Sempre retorna para a home após login/logout para evitar loops
+            if (url.startsWith(baseUrl)) return url
+            return baseUrl
+        },
+    },
+    events: {
+        // Garante que o usuário de aplicação (tabela `users`) exista no primeiro login
+        async signIn({ user }) {
+            try {
+                if (!user?.id) return;
+                // Usa SQL para não depender dos tipos gerados
+                await prisma.$executeRawUnsafe(
+                    'insert into public.users (id) values ($1) on conflict (id) do nothing',
+                    user.id
+                );
+            } catch (err) {
+                console.error('[NextAuth][events.signIn] upsert users failed:', err);
+            }
+        },
     },
 };

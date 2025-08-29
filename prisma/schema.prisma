@@ -20,7 +20,7 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-  auth_users        auth_users @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([provider, providerAccountId], map: "provider_unique_id")
   @@index([userId])
@@ -31,7 +31,7 @@ model Session {
   sessionToken String     @unique
   userId       String
   expires      DateTime   @db.Timestamptz(6)
-  auth_users   auth_users @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([userId])
 }
@@ -63,8 +63,8 @@ model auctions {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model auth_users {
-  id            String    @id
+model User {
+  id            String    @id @default(cuid())
   name          String?
   email         String?   @unique
   emailVerified DateTime? @db.Timestamptz(6)
@@ -72,6 +72,8 @@ model auth_users {
   Account       Account[]
   Session       Session[]
   users         users?
+
+  @@map("auth_users")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
@@ -166,7 +168,7 @@ model users {
   credit_transactions credit_transactions[]
   leads               leads[]
   ledger_entries      ledger_entries[]
-  auth_users          auth_users            @relation(fields: [id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user                User                  @relation(fields: [id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
 enum account_type_enum {
