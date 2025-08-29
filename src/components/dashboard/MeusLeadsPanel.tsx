@@ -6,7 +6,7 @@ import { fetchPurchasedLeads } from "@/lib/api";
 import { FiShoppingBag } from "react-icons/fi";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PurchasedLeadCard } from "./leads/PurchasedLeadCard";
-import type { PurchasedLead } from "./leads/types";
+import { PurchasedLead } from "@/lib/custom-types";
 
 export default function MeusLeadsPanel() {
   const {
@@ -73,8 +73,6 @@ export default function MeusLeadsPanel() {
             <PurchasedLeadCard
               key={purchasedLead.lead.id}
               lead={purchasedLead.lead}
-              // ===== CORREÇÃO APLICADA AQUI =====
-              // A string de data é convertida para um objeto Date.
               purchaseDate={new Date(purchasedLead.purchaseDate)}
               purchasePrice={purchasedLead.purchasePrice}
             />

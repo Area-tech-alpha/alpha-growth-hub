@@ -1,4 +1,10 @@
-import type { UserProfile, Auction, PurchasedLead, Bid } from "./types";
+import type {
+  UserProfile,
+  AuctionWithLead,
+  PurchasedLead,
+  BidWithUserName,
+} from "@/lib/custom-types";
+
 async function apiFetch(url: string, options: RequestInit = {}) {
   const response = await fetch(url, options);
   if (!response.ok) {
@@ -11,13 +17,17 @@ async function apiFetch(url: string, options: RequestInit = {}) {
 }
 
 export const fetchUserProfile = (): Promise<UserProfile> =>
-  apiFetch("/api/user/profile");
-export const fetchActiveAuctions = (): Promise<Auction[]> =>
+  apiFetch("/api/profile/user");
+
+export const fetchActiveAuctions = (): Promise<AuctionWithLead[]> =>
   apiFetch("/api/auctions/active");
+
 export const fetchPurchasedLeads = (): Promise<PurchasedLead[]> =>
   apiFetch("/api/leads/purchased");
-export const fetchBidsForAuction = (auctionId: string): Promise<Bid[]> =>
-  apiFetch(`/api/auctions/${auctionId}/bids`);
+
+export const fetchBidsForAuction = (
+  auctionId: string
+): Promise<BidWithUserName[]> => apiFetch(`/api/auctions/${auctionId}/bids`);
 
 export const postBid = ({
   auctionId,
@@ -25,7 +35,7 @@ export const postBid = ({
 }: {
   auctionId: string;
   amount: number;
-}): Promise<Bid> => {
+}): Promise<BidWithUserName> => {
   return apiFetch(`/api/auctions/${auctionId}/bids`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

@@ -2,7 +2,6 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import type { Auction } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import {
   MapPin,
@@ -11,24 +10,31 @@ import {
   Megaphone,
   Building,
   Target,
-  User,
-  Phone,
-  Mail,
 } from "lucide-react";
 import { CountdownTimer } from "../leads/CountdownTimer";
+import type { AuctionWithLead } from "@/lib/custom-types";
+import { Decimal } from "@prisma/client/runtime/library";
 
 interface LeadCardProps {
-  auction: Auction;
+  auction: AuctionWithLead;
   onSelect: () => void;
 }
 
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
-    value
-  );
+const formatCurrency = (value: number | Decimal | undefined) => {
+  if (value === undefined) return "N/A";
+  const numericValue = typeof value === "number" ? value : value.toNumber();
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(numericValue);
+};
 
 export function LeadCard({ auction, onSelect }: LeadCardProps) {
-  const { lead } = auction;
+  const { leads: lead } = auction;
+
+  if (!lead) {
+    return null;
+  }
 
   return (
     <Card
@@ -40,17 +46,20 @@ export function LeadCard({ auction, onSelect }: LeadCardProps) {
         <div className="flex justify-between items-start">
           <div className="flex-1">
             <CardTitle className="text-lg font-bold text-yellow-600 mb-2">
-              {lead.name}
+              {lead.companyName}
             </CardTitle>
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
               <MapPin className="h-4 w-4" />
-              {lead.location}
+              {lead.location || "Não informado"}
             </div>
           </div>
-          <CountdownTimer expiresAt={auction.expiredAt} onExpire={() => {}} />
+          <CountdownTimer
+            expiresAt={auction.expiredAt.toISOString()}
+            onExpire={() => {}}
+          />
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="secondary">{lead.channel}</Badge>
+          <Badge variant="secondary">{lead.channel || "N/A"}</Badge>
         </div>
       </CardHeader>
 
@@ -91,7 +100,9 @@ export function LeadCard({ auction, onSelect }: LeadCardProps) {
               <Target className="h-3 w-3 text-foreground" />
               <div>
                 <div className="text-muted-foreground">Nicho</div>
-                <div className="font-semibold">{lead.segment}</div>
+                <div className="font-semibold">
+                  {lead.segment || "Não informado"}
+                </div>
               </div>
             </div>
           </div>

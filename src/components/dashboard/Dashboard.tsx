@@ -13,12 +13,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CiCreditCard1 } from "react-icons/ci";
 import { IoMdTrendingUp } from "react-icons/io";
 import { FiShoppingBag } from "react-icons/fi";
-import type { Auction } from "@/lib/types";
+import type { AuctionWithLead } from "@/lib/custom-types";
 
 export default function Dashboard({
   initialAuctions,
 }: {
-  initialAuctions: Auction[];
+  initialAuctions: AuctionWithLead[];
 }) {
   const searchParams = useSearchParams();
 
