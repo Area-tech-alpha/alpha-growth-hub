@@ -68,8 +68,10 @@ export const authOptions: NextAuthOptions = {
                 if (!user?.id) return;
                 // Usa SQL para não depender dos tipos gerados
                 await prisma.$executeRawUnsafe(
-                    'insert into public.users (id) values ($1) on conflict (id) do nothing',
-                    user.id
+                    'insert into public.users (id, name, email) values ($1, $2, $3) on conflict (id) do update set name = coalesce(excluded.name, public.users.name), email = coalesce(excluded.email, public.users.email)',
+                    user.id,
+                    user.name ?? null,
+                    user.email ?? null
                 );
             } catch (err) {
                 console.error('[NextAuth][events.signIn] upsert users failed:', err);

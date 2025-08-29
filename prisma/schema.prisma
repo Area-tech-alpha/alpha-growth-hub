@@ -161,6 +161,8 @@ model processed_webhooks {
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model users {
   id                  String                @id
+  name                String?
+  email               String?
   credit_balance      Decimal               @default(0.00) @db.Decimal(10, 2)
   created_at          DateTime              @default(now()) @db.Timestamptz(6)
   updated_at          DateTime              @default(now()) @db.Timestamptz(6)
