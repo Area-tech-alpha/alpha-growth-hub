@@ -3,6 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import type { Auction } from "@/lib/types";
 
 export default async function Home() {
+  const session = await getServerSession(authOptions);
   const supabase = await createClient();
 
   const { data: initialAuctions, error } = await supabase
