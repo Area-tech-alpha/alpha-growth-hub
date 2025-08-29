@@ -1,6 +1,8 @@
 import Dashboard from "@/components/dashboard/Dashboard";
 import { createClient } from "@/utils/supabase/server";
 import type { Auction } from "@/lib/types";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../../auth";
 
 export default async function Home() {
   const session = await getServerSession(authOptions);
