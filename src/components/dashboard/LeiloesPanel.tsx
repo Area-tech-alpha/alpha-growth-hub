@@ -7,6 +7,7 @@ import { AuctionModal } from "./leiloes/AuctionModal";
 import type { Lead as AuctionLead } from "./leads/types";
 import type { AuctionRecord, AuctionRow, AuctionWithLead, LeadForAuction, Bid } from "./leiloes/types";
 
+
 // Tipagem para um Leilão que inclui os dados do Lead aninhados
 type AuctionWithLeadLocal = AuctionWithLead;
 
@@ -135,9 +136,9 @@ export default function LeiloesPanel({ initialAuctions }: { initialAuctions: Auc
                     schema: 'public',
                     table: 'auctions'
                 },
-                async (payload) => {
+                async (payload: { new: AuctionRowLocal & { winning_bid_id?: string | null } }) => {
                     console.log('[Realtime][UPDATE] auctions payload:', payload)
-                    const updated = payload.new as AuctionRowLocal;
+                    const updated = payload.new as AuctionRowLocal & { winning_bid_id?: string | null };
                     setActiveAuctions(prev => {
                         const exists = prev.some(a => a.id === updated.id);
                         // If the auction turns closed, remove it
@@ -154,6 +155,7 @@ export default function LeiloesPanel({ initialAuctions }: { initialAuctions: Auc
                         }
                         return prev;
                     });
+
                 }
             )
             // BIDS: update list stats when new bids arrive
@@ -202,8 +204,14 @@ export default function LeiloesPanel({ initialAuctions }: { initialAuctions: Auc
     }, []);
 
     const handleExpire = (auctionId: string) => {
-        // Remove o leilão da lista quando o timer expira
+        // Remove o leilão da lista quando o timer expira e solicita fechamento no backend
         setActiveAuctions(prev => prev.filter(auction => auction.id !== auctionId));
+        fetch(`/api/auctions/${auctionId}/close`, { method: 'POST' })
+            .then(async (res) => {
+                const json = await res.json().catch(() => ({}))
+                console.log('[LeiloesPanel] close result:', res.status, json)
+            })
+            .catch((e) => console.error('[LeiloesPanel] close request failed:', e))
     };
 
     const user = { id: "current-user", name: "Você" };

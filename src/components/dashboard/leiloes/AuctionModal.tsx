@@ -36,16 +36,8 @@ export const AuctionModal = ({ auctionId, lead, onClose, user, initialBids }: Au
     const handleExpire = () => {
         setIsAuctionActive(false);
         const lastBid = bids[0];
-        if (lastBid && lastBid.userId === (user.id || 'current-user')) {
-            setHasWon(true);
-            toast.success("Parabéns! Você ganhou o leilão!", {
-                description: "Agora você tem acesso a todas as informações do lead.",
-            });
-        } else {
-            toast("Leilão Encerrado!", {
-                description: `O leilão para "${lead.name}" foi finalizado.`,
-            });
-        }
+        const currentUserId = user.id || 'current-user';
+        setHasWon(Boolean(lastBid && lastBid.userId === currentUserId));
     };
 
     // Subscribe to realtime INSERTs (no initial fetch if already provided)
@@ -100,6 +92,10 @@ export const AuctionModal = ({ auctionId, lead, onClose, user, initialBids }: Au
     };
 
     const handleBid = async () => {
+        if (!isAuctionActive) {
+            toast.error('Leilão encerrado', { description: 'Não é possível enviar lances após o término.' })
+            return;
+        }
         const amount = parseFloat(bidAmount);
         if (!amount || amount <= currentBid) {
             toast.error("Lance inválido", { description: `Seu lance deve ser maior que ${formatCurrency(currentBid)}` });
@@ -219,7 +215,7 @@ export const AuctionModal = ({ auctionId, lead, onClose, user, initialBids }: Au
                                     <div className="flex items-center gap-2 text-sm text-yellow-600"><AlertCircle className="h-4 w-4" />Lance mínimo: {formatCurrency(Math.max(currentBid + 1, lead.minimumBid as number))}</div>
                                     <div className="flex gap-2">
                                         <Input type="number" placeholder="Valor do lance" value={bidAmount} onChange={(e) => setBidAmount(e.target.value)} className="flex-1" min={Math.max(currentBid + 1, lead.minimumBid as number)} />
-                                        <Button onClick={handleBid} disabled={isSubmitting} className="bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-black"><Zap className="h-4 w-4 mr-2" />{isSubmitting ? 'Enviando...' : 'Dar Lance'}</Button>
+                                        <Button onClick={handleBid} disabled={isSubmitting || !isAuctionActive || hasWon} className="bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-black"><Zap className="h-4 w-4 mr-2" />{isSubmitting ? 'Enviando...' : 'Dar Lance'}</Button>
                                     </div>
                                 </div>
                             </div>
