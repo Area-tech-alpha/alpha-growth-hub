@@ -5,9 +5,9 @@ const prisma = new PrismaClient()
 
 export async function POST(
     _request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
-    const auctionId = params.id
+    const { id: auctionId } = await params
     if (!auctionId) {
         return NextResponse.json({ error: 'Missing auction id' }, { status: 400 })
     }
@@ -64,9 +64,9 @@ export async function POST(
         })
 
         return NextResponse.json(result.body, { status: result.status })
-    } catch (error: any) {
-        console.error('[close-auction] error:', error?.message || error)
-        return NextResponse.json({ error: 'Internal error', details: error?.message || String(error) }, { status: 500 })
+    } catch (error: unknown) {
+        console.error('[close-auction] error:', error)
+        return NextResponse.json({ error: 'Internal error', details: String(error) }, { status: 500 })
     }
 }
 
