@@ -1,49 +1,22 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
-import { createClient } from "@/utils/supabase/client";
+import { useEffect } from "react";
 import { FiShoppingBag } from "react-icons/fi";
 import { PurchasedLeadCard } from "./leads/PurchasedLeadCard";
 import type { Lead } from "./leads/types";
+import { useRealtimeStore } from "@/store/realtime-store";
+import type { RealtimeState } from "@/store/realtime-store";
 
-const supabase = createClient();
-
-export default function MeusLeadsPanel({ initialPurchasedLeads }: { initialPurchasedLeads: Lead[] }) {
-    const { data: session } = useSession();
-    const [purchasedLeads, setPurchasedLeads] = useState(initialPurchasedLeads);
+export default function MeusLeadsPanel() {
+    const purchasedLeads = useRealtimeStore((s: RealtimeState) => s.purchasedLeads) as Lead[];
 
     useEffect(() => {
-        if (!session?.user?.id) return;
-
-        const channel = supabase
-            .channel('purchased-leads-channel')
-            .on(
-                'postgres_changes',
-                {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'leads',
-                    filter: `owner_id=eq.${session.user.id}`
-                },
-                (payload) => {
-                    console.log('Você comprou um novo lead!', payload.new);
-                    const newPurchasedLead = payload.new as Lead;
-
-                    setPurchasedLeads(prevLeads => {
-                        if (prevLeads.some(lead => lead.id === newPurchasedLead.id)) {
-                            return prevLeads;
-                        }
-                        return [newPurchasedLead, ...prevLeads];
-                    });
-                }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [session?.user?.id]);
+        console.log('[MeusLeadsPanel] purchasedLeads length:', purchasedLeads.length);
+        if (purchasedLeads.length > 0) {
+            const first = purchasedLeads[0] as Lead & { owner_id?: string };
+            console.log('[MeusLeadsPanel] first lead sample:', { id: first?.id, owner: first?.owner_id });
+        }
+    }, [purchasedLeads.length, purchasedLeads]);
 
     return (
         <>

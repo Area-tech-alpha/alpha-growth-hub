@@ -1,10 +1,10 @@
 "use client";
 
-import React from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { LuCoins } from "react-icons/lu";
+import { useState, ChangeEvent } from "react";
 
 type CreditosPanelProps = {
     currentCredits?: number;
@@ -16,11 +16,11 @@ export default function CreditosPanel({
     defaultAmount = 50,
 }: CreditosPanelProps) {
     const { data: session } = useSession();
-    const [amount, setAmount] = React.useState<number>(defaultAmount);
-    const [loading, setLoading] = React.useState(false);
-    const [error, setError] = React.useState<string | null>(null);
+    const [amount, setAmount] = useState<number>(defaultAmount);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
         const value = Number(e.target.value);
         if (Number.isNaN(value)) return;
         setAmount(Math.max(10, Math.floor(value)));

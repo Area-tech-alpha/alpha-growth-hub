@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
@@ -12,6 +12,11 @@ import { CiCreditCard1 } from "react-icons/ci";
 import { IoMdTrendingUp } from "react-icons/io";
 import { FiShoppingBag } from "react-icons/fi";
 import type { AuctionRecord, LeadForAuction } from "./leiloes/types";
+import type { AuctionWithLead } from "./leiloes/types";
+import type { Lead } from "./leads/types";
+import { useRealtimeStore } from "@/store/realtime-store";
+import type { RealtimeState } from "@/store/realtime-store";
+import type { Bid } from "./leiloes/types";
 
 export default function Dashboard({
     initialAuctions,
@@ -22,47 +27,186 @@ export default function Dashboard({
 }) {
     const supabase = createClient();
     const { data: session } = useSession();
+    const userId = session?.user?.id;
     const userIdRef = useRef<string | undefined>(undefined);
     const bidsByAuctionRef = useRef<Record<string, { userId: string; id: string }[]>>({});
+    const setInitialAuctions = useRealtimeStore((s: RealtimeState) => s.setInitialAuctions);
+    const setInitialPurchasedLeads = useRealtimeStore((s: RealtimeState) => s.setInitialPurchasedLeads);
+    const upsertAuctionWithLead = useRealtimeStore((s: RealtimeState) => s.upsertAuctionWithLead);
+    const updateAuctionFields = useRealtimeStore((s: RealtimeState) => s.updateAuctionFields);
+    const removeAuctionById = useRealtimeStore((s: RealtimeState) => s.removeAuctionById);
+    const addBidForAuction = useRealtimeStore((s: RealtimeState) => s.addBidForAuction);
+    const updateAuctionStatsFromBid = useRealtimeStore((s: RealtimeState) => s.updateAuctionStatsFromBid);
+    const addPurchasedLeadIfMissing = useRealtimeStore((s: RealtimeState) => s.addPurchasedLeadIfMissing);
+    const setBidsForAuction = useRealtimeStore((s: RealtimeState) => s.setBidsForAuction);
 
     useEffect(() => {
-        userIdRef.current = session?.user?.id;
-    }, [session?.user?.id]);
+        userIdRef.current = userId;
+        console.log('[Dashboard] userId:', userId);
+    }, [userId]);
+
+    // Normalize server-provided auctions and purchased leads into the store
+    const normalizedInitialAuctions: AuctionWithLead[] = useMemo(() => {
+        const mapped = (initialAuctions || []).map((auction) => ({
+            id: auction.id,
+            status: auction.status,
+            expired_at: auction.expired_at,
+            leads: { ...(auction.leads as Lead), expires_at: auction.expired_at } as LeadForAuction,
+        }));
+        console.log('[Dashboard] normalizedInitialAuctions count:', mapped.length);
+        return mapped;
+    }, [initialAuctions]);
 
     useEffect(() => {
-        // Subscribe globally to auctions updates and bids inserts to drive global toasts
-        const channel = supabase
-            .channel('dashboard-global-auctions')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bids' }, (payload: { new: { id: string; auction_id: string; user_id: string } }) => {
-                const row = payload.new;
-                const list = bidsByAuctionRef.current[row.auction_id] || [];
-                // Keep a small record of bidders per auction
-                if (!list.some(b => b.id === row.id)) {
-                    bidsByAuctionRef.current[row.auction_id] = [{ id: row.id as string, userId: row.user_id as string }, ...list].slice(0, 100);
+        console.log('[Dashboard] setInitial state', { auctions: normalizedInitialAuctions.length, purchasedLeads: (initialPurchasedLeads as unknown as Lead[])?.length || 0 });
+        setInitialAuctions(normalizedInitialAuctions);
+        setInitialPurchasedLeads((initialPurchasedLeads as unknown as Lead[]) || []);
+    }, [normalizedInitialAuctions, initialPurchasedLeads, setInitialAuctions, setInitialPurchasedLeads]);
+
+    // Prefetch bids for currently known auctions so modals and counters are instant
+    useEffect(() => {
+        console.log('[Dashboard] Prefetch bids start');
+        const load = async () => {
+            const auctionIds = normalizedInitialAuctions.map(a => a.id);
+            console.log('[Dashboard] Prefetch auctionIds:', auctionIds);
+            await Promise.all(auctionIds.map(async (auctionId) => {
+                const { data, error } = await supabase
+                    .from('bids')
+                    .select('*')
+                    .eq('auction_id', auctionId)
+                    .order('created_at', { ascending: false });
+                if (error) {
+                    console.error('[Dashboard] Prefetch bids error:', { auctionId, error: error.message });
+                    return;
                 }
+                const mapped: Bid[] = (data || []).map((row: { id: string; user_id: string; amount: number | string; created_at: string }) => ({
+                    id: row.id,
+                    leadId: '',
+                    userId: row.user_id,
+                    userName: row.user_id?.slice(0, 8) || 'Participante',
+                    amount: typeof row.amount === 'string' ? parseFloat(row.amount) : row.amount,
+                    timestamp: new Date(row.created_at)
+                }));
+                setBidsForAuction(auctionId, mapped);
+                console.log('[Dashboard] Prefetch bids done for', auctionId, 'count:', mapped.length);
+            }));
+        };
+        if (normalizedInitialAuctions.length > 0) {
+            load();
+        }
+    }, [normalizedInitialAuctions, supabase, setBidsForAuction]);
+
+    // Realtime: auctions and bids (global, independent of user)
+    useEffect(() => {
+        console.log('[Dashboard] Subscribing auctions/bids realtime');
+        const channel = supabase
+            .channel('dashboard-realtime')
+            // When a new auction is created
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'auctions' }, async (payload: { new: { id: string; status: string; expired_at: string; lead_id: string } }) => {
+                const newRow = payload.new;
+                const { data: leadData } = await supabase
+                    .from('leads')
+                    .select('*')
+                    .eq('id', newRow.lead_id)
+                    .single();
+                if (!leadData) return;
+                upsertAuctionWithLead({
+                    id: newRow.id,
+                    status: newRow.status,
+                    expired_at: newRow.expired_at,
+                    leads: { ...(leadData as Lead), expires_at: newRow.expired_at } as LeadForAuction,
+                });
             })
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'auctions' }, (payload: { new: { id: string; status: string; winning_bid_id?: string | null } }) => {
+            // When an auction updates (status/expiry)
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'auctions' }, (payload: { new: { id: string; status: string; expired_at: string; lead_id: string; winning_bid_id?: string | null } }) => {
                 const updated = payload.new;
-                if (updated.status === 'open') return;
-                const userId = userIdRef.current;
-                if (!userId) return;
+                if (updated.status !== 'open') {
+                    removeAuctionById(updated.id);
+                } else {
+                    updateAuctionFields(updated.id, { status: updated.status, expired_at: updated.expired_at });
+                }
+
+                // Toast outcomes for the current user
+                const currentUserId = userIdRef.current;
+                if (!currentUserId) return;
                 const auctionBids = bidsByAuctionRef.current[updated.id] || [];
                 if (updated.status === 'closed_won') {
                     const winningBidId = updated.winning_bid_id as string | null;
                     if (winningBidId) {
                         const winningBid = auctionBids.find(b => b.id === winningBidId);
-                        if (winningBid && winningBid.userId === userId) {
+                        if (winningBid && winningBid.userId === currentUserId) {
                             toast.success('Parabéns! Você ganhou o leilão!', { description: 'Veja o lead em Meus Leads.' });
-                        } else if (auctionBids.some(b => b.userId === userId)) {
+                            // Ensure: fetch the lead by lead_id and add to store (covers any Realtime gaps)
+                            (async () => {
+                                try {
+                                    const { data } = await supabase
+                                        .from('leads')
+                                        .select('*')
+                                        .eq('id', updated.lead_id)
+                                        .single();
+                                    if (data?.id) {
+                                        console.log('[Dashboard] Ensuring purchased lead via Supabase:', data.id)
+                                        addPurchasedLeadIfMissing(data as unknown as Lead)
+                                    }
+                                } catch {
+                                }
+                            })();
+                        } else if (auctionBids.some(b => b.userId === currentUserId)) {
                             toast('Leilão encerrado', { description: 'Outro usuário venceu. Seus créditos retornaram.' });
                         }
                     }
                 }
             })
-            .subscribe();
+            // When a new bid arrives
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bids' }, (payload: { new: { id: string; auction_id: string; user_id: string; amount: number | string } }) => {
+                const row = payload.new;
+                const amount = typeof row.amount === 'string' ? parseFloat(row.amount) : row.amount;
+                updateAuctionStatsFromBid(row.auction_id, amount);
+                addBidForAuction(row.auction_id, {
+                    id: row.id,
+                    leadId: '',
+                    userId: row.user_id,
+                    userName: row.user_id?.slice(0, 8) || 'Participante',
+                    amount,
+                    timestamp: new Date(),
+                });
+                // Track for outcomes toast
+                const list = bidsByAuctionRef.current[row.auction_id] || [];
+                if (!list.some(b => b.id === row.id)) {
+                    bidsByAuctionRef.current[row.auction_id] = [{ id: row.id, userId: row.user_id }, ...list].slice(0, 100);
+                }
+            })
+            .subscribe((status) => {
+                console.log('[Dashboard] auctions/bids channel status:', status);
+            });
 
-        return () => { supabase.removeChannel(channel); };
-    }, [supabase]);
+        return () => {
+            console.log('[Dashboard] Unsubscribing auctions/bids realtime');
+            supabase.removeChannel(channel);
+        };
+    }, [supabase, upsertAuctionWithLead, updateAuctionFields, removeAuctionById, updateAuctionStatsFromBid, addBidForAuction, addPurchasedLeadIfMissing, setBidsForAuction]);
+
+    // Realtime: leads purchased by the current user
+    useEffect(() => {
+        if (!userId) {
+            console.warn('[Dashboard] Skip leads realtime: no userId');
+            return;
+        }
+        console.log('[Dashboard] Subscribing leads realtime for owner:', userId);
+        const channel = supabase
+            .channel('dashboard-realtime-leads')
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'leads', filter: `owner_id=eq.${userId}` }, (payload: { new: Lead & { owner_id?: string } }) => {
+                console.log('[Dashboard] leads UPDATE payload:', { id: payload.new?.id, owner_id: payload.new?.owner_id });
+                addPurchasedLeadIfMissing(payload.new as unknown as Lead);
+            })
+            .subscribe((status) => {
+                console.log('[Dashboard] leads channel status:', status);
+            });
+        return () => {
+            console.log('[Dashboard] Unsubscribing leads realtime');
+            supabase.removeChannel(channel);
+        };
+    }, [supabase, userId, addPurchasedLeadIfMissing]);
     return (
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <Tabs defaultValue="leiloes" className="w-full">
@@ -86,10 +230,10 @@ export default function Dashboard({
                     <CreditosPanel />
                 </TabsContent>
                 <TabsContent value="meus-leads">
-                    <MeusLeadsPanel initialPurchasedLeads={initialPurchasedLeads} />
+                    <MeusLeadsPanel />
                 </TabsContent>
                 <TabsContent value="leiloes">
-                    <LeiloesPanel initialAuctions={initialAuctions} />
+                    <LeiloesPanel />
                 </TabsContent>
             </Tabs>
         </div>

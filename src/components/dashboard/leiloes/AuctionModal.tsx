@@ -27,7 +27,6 @@ export const AuctionModal = ({ auctionId, lead, onClose, user, initialBids }: Au
     const [isAuctionActive, setIsAuctionActive] = useState(new Date(lead.expires_at).getTime() > Date.now());
     const [bidAmount, setBidAmount] = useState('');
     const [currentBid, setCurrentBid] = useState(lead.currentBid);
-    const [bidders, setBidders] = useState(lead.bidders);
     const [bids, setBids] = useState<Bid[]>(initialBids || []);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [hasWon, setHasWon] = useState(false);
@@ -42,13 +41,11 @@ export const AuctionModal = ({ auctionId, lead, onClose, user, initialBids }: Au
 
     // Subscribe to realtime INSERTs (no initial fetch if already provided)
     useEffect(() => {
-        let isMounted = true;
 
         // Sync counters with provided initial bids
         if (initialBids && initialBids.length > 0) {
             const top = initialBids[0]?.amount ?? lead.currentBid;
             setCurrentBid(top);
-            setBidders(initialBids.length);
         }
 
         const channel = supabase
@@ -73,7 +70,6 @@ export const AuctionModal = ({ auctionId, lead, onClose, user, initialBids }: Au
                         return [bid, ...prev];
                     });
                     setCurrentBid(prev => Math.max(prev, amount || 0));
-                    setBidders(prev => prev + 1);
                 }
             )
             .subscribe((status) => {
@@ -81,11 +77,10 @@ export const AuctionModal = ({ auctionId, lead, onClose, user, initialBids }: Au
             });
 
         return () => {
-            isMounted = false;
             console.log('[AuctionModal] Unsubscribing bids channel:', `bids-auction-${auctionId}`)
             supabase.removeChannel(channel);
         };
-    }, [auctionId, lead.id, lead.currentBid, initialBids?.length]);
+    }, [auctionId, lead.id, lead.currentBid, initialBids?.length, initialBids]);
 
     const formatCurrency = (value: number) => {
         return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
@@ -138,7 +133,6 @@ export const AuctionModal = ({ auctionId, lead, onClose, user, initialBids }: Au
                 return [newBid, ...prev];
             });
             setCurrentBid(newBid.amount);
-            setBidders(prev => prev + 1);
             setBidAmount('');
             toast.success("Lance realizado com sucesso!", { description: `Seu lance de ${formatCurrency(amount)} foi registrado.` });
         } catch (e) {
