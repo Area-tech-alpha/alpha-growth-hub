@@ -67,6 +67,7 @@ export default function CreditosPanel({
           value={amount}
           onChange={(e) => setAmount(Number(e.target.value))}
           min={130}
+          placeholder="Mínimo de 130 créditos"
         />
       </CardContent>
       <CardFooter>

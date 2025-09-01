@@ -1,52 +1,18 @@
 "use client";
 
 import React from "react";
-import { useQuery } from "@tanstack/react-query";
-import { fetchPurchasedLeads } from "@/lib/api";
 import { FiShoppingBag } from "react-icons/fi";
-import { Skeleton } from "@/components/ui/skeleton";
-import { PurchasedLeadCard } from "./leads/PurchasedLeadCard";
-import { PurchasedLead } from "@/lib/custom-types";
 
-export default function MeusLeadsPanel() {
-  const {
-    data: purchasedLeads,
-    isLoading,
-    isError,
-  } = useQuery<PurchasedLead[]>({
-    queryKey: ["purchasedLeads"],
-    queryFn: fetchPurchasedLeads,
-  });
+import { LeadForAuction } from "@/lib/custom-types";
 
-  if (isLoading) {
-    return (
-      <>
-        <div className="flex items-center justify-between">
-          <div>
-            <Skeleton className="h-8 w-64 mb-2" />
-            <Skeleton className="h-4 w-96" />
-          </div>
-          <div className="text-right">
-            <Skeleton className="h-8 w-10 ml-auto" />
-            <Skeleton className="h-4 w-24 mt-1" />
-          </div>
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-          <Skeleton className="h-64 w-full rounded-lg" />
-          <Skeleton className="h-64 w-full rounded-lg" />
-        </div>
-      </>
-    );
-  }
+interface MeusLeadsPanelProps {
+  initialPurchasedLeads: LeadForAuction[];
+}
 
-  if (isError) {
-    return (
-      <div className="text-center py-12 text-red-500">
-        <p>Falha ao carregar seus leads comprados.</p>
-        <p>Por favor, tente recarregar a página.</p>
-      </div>
-    );
-  }
+export default function MeusLeadsPanel({
+  initialPurchasedLeads,
+}: MeusLeadsPanelProps) {
+  const purchasedLeads = initialPurchasedLeads || [];
 
   return (
     <>
@@ -61,21 +27,35 @@ export default function MeusLeadsPanel() {
         </div>
         <div className="text-right">
           <div className="text-2xl font-bold text-yellow-600">
-            {purchasedLeads?.length || 0}
+            {purchasedLeads.length || 0}
           </div>
           <div className="text-sm text-muted-foreground">leads comprados</div>
         </div>
       </div>
 
-      {purchasedLeads && purchasedLeads.length > 0 ? (
+      {purchasedLeads.length > 0 ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {purchasedLeads.map((purchasedLead) => (
-            <PurchasedLeadCard
-              key={purchasedLead.lead.id}
-              lead={purchasedLead.lead}
-              purchaseDate={new Date(purchasedLead.purchaseDate)}
-              purchasePrice={purchasedLead.purchasePrice}
-            />
+          {purchasedLeads.map((lead) => (
+            <div
+              key={lead.id}
+              className="p-4 border rounded-lg bg-card text-card-foreground"
+            >
+              <h3 className="font-semibold text-lg">{lead.companyName}</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                {lead.segment}
+              </p>
+              <div className="border-t pt-2 mt-2 text-sm">
+                <p>
+                  <strong>Contato:</strong> {lead.contactName}
+                </p>
+                <p>
+                  <strong>Email:</strong> {lead.email}
+                </p>
+                <p>
+                  <strong>Telefone:</strong> {lead.phone}
+                </p>
+              </div>
+            </div>
           ))}
         </div>
       ) : (
