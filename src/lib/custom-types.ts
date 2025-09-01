@@ -1,9 +1,6 @@
 import type {
   Lead as PrismaLead,
   Auction as PrismaAuction,
-  Bid as PrismaBid,
-  User as PrismaUser,
-  AuthUser as PrismaAuthUser,
 } from "@prisma/client";
 
 export interface UserProfile {
@@ -12,22 +9,37 @@ export interface UserProfile {
   email: string | null;
   creditBalance: number;
 }
-export interface AuctionWithLead extends PrismaAuction {
-  leads: PrismaLead;
-  bidders?: number;
-  currentBid?: number;
+
+export interface BidWithUserName {
+  id: string;
+  userId: string;
+  auctionId: string;
+  amount: { toNumber(): number };
+  createdAt: Date | null;
+  user: {
+    name: string | null;
+  };
+}
+
+export interface AuctionWithLead extends Omit<PrismaAuction, "minimumBid"> {
+  leads: Omit<
+    PrismaLead,
+    "revenue" | "marketingInvestment" | "minimumValue"
+  > & {
+    revenue: { toNumber(): number };
+    marketingInvestment: { toNumber(): number };
+    minimumValue: { toNumber(): number } | null;
+  };
+  bids: BidWithUserName[];
+  minimumBid: { toNumber(): number };
+  bidders?: number | { toNumber(): number };
+  currentBid?: number | { toNumber(): number };
 }
 
 export interface PurchasedLead {
   purchaseDate: Date;
   purchasePrice: number;
   lead: PrismaLead;
-}
-
-export interface BidWithUserName extends PrismaBid {
-  user: {
-    name: string | null;
-  };
 }
 
 export interface AuctionRow {
@@ -39,11 +51,12 @@ export interface AuctionRow {
 
 export type LeadForAuction = PrismaLead & { expires_at: string };
 
-export interface AuctionRecord extends Omit<PrismaAuction, "leadId"> {
+export interface AuctionRecord extends Omit<PrismaAuction, "leadId" | "lead"> {
   leads: PrismaLead;
 }
 
-export interface AuctionWithLeadUI extends Omit<PrismaAuction, "leadId"> {
+export interface AuctionWithLeadUI
+  extends Omit<PrismaAuction, "leadId" | "lead"> {
   leads: LeadForAuction;
   [key: string]: unknown;
 }

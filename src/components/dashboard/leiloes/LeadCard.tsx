@@ -13,14 +13,14 @@ import {
 } from "lucide-react";
 import { CountdownTimer } from "../leads/CountdownTimer";
 import type { AuctionWithLead } from "@/lib/custom-types";
-import { Decimal } from "@prisma/client/runtime/library";
+
 
 interface LeadCardProps {
   auction: AuctionWithLead;
   onSelect: () => void;
 }
 
-const formatCurrency = (value: number | Decimal | undefined) => {
+const formatCurrency = (value: number | { toNumber(): number } | undefined) => {
   if (value === undefined) return "N/A";
   const numericValue = typeof value === "number" ? value : value.toNumber();
   return new Intl.NumberFormat("pt-BR", {
@@ -111,13 +111,13 @@ export function LeadCard({ auction, onSelect }: LeadCardProps) {
         <div className="grid grid-cols-2 gap-4 pt-2">
           <div className="text-center">
             <div className="text-lg font-bold text-yellow-600">
-              {formatCurrency(auction.currentBid)}
+              {formatCurrency(typeof auction.currentBid === 'object' ? auction.currentBid.toNumber() : (auction.currentBid || 0))}
             </div>
             <div className="text-xs text-muted-foreground">Lance Atual</div>
           </div>
           <div className="text-center">
             <div className="text-lg font-bold text-foreground">
-              {auction.bidders || 0}
+              {typeof auction.bidders === 'object' ? auction.bidders.toNumber() : (auction.bidders || 0)}
             </div>
             <div className="text-xs text-muted-foreground">Lances</div>
           </div>

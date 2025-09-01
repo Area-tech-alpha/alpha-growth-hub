@@ -13,12 +13,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { Lead } from "@prisma/client";
-import { Decimal } from "@prisma/client/runtime/library";
+
 
 interface PurchasedLeadCardProps {
   lead: Lead;
   purchaseDate: Date;
-  purchasePrice: number | Decimal;
+  purchasePrice: number | { toNumber(): number };
 }
 
 export const PurchasedLeadCard = ({
@@ -26,7 +26,7 @@ export const PurchasedLeadCard = ({
   purchaseDate,
   purchasePrice,
 }: PurchasedLeadCardProps) => {
-  const formatCurrency = (value: number | Decimal) => {
+  const formatCurrency = (value: number | { toNumber(): number }) => {
     const numericValue = typeof value === "number" ? value : value.toNumber();
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",

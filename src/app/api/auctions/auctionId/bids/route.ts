@@ -1,13 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 
 export async function GET(
-  _request: Request,
-  { params }: { params: { auctionId: string } }
+  _request: NextRequest,
+  context: { params: Promise<Record<string, string | string[]>> }
 ) {
   try {
     const supabase = await createClient();
-    const auctionId = params.auctionId;
+    const params = await context.params;
+    const auctionId = params.auctionId as string;
 
     const { data: bids, error } = await supabase
       .from("bids")
@@ -45,7 +46,7 @@ export async function GET(
     const errorMessage =
       error instanceof Error ? error.message : "Erro interno do servidor";
     console.error(
-      `Erro em GET /api/auctions/${params.auctionId}/bids:`,
+      `Erro em GET /api/auctions/bids:`,
       errorMessage
     );
     return NextResponse.json({ error: errorMessage }, { status: 500 });
@@ -53,12 +54,13 @@ export async function GET(
 }
 
 export async function POST(
-  request: Request,
-  { params }: { params: { auctionId: string } }
+  request: NextRequest,
+  context: { params: Promise<Record<string, string | string[]>> }
 ) {
   try {
     const supabase = await createClient();
-    const auctionId = params.auctionId;
+    const params = await context.params;
+    const auctionId = params.auctionId as string;
     const { amount } = await request.json();
 
     const {
@@ -138,7 +140,7 @@ export async function POST(
     const errorMessage =
       error instanceof Error ? error.message : "Erro interno do servidor";
     console.error(
-      `Erro em POST /api/auctions/${params.auctionId}/bids:`,
+      `Erro em POST /api/auctions/bids:`,
       errorMessage
     );
     return NextResponse.json({ error: errorMessage }, { status: 500 });

@@ -28,10 +28,9 @@ model AuthUser {
   email         String?   @unique
   emailVerified DateTime? @map("emailVerified") @db.Timestamptz
   image         String?
-
-  accounts Account[]
-  sessions Session[]
-  user     User?
+  accounts      Account[]
+  sessions      Session[]
+  user          User?
 
   @@map("auth_users")
 }
@@ -60,8 +59,7 @@ model Session {
   sessionToken String   @unique @map("sessionToken")
   userId       String   @map("userId")
   expires      DateTime @db.Timestamptz
-
-  authUser AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  authUser     AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("Session")
 }
@@ -76,11 +74,10 @@ model VerificationToken {
 }
 
 model User {
-  id            String   @id
-  creditBalance Decimal  @default(0.00) @map("credit_balance") @db.Decimal(10, 2)
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt     DateTime @default(now()) @map("updated_at") @db.Timestamptz
-
+  id                 String              @id
+  creditBalance      Decimal             @default(0.00) @map("credit_balance") @db.Decimal(10, 2)
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime            @default(now()) @map("updated_at") @db.Timestamptz
   authUser           AuthUser            @relation(fields: [id], references: [id], onDelete: Cascade)
   ownedLeads         Lead[]
   bids               Bid[]
@@ -102,13 +99,12 @@ model Lead {
   segment             String?   @db.VarChar(100)
   minimumValue        Decimal?  @map("minimum_value") @db.Decimal(15, 2)
   status              String    @default("cold") @db.VarChar(50)
-  channel             String?   @db.VarChar(100) // A propriedade que causava o erro!
+  channel             String?   @db.VarChar(100)
   ownerId             String?   @map("owner_id")
   createdAt           DateTime? @default(now()) @map("created_at") @db.Timestamptz
   updatedAt           DateTime? @default(now()) @map("updated_at") @db.Timestamptz
-
-  owner   User?    @relation(fields: [ownerId], references: [id], onUpdate: NoAction)
-  auction Auction?
+  owner               User?     @relation(fields: [ownerId], references: [id], onUpdate: NoAction)
+  auction             Auction?
 
   @@map("leads")
 }
@@ -121,24 +117,22 @@ model Auction {
   winningBidId String?   @unique @map("winning_bid_id") @db.Uuid
   expiredAt    DateTime  @map("expired_at") @db.Timestamptz
   createdAt    DateTime? @default(now()) @map("created_at") @db.Timestamptz
-
-  lead       Lead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  winningBid Bid?  @relation("WinningBid", fields: [winningBidId], references: [id], onUpdate: NoAction, map: "fk_winning_bid")
-  bids       Bid[]
+  lead         Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  winningBid   Bid?      @relation("WinningBid", fields: [winningBidId], references: [id], onUpdate: NoAction, map: "fk_winning_bid")
+  bids         Bid[]
 
   @@map("auctions")
 }
 
 model Bid {
-  id        String    @id @default(uuid()) @db.Uuid
-  auctionId String    @map("auction_id") @db.Uuid
-  userId    String    @map("user_id")
-  amount    Decimal   @db.Decimal(10, 2)
-  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamptz
-
-  auction        Auction  @relation(fields: [auctionId], references: [id], onDelete: Cascade)
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  winningAuction Auction? @relation("WinningBid") // Relação para identificar o lance vencedor
+  id             String    @id @default(uuid()) @db.Uuid
+  auctionId      String    @map("auction_id") @db.Uuid
+  userId         String    @map("user_id")
+  amount         Decimal   @db.Decimal(10, 2)
+  createdAt      DateTime? @default(now()) @map("created_at") @db.Timestamptz
+  auction        Auction   @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  winningAuction Auction?  @relation("WinningBid")
 
   @@map("bids")
 }
@@ -152,31 +146,29 @@ model ProcessedWebhook {
 }
 
 model CreditTransaction {
-  id               BigInt    @id @default(autoincrement())
-  asaasPaymentId   String    @unique @map("asaas_payment_id")
-  userId           String    @map("user_id")
-  amountPaid       Decimal   @map("amount_paid") @db.Decimal(10, 2)
-  creditsPurchased Decimal   @map("credits_purchased") @db.Decimal(10, 2)
+  id               BigInt        @id @default(autoincrement())
+  asaasPaymentId   String        @unique @map("asaas_payment_id")
+  userId           String        @map("user_id")
+  amountPaid       Decimal       @map("amount_paid") @db.Decimal(10, 2)
+  creditsPurchased Decimal       @map("credits_purchased") @db.Decimal(10, 2)
   metadata         Json?
-  status           String    @default("completed") @db.VarChar(50)
-  createdAt        DateTime? @default(now()) @map("created_at") @db.Timestamptz
-
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ledgerEntries LedgerEntry[]
+  status           String        @default("completed") @db.VarChar(50)
+  createdAt        DateTime?     @default(now()) @map("created_at") @db.Timestamptz
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ledgerEntries    LedgerEntry[]
 
   @@map("credit_transactions")
 }
 
 model LedgerEntry {
-  id            BigInt          @id @default(autoincrement())
-  transactionId BigInt          @map("transaction_id")
-  userId        String          @map("user_id")
-  accountType   AccountTypeEnum @map("account_type")
-  amount        Decimal         @db.Decimal(10, 2)
-  createdAt     DateTime?       @default(now()) @map("created_at") @db.Timestamptz
-
-  transaction CreditTransaction @relation(fields: [transactionId], references: [id], onUpdate: NoAction)
-  user        User              @relation(fields: [userId], references: [id], onUpdate: NoAction)
+  id            BigInt            @id @default(autoincrement())
+  transactionId BigInt            @map("transaction_id")
+  userId        String            @map("user_id")
+  accountType   AccountTypeEnum   @map("account_type")
+  amount        Decimal           @db.Decimal(10, 2)
+  createdAt     DateTime?         @default(now()) @map("created_at") @db.Timestamptz
+  transaction   CreditTransaction @relation(fields: [transactionId], references: [id], onUpdate: NoAction)
+  user          User              @relation(fields: [userId], references: [id], onUpdate: NoAction)
 
   @@map("ledger_entries")
 }

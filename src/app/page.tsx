@@ -1,9 +1,13 @@
 import Dashboard from "@/components/dashboard/Dashboard";
 import { createClient } from "@/utils/supabase/server";
 import { AuctionWithLead } from "@/lib/custom-types";
-import { Lead } from "@prisma/client";
-import { Decimal } from "@prisma/client/runtime/library";
 
+interface SupabaseBid {
+  id: string;
+  user_id: string;
+  amount: number;
+  created_at: string;
+}
 interface SupabaseLead {
   id: string;
   company_name: string;
@@ -18,10 +22,9 @@ interface SupabaseLead {
   status: string;
   channel: string | null;
   owner_id: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at: string | null;
+  updated_at: string | null;
 }
-
 interface SupabaseAuction {
   id: string;
   lead_id: string;
@@ -29,8 +32,9 @@ interface SupabaseAuction {
   status: string;
   winning_bid_id: string | null;
   expired_at: string;
-  created_at: string;
+  created_at: string | null;
   leads: SupabaseLead;
+  bids: SupabaseBid[];
 }
 
 export default async function Home() {
@@ -38,46 +42,71 @@ export default async function Home() {
 
   const { data: initialAuctionsFromSupabase, error } = await supabase
     .from("auctions")
-    .select("*, leads(*)")
+    .select("*, leads(*), bids!bids_auction_id_fkey(*)")
     .eq("status", "open")
     .gt("expired_at", new Date().toISOString());
 
-  if (error) {
-    console.error("Erro ao buscar leilões iniciais:", error.message);
+  if (error || !initialAuctionsFromSupabase) {
+    console.error("Erro ao buscar leilões iniciais:", error?.message);
     return <Dashboard initialAuctions={[]} />;
   }
 
   const initialAuctions: AuctionWithLead[] = initialAuctionsFromSupabase.map(
     (auction: SupabaseAuction) => {
-      const formattedLead: Lead = {
+      const formattedLead = {
         id: auction.leads.id,
         companyName: auction.leads.company_name,
         contactName: auction.leads.contact_name,
         phone: auction.leads.phone,
         email: auction.leads.email,
-        revenue: new Decimal(auction.leads.revenue),
-        marketingInvestment: new Decimal(auction.leads.marketing_investment),
+        revenue: { toNumber: () => auction.leads.revenue } as {
+          toNumber(): number;
+        },
+        marketingInvestment: {
+          toNumber: () => auction.leads.marketing_investment,
+        } as { toNumber(): number },
         location: auction.leads.location,
         segment: auction.leads.segment,
         minimumValue: auction.leads.minimum_value
-          ? new Decimal(auction.leads.minimum_value)
+          ? ({ toNumber: () => auction.leads.minimum_value } as {
+              toNumber(): number;
+            })
           : null,
         status: auction.leads.status,
         channel: auction.leads.channel,
         ownerId: auction.leads.owner_id,
-        createdAt: new Date(auction.leads.created_at),
-        updatedAt: new Date(auction.leads.updated_at),
+        createdAt: auction.leads.created_at
+          ? new Date(auction.leads.created_at)
+          : null,
+        updatedAt: auction.leads.updated_at
+          ? new Date(auction.leads.updated_at)
+          : null,
       };
 
       return {
         id: auction.id,
         leadId: auction.lead_id,
-        minimumBid: new Decimal(auction.minimum_bid),
+        minimumBid: { toNumber: () => auction.minimum_bid } as {
+          toNumber(): number;
+        },
         status: auction.status,
         winningBidId: auction.winning_bid_id,
         expiredAt: new Date(auction.expired_at),
-        createdAt: new Date(auction.created_at),
+        createdAt: auction.created_at ? new Date(auction.created_at) : null,
         leads: formattedLead,
+        bids: (auction.bids || []).map((b) => ({
+          id: b.id,
+          userId: b.user_id,
+          amount: { toNumber: () => b.amount } as { toNumber(): number },
+          createdAt: new Date(b.created_at),
+          auctionId: auction.id,
+          user: { name: "Carregando..." },
+        })),
+        bidders: auction.bids?.length || 0,
+        currentBid:
+          auction.bids && auction.bids.length > 0
+            ? Math.max(...auction.bids.map((b) => b.amount))
+            : ({ toNumber: () => 0 } as { toNumber(): number }),
       };
     }
   );
