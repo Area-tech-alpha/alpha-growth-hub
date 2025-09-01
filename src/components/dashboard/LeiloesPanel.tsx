@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { createClient } from "@/utils/supabase/client";
 import StatsCards from "./leiloes/statsCards";
 import { Clock, TrendingUp, Users } from "lucide-react";
@@ -17,6 +18,7 @@ type AuctionRowLocal = AuctionRow;
 const supabase = createClient();
 
 export default function LeiloesPanel({ initialAuctions }: { initialAuctions: AuctionRecord[] }) {
+    const { data: session } = useSession();
     const [activeAuctions, setActiveAuctions] = useState<AuctionWithLeadLocal[]>(() => {
         const normalized = (initialAuctions || []).map((auction) => ({
             id: auction.id,
@@ -214,7 +216,7 @@ export default function LeiloesPanel({ initialAuctions }: { initialAuctions: Auc
             .catch((e) => console.error('[LeiloesPanel] close request failed:', e))
     };
 
-    const user = { id: "current-user", name: "Você" };
+    const user = { id: session?.user?.id, name: session?.user?.name || "Você" };
 
     // Calcula os stats com base nos leilões ativos
     const totalValue = activeAuctions.reduce((sum, auction) => sum + (auction.leads.currentBid || 0), 0);

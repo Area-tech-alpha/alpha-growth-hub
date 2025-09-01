@@ -2,7 +2,7 @@ export interface Lead {
     id: string;
     name: string;
     description: string;
-    status: 'hot' | 'warm' | 'cold' | 'closed';
+    status: 'hot' | "high_frozen" | "low_frozen" | 'cold' | 'sold';
     expires_at: string;
     location: string;
     channel: string;
@@ -18,6 +18,7 @@ export interface Lead {
     maskedPhone: string;
     maskedEmail: string;
     currentBid: number;
+    owner_id?: string;
     bidders: number;
     category: string;
     tags: string[];

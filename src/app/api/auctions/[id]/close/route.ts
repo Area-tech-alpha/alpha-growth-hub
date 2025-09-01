@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
+import type { Prisma } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
@@ -13,7 +14,7 @@ export async function POST(
     }
 
     try {
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             const auction = await tx.auctions.findUnique({
                 where: { id: auctionId },
                 include: { leads: true }
@@ -32,6 +33,7 @@ export async function POST(
             if (!topBid) {
                 // No bids -> close as expired and freeze lead based on status
                 const currentLeadStatus = auction.leads?.status || 'cold'
+                console.log('[close-auction] currentLeadStatus:', currentLeadStatus)
                 const nextLeadStatus = currentLeadStatus === 'hot' ? 'high_frozen' : 'low_frozen'
 
                 const [updatedAuction, updatedLead] = await Promise.all([
