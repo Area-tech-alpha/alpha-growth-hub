@@ -8,29 +8,17 @@ import { LeadCard } from "./leiloes/LeadCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import StatsCards from "./leiloes/statsCards";
 import { Clock, TrendingUp, Users } from "lucide-react";
-import type { AuctionWithLead } from "@/lib/custom-types";
+import { LeadCard } from "./leiloes/LeadCard";
+import { AuctionModal } from "./leiloes/AuctionModal";
+import type { Lead as AuctionLead } from "./leads/types";
+import type { AuctionRecord, AuctionRow, AuctionWithLead, LeadForAuction, Bid } from "./leiloes/types";
 
-import { createClient } from "@/utils/supabase/client";
 
-interface BrowserDecimal {
-  toNumber(): number;
-}
+// Tipagem para um Leilão que inclui os dados do Lead aninhados
+type AuctionWithLeadLocal = AuctionWithLead;
 
-class BrowserDecimalImpl implements BrowserDecimal {
-  private value: number;
-
-  constructor(value: number | string) {
-    this.value = typeof value === "string" ? parseFloat(value) : value;
-  }
-
-  toNumber(): number {
-    return this.value;
-  }
-
-  static from(value: number | string): BrowserDecimal {
-    return new BrowserDecimalImpl(value);
-  }
-}
+// Tipagem mínima para o payload do Supabase da tabela auctions
+type AuctionRowLocal = AuctionRow;
 
 const supabase = createClient();
 
@@ -79,164 +67,128 @@ export default function LeiloesPanel({
     }
   }, [fetchedAuctions]);
 
-  useEffect(() => {
-    console.log("[LeiloesPanel] Subscribing to realtime auctions...");
-    const channel = supabase
-      .channel("realtime-auctions")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "auctions",
-        },
-        async (payload) => {
-          console.log("[Realtime][INSERT] auctions payload:", payload);
-          const newAuction = payload.new as {
-            id: string;
-            lead_id: string;
-            expired_at: string;
-            created_at?: string;
-            status: string;
-          };
-          const { data: leadData, error } = await supabase
-            .from("leads")
-            .select("*")
-            .eq("id", newAuction.lead_id)
-            .single();
-          if (error || !leadData) {
-            console.error("[Realtime][INSERT] lead fetch failed:", {
-              error,
-              leadId: newAuction.lead_id,
-            });
-            return;
-          }
-          const newAuctionWithLead = {
-            ...newAuction,
-            leadId: newAuction.lead_id,
-            expiredAt: new Date(newAuction.expired_at),
-            createdAt: newAuction.created_at
-              ? new Date(newAuction.created_at)
-              : new Date(),
-            minimumBid: BrowserDecimalImpl.from(0),
-            winningBidId: null,
-            leads: leadData,
-            bids: [],
-            bidders: 0,
-            currentBid: 0,
-          };
-          console.log(
-            "[Realtime][INSERT] normalized new auction:",
-            newAuctionWithLead
-          );
-          setActiveAuctions((prev) => {
-            if (prev.some((a) => a.id === newAuctionWithLead.id)) {
-              console.log(
-                "[Realtime][INSERT] duplicate ignored:",
-                newAuctionWithLead.id
-              );
-              return prev;
-            }
-            const updated = [
-              newAuctionWithLead as unknown as AuctionWithLead,
-              ...prev,
-            ];
-            console.log("[LeiloesPanel] state after INSERT:", updated);
-            return updated;
-          });
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "auctions",
-        },
-        async (payload) => {
-          console.log("[Realtime][UPDATE] auctions payload:", payload);
-          const updated = payload.new as {
-            id: string;
-            status: string;
-            expired_at: string;
-          };
-          setActiveAuctions((prev) => {
-            const exists = prev.some((a) => a.id === updated.id);
-            if (updated.status !== "open") {
-              const filtered = prev.filter((a) => a.id !== updated.id);
-              console.log(
-                "[LeiloesPanel] state after UPDATE -> closed:",
-                filtered
-              );
-              return filtered;
-            }
-            if (exists) {
-              const mapped = prev.map((a) =>
-                a.id === updated.id
-                  ? {
-                      ...a,
-                      status: updated.status,
-                      expiredAt: new Date(updated.expired_at),
-                      leads: { ...a.leads, expires_at: updated.expired_at },
+    useEffect(() => {
+        console.log('[LeiloesPanel] Subscribing to realtime auctions...')
+        const channel = supabase
+            .channel('realtime-auctions')
+            // INSERT of new, still-open auctions
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'auctions'
+                },
+                async (payload) => {
+                    console.log('[Realtime][INSERT] auctions payload:', payload)
+                    const newAuction = payload.new as AuctionRowLocal;
+                    // fetch related lead
+                    const { data: leadData, error } = await supabase
+                        .from('leads')
+                        .select('*')
+                        .eq('id', newAuction.lead_id)
+                        .single();
+                    if (error || !leadData) {
+                        console.error('[Realtime][INSERT] lead fetch failed:', { error, leadId: newAuction.lead_id });
+                        return;
                     }
-                  : a
-              );
-              console.log(
-                "[LeiloesPanel] state after UPDATE -> open change:",
-                mapped
-              );
-              return mapped;
-            }
-            return prev;
-          });
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "bids",
-        },
-        (payload) => {
-          const bid = payload.new as {
-            auction_id: string;
-            amount: number | string;
-            user_id: string;
-          };
-          console.log("[Realtime][INSERT] bids payload:", bid);
-          setActiveAuctions((prev) =>
-            prev.map((a) => {
-              if (a.id !== bid.auction_id) return a;
-              const amount =
-                typeof bid.amount === "string"
-                  ? parseFloat(bid.amount)
-                  : typeof bid.amount === "object" && bid.amount !== null
-                  ? (bid.amount as BrowserDecimal).toNumber()
-                  : bid.amount;
-              const nextCurrent = Math.max(
-                typeof a.currentBid === "object"
-                  ? (a.currentBid as BrowserDecimal).toNumber()
-                  : a.currentBid || 0,
-                amount || 0
-              );
-              const nextBidders =
-                (typeof a.bidders === "object"
-                  ? (a.bidders as BrowserDecimal).toNumber()
-                  : a.bidders || 0) + 1;
-              const updated = {
-                ...a,
-                currentBid: nextCurrent,
-                bidders: nextBidders,
-              };
-              return updated;
-            })
-          );
-        }
-      )
-      .subscribe((status) => {
-        console.log("[Realtime] channel status:", status);
-      });
+                    const newAuctionWithLead: AuctionWithLeadLocal = {
+                        ...newAuction,
+                        leads: { ...(leadData as AuctionLead), expires_at: newAuction.expired_at } as LeadForAuction,
+                    };
+                    console.log('[Realtime][INSERT] normalized new auction:', newAuctionWithLead)
+                    setActiveAuctions(prev => {
+                        // dedupe by id
+                        if (prev.some(a => a.id === newAuctionWithLead.id)) {
+                            console.log('[Realtime][INSERT] duplicate ignored:', newAuctionWithLead.id)
+                            return prev;
+                        }
+                        const updated = [newAuctionWithLead, ...prev]
+                        console.log('[LeiloesPanel] state after INSERT:', updated)
+                        return updated;
+                    });
+                }
+            )
+            // DEBUG: log any INSERT (duplicate of above but without state changes)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'auctions'
+                },
+                (payload) => {
+                    console.log('[Realtime][DEBUG][INSERT] raw auctions insert:', payload)
+                }
+            )
+            // UPDATE: reflect status changes and expiry updates
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'auctions'
+                },
+                async (payload: { new: AuctionRowLocal & { winning_bid_id?: string | null } }) => {
+                    console.log('[Realtime][UPDATE] auctions payload:', payload)
+                    const updated = payload.new as AuctionRowLocal & { winning_bid_id?: string | null };
+                    setActiveAuctions(prev => {
+                        const exists = prev.some(a => a.id === updated.id);
+                        // If the auction turns closed, remove it
+                        if (updated.status !== 'open') {
+                            const filtered = prev.filter(a => a.id !== updated.id)
+                            console.log('[LeiloesPanel] state after UPDATE -> closed:', filtered)
+                            return filtered;
+                        }
+                        // If we have it, update fields; if not, fetch lead and add (edge case)
+                        if (exists) {
+                            const mapped = prev.map(a => a.id === updated.id ? { ...a, status: updated.status, expired_at: updated.expired_at, leads: { ...a.leads, expires_at: updated.expired_at } } : a)
+                            console.log('[LeiloesPanel] state after UPDATE -> open change:', mapped)
+                            return mapped;
+                        }
+                        return prev;
+                    });
+
+                }
+            )
+            // BIDS: update list stats when new bids arrive
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'bids'
+                },
+                (payload) => {
+                    const bid = payload.new as { auction_id: string; amount: number | string; user_id: string };
+                    console.log('[Realtime][INSERT] bids payload:', bid)
+                    setActiveAuctions(prev => prev.map(a => {
+                        if (a.id !== bid.auction_id) return a;
+                        const amount = typeof bid.amount === 'string' ? parseFloat(bid.amount) : bid.amount;
+                        const nextCurrent = Math.max(a.leads.currentBid || 0, amount || 0);
+                        const nextBidders = (a.leads.bidders || 0) + 1;
+                        const updated = { ...a, leads: { ...a.leads, currentBid: nextCurrent, bidders: nextBidders } };
+                        return updated;
+                    }));
+                    setBidsByAuction(prev => {
+                        const amount = typeof bid.amount === 'string' ? parseFloat(bid.amount) : bid.amount;
+                        const newBid: Bid = {
+                            id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+                            leadId: activeAuctions.find(a => a.id === bid.auction_id)?.leads?.id || '',
+                            userId: bid.user_id,
+                            userName: bid.user_id?.slice(0, 8) || 'Participante',
+                            amount,
+                            timestamp: new Date()
+                        };
+                        const list = prev[bid.auction_id] || [];
+                        if (list.some(b => b.id === newBid.id)) return prev;
+                        return { ...prev, [bid.auction_id]: [newBid, ...list] };
+                    });
+                }
+            )
+            .subscribe((status) => {
+                console.log('[Realtime] channel status:', status)
+            });
 
     return () => {
       console.log("[LeiloesPanel] Unsubscribing from realtime auctions");
@@ -244,41 +196,23 @@ export default function LeiloesPanel({
     };
   }, []);
 
-  if (isLoading && (!initialAuctions || initialAuctions.length === 0)) {
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Skeleton className="h-96 w-full rounded-lg" />
-        <Skeleton className="h-96 w-full rounded-lg" />
-        <Skeleton className="h-96 w-full rounded-lg" />
-      </div>
-    );
-  }
+    const handleExpire = (auctionId: string) => {
+        // Remove o leilão da lista quando o timer expira e solicita fechamento no backend
+        setActiveAuctions(prev => prev.filter(auction => auction.id !== auctionId));
+        fetch(`/api/auctions/${auctionId}/close`, { method: 'POST' })
+            .then(async (res) => {
+                const json = await res.json().catch(() => ({}))
+                console.log('[LeiloesPanel] close result:', res.status, json)
+            })
+            .catch((e) => console.error('[LeiloesPanel] close request failed:', e))
+    };
 
-  if (isError) {
-    return (
-      <div className="text-center py-10 text-red-500">
-        Falha ao carregar os leilões.
-      </div>
-    );
-  }
+    const user = { id: "current-user", name: "Você" };
 
-  const totalValue = activeAuctions.reduce(
-    (sum, auction) =>
-      sum +
-      (typeof auction.currentBid === "object"
-        ? (auction.currentBid as BrowserDecimal).toNumber()
-        : auction.currentBid || 0),
-    0
-  );
-  const activeAuctionsCount = activeAuctions.length;
-  const totalBidders = activeAuctions.reduce(
-    (sum, auction) =>
-      sum +
-      (typeof auction.bidders === "object"
-        ? (auction.bidders as BrowserDecimal).toNumber()
-        : auction.bidders || 0),
-    0
-  );
+    // Calcula os stats com base nos leilões ativos
+    const totalValue = activeAuctions.reduce((sum, auction) => sum + (auction.leads.currentBid || 0), 0);
+    const activeAuctionsCount = activeAuctions.length;
+    const totalBidders = activeAuctions.reduce((sum, auction) => sum + (auction.leads.bidders || 0), 0);
 
   return (
     <>

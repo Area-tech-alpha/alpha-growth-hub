@@ -48,102 +48,130 @@ export const AuctionModal = ({
   const queryClient = useQueryClient();
   const supabase = createClient();
 
-  const [bidAmount, setBidAmount] = useState("");
-  const [hasWon, setHasWon] = useState(false);
+export const AuctionModal = ({ auctionId, lead, onClose, user, initialBids }: AuctionModalProps) => {
+    const [isAuctionActive, setIsAuctionActive] = useState(new Date(lead.expires_at).getTime() > Date.now());
+    const [bidAmount, setBidAmount] = useState('');
+    const [currentBid, setCurrentBid] = useState(lead.currentBid);
+    const [bidders, setBidders] = useState(lead.bidders);
+    const [bids, setBids] = useState<Bid[]>(initialBids || []);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [hasWon, setHasWon] = useState(false);
+    const [userCredits] = useState(1500);
 
-  const { data: bids = [], isLoading: isLoadingBids } = useQuery<
-    BidWithUserName[]
-  >({
-    queryKey: ["bids", auction.id],
-    queryFn: () => fetchBidsForAuction(auction.id),
-    initialData: auction.bids,
-  });
+    const handleExpire = () => {
+        setIsAuctionActive(false);
+        const lastBid = bids[0];
+        const currentUserId = user.id || 'current-user';
+        setHasWon(Boolean(lastBid && lastBid.userId === currentUserId));
+    };
 
-  useEffect(() => {
-    const channel = supabase
-      .channel(`bids-auction-${auction.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "bids",
-          filter: `auction_id=eq.${auction.id}`,
-        },
-        (payload) => {
-          console.log("[Realtime] Novo lance recebido:", payload.new);
-          toast.info("Novo lance recebido!");
-          queryClient.invalidateQueries({ queryKey: ["bids", auction.id] });
-          queryClient.invalidateQueries({ queryKey: ["activeAuctions"] });
+    // Subscribe to realtime INSERTs (no initial fetch if already provided)
+    useEffect(() => {
+        let isMounted = true;
+
+        // Sync counters with provided initial bids
+        if (initialBids && initialBids.length > 0) {
+            const top = initialBids[0]?.amount ?? lead.currentBid;
+            setCurrentBid(top);
+            setBidders(initialBids.length);
         }
-      )
-      .subscribe();
+
+        const channel = supabase
+            .channel(`bids-auction-${auctionId}`)
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'bids', filter: `auction_id=eq.${auctionId}` },
+                (payload: { new: { id: string; user_id: string; amount: number | string; created_at: string } }) => {
+                    const row = payload.new;
+                    console.log('[AuctionModal][Realtime][INSERT] bid:', row)
+                    const amount = typeof row.amount === 'string' ? parseFloat(row.amount) : row.amount;
+                    const bid: Bid = {
+                        id: row.id,
+                        leadId: lead.id,
+                        userId: row.user_id,
+                        userName: row.user_id?.slice(0, 8) || 'Participante',
+                        amount,
+                        timestamp: new Date(row.created_at)
+                    };
+                    setBids(prev => {
+                        if (prev.some(b => b.id === bid.id)) return prev;
+                        return [bid, ...prev];
+                    });
+                    setCurrentBid(prev => Math.max(prev, amount || 0));
+                    setBidders(prev => prev + 1);
+                }
+            )
+            .subscribe((status) => {
+                console.log('[AuctionModal] channel status:', status)
+            });
 
     return () => {
       supabase.removeChannel(channel);
     };
   }, [auction.id, supabase, queryClient]);
 
-  const formatCurrency = (
-    value: number | { toNumber(): number } | undefined
-  ) => {
-    if (value === undefined) return "N/A";
-    const numericValue = typeof value === "number" ? value : value.toNumber();
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(numericValue);
-  };
+    const formatCurrency = (value: number) => {
+        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
+    };
 
-  const highestBidAmount = bids.length > 0 ? bids[0].amount.toNumber() : 0;
-  const currentBid = Math.max(
-    highestBidAmount,
-    auction.minimumBid ? auction.minimumBid.toNumber() : 0
-  );
-
-  const { mutate: placeBid, isPending: isSubmitting } = useMutation({
-    mutationFn: (amount: number) => postBid({ auctionId: auction.id, amount }),
-    onSuccess: () => {
-      toast.success("Lance realizado com sucesso!");
-      setBidAmount("");
-      queryClient.invalidateQueries({ queryKey: ["userProfile"] });
-    },
-    onError: (error: Error) => {
-      toast.error("Erro ao dar o lance", { description: error.message });
-    },
-  });
-
-  const handleExpire = () => {
-    const lastBid = bids[0];
-    if (lastBid && session?.user?.id && lastBid.userId === session.user.id) {
-      setHasWon(true);
-      toast.success("Parabéns! Você ganhou o leilão!");
-    } else {
-      toast("Leilão Encerrado!");
-    }
-  };
-
-  const handleBid = () => {
-    const amount = parseFloat(bidAmount);
-    if (!amount || amount <= currentBid) {
-      toast.error("Lance inválido", {
-        description: `Seu lance deve ser maior que ${formatCurrency(
-          currentBid
-        )}`,
-      });
-      return;
-    }
-    if (amount > userCredits) {
-      toast.error("Créditos insuficientes", {
-        description: `Você precisa de ${formatCurrency(amount)} em créditos.`,
-      });
-      return;
-    }
-    placeBid(amount);
-  };
-
-  const leadData = auction.leads;
-  const isAuctionActive = new Date(auction.expiredAt).getTime() > Date.now();
+    const handleBid = async () => {
+        if (!isAuctionActive) {
+            toast.error('Leilão encerrado', { description: 'Não é possível enviar lances após o término.' })
+            return;
+        }
+        const amount = parseFloat(bidAmount);
+        if (!amount || amount <= currentBid) {
+            toast.error("Lance inválido", { description: `Seu lance deve ser maior que ${formatCurrency(currentBid)}` });
+            return;
+        }
+        if (amount < (lead.minimumBid as number)) {
+            toast.error("Lance muito baixo", { description: `O lance mínimo é ${formatCurrency(lead.minimumBid as number)}` });
+            return;
+        }
+        if (amount > userCredits) {
+            toast.error("Créditos insuficientes", { description: `Você precisa de pelo menos ${formatCurrency(amount)} em créditos.` });
+            return;
+        }
+        setIsSubmitting(true);
+        try {
+            const insertPayload: { auction_id: string; user_id: string; amount: number } = {
+                auction_id: auctionId,
+                user_id: user.id || 'current-user',
+                amount
+            };
+            const { data, error } = await supabase
+                .from('bids')
+                .insert(insertPayload)
+                .select()
+                .single();
+            if (error) {
+                throw error;
+            }
+            const row = data as unknown as { id: string; user_id: string; amount: number | string; created_at: string };
+            const newBid: Bid = {
+                id: row.id,
+                leadId: lead.id,
+                userId: row.user_id,
+                userName: user.name,
+                amount: typeof row.amount === 'string' ? parseFloat(row.amount) : row.amount,
+                timestamp: new Date(row.created_at)
+            };
+            setBids(prev => {
+                if (prev.some(b => b.id === newBid.id)) return prev;
+                return [newBid, ...prev];
+            });
+            setCurrentBid(newBid.amount);
+            setBidders(prev => prev + 1);
+            setBidAmount('');
+            toast.success("Lance realizado com sucesso!", { description: `Seu lance de ${formatCurrency(amount)} foi registrado.` });
+        } catch (e) {
+            const message = (e as { message?: string })?.message || String(e)
+            console.error('[AuctionModal] Insert bid error:', message)
+            toast.error('Falha ao enviar lance', { description: message || 'Tente novamente.' })
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
@@ -265,108 +293,50 @@ export const AuctionModal = ({
             </div>
           </div>
 
-          <div className="space-y-6">
-            {isAuctionActive && !hasWon ? (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Fazer Lance</h3>
-                <div className="p-3 bg-muted rounded-lg">
-                  <div className="flex items-center gap-2 text-sm mb-2">
-                    <Coins className="h-4 w-4" /> Seus créditos:{" "}
-                    {userCredits.toLocaleString()}
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm text-yellow-600">
-                    <AlertCircle className="h-4 w-4" /> Lance mínimo:{" "}
-                    {formatCurrency(
-                      Math.max(currentBid + 1, auction.minimumBid.toNumber())
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      type="number"
-                      placeholder="Valor do lance"
-                      value={bidAmount}
-                      onChange={(e) => setBidAmount(e.target.value)}
-                      className="flex-1"
-                      min={Math.max(
-                        currentBid + 1,
-                        auction.minimumBid.toNumber()
-                      )}
-                    />
-                    <Button
-                      onClick={handleBid}
-                      disabled={isSubmitting}
-                      className="bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-black"
-                    >
-                      <Zap className="h-4 w-4 mr-2" />
-                      {isSubmitting ? "Enviando..." : "Dar Lance"}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="p-6 bg-muted rounded-lg text-center">
-                <h3 className="text-lg font-semibold text-foreground mb-2">
-                  {hasWon ? "Leilão Ganho!" : "Leilão Encerrado"}
-                </h3>
-                <p className="text-muted-foreground">
-                  {hasWon
-                    ? "Parabéns! Você ganhou este leilão."
-                    : "Este leilão foi finalizado."}
-                </p>
-              </div>
-            )}
-            <Separator />
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Histórico de Lances</h3>
-              {isLoadingBids ? (
-                <p>Carregando histórico...</p>
-              ) : (
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {bids.map((bid, index) => (
-                    <div
-                      key={bid.id}
-                      className={`p-3 rounded-lg border ${
-                        index === 0
-                          ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700"
-                          : "bg-muted border-border"
-                      }`}
-                    >
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">
-                            {bid.user?.name || "Participante"}
-                          </span>
-                          {index === 0 && (
-                            <Badge
-                              variant="secondary"
-                              className="bg-yellow-100 text-yellow-800 text-xs"
-                            >
-                              Maior lance
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="text-right">
-                          <div className="font-bold text-yellow-600">
-                            {formatCurrency(bid.amount)}
-                          </div>
-                          {bid.createdAt && (
-                            <div className="text-xs text-muted-foreground">
-                              {new Date(bid.createdAt).toLocaleTimeString(
-                                "pt-BR"
-                              )}
+                    {/* Right Column - Bidding */}
+                    <div className="space-y-6">
+                        {isAuctionActive && !hasWon ? (
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-semibold">Fazer Lance</h3>
+                                <div className="p-3 bg-yellow-50 rounded-lg">
+                                    <div className="flex items-center gap-2 text-yellow-700 text-sm mb-2"><Coins className="h-4 w-4" />Seus créditos: {userCredits.toLocaleString()}</div>
+                                </div>
+                                <div className="space-y-3">
+                                    <div className="flex items-center gap-2 text-sm text-yellow-600"><AlertCircle className="h-4 w-4" />Lance mínimo: {formatCurrency(Math.max(currentBid + 1, lead.minimumBid as number))}</div>
+                                    <div className="flex gap-2">
+                                        <Input type="number" placeholder="Valor do lance" value={bidAmount} onChange={(e) => setBidAmount(e.target.value)} className="flex-1" min={Math.max(currentBid + 1, lead.minimumBid as number)} />
+                                        <Button onClick={handleBid} disabled={isSubmitting || !isAuctionActive || hasWon} className="bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-black"><Zap className="h-4 w-4 mr-2" />{isSubmitting ? 'Enviando...' : 'Dar Lance'}</Button>
+                                    </div>
+                                </div>
                             </div>
-                          )}
+                        ) : (
+                            <div className="p-6 bg-muted rounded-lg text-center">
+                                <h3 className="text-lg font-semibold text-foreground mb-2">{hasWon ? 'Leilão Ganho!' : 'Leilão Encerrado'}</h3>
+                                <p className="text-muted-foreground">{hasWon ? 'Parabéns! Você ganhou este leilão.' : 'Este leilão foi finalizado.'}</p>
+                            </div>
+                        )}
+                        <Separator />
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-semibold">Histórico de Lances</h3>
+                            <div className="space-y-2 max-h-64 overflow-y-auto">
+                                {bids.map((bid, index) => (
+                                    <div key={bid.id} className={`p-3 rounded-lg border ${index === 0 ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700' : 'bg-muted border-border'}`}>
+                                        <div className="flex justify-between items-center">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-medium">{bid.userName}</span>
+                                                {index === 0 && (<Badge variant="secondary" className="bg-yellow-100 text-yellow-800 text-xs">Maior lance</Badge>)}
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="font-bold text-yellow-600">{formatCurrency(bid.amount)}</div>
+                                                <div className="text-xs text-muted-foreground">{bid.timestamp.toLocaleTimeString()}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-                      </div>
                     </div>
-                  ))}
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
 
         <div className="flex justify-end pt-4">
           <Button variant="outline" onClick={onClose}>
