@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+export const runtime = 'nodejs';
+
 export async function POST(request: Request) {
     try {
         const body = await request.json();
@@ -44,6 +46,15 @@ export async function POST(request: Request) {
 
         if (!userId) {
             console.warn(`[Asaas Webhook] Não foi possível resolver userId para pagamento ${asaasPaymentId}.`);
+            try {
+                await prisma.processed_webhooks.upsert({
+                    where: { event_key: asaasPaymentId },
+                    update: { status: 'failed' },
+                    create: { event_key: asaasPaymentId, status: 'failed' }
+                });
+            } catch (e) {
+                console.warn('[Asaas Webhook] Falha ao registrar webhook como failed:', e);
+            }
             return NextResponse.json({ error: 'Usuário não identificado' }, { status: 500 });
         }
 

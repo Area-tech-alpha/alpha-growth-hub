@@ -8,6 +8,8 @@ const ASAAS_API_URL = process.env.ASAAS_API_URL!;
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY!;
 const SITE_URL = process.env.NEXTAUTH_URL!;
 
+export const runtime = 'nodejs';
+
 export async function POST(request: Request) {
     try {
         const { amount } = await request.json();
