@@ -67,24 +67,26 @@ export async function POST(request: Request) {
         const asaasResponse = await response.json();
 
         // Persist linkage between Asaas checkout and our user for webhook correlation
+        if (!asaasResponse?.id) {
+            return NextResponse.json({ error: 'Resposta inválida do Asaas (sem id do checkout)' }, { status: 502 });
+        }
         try {
-            if (asaasResponse?.id) {
-                const prisma = new PrismaClient();
-                await prisma.checkout_sessions.upsert({
-                    where: { asaas_checkout_id: asaasResponse.id },
-                    update: {
-                        internal_checkout_id: internalCheckoutId,
-                        user_id: session.user.id,
-                    },
-                    create: {
-                        asaas_checkout_id: asaasResponse.id,
-                        internal_checkout_id: internalCheckoutId,
-                        user_id: session.user.id,
-                    }
-                });
-            }
+            const prisma = new PrismaClient();
+            await prisma.checkout_sessions.upsert({
+                where: { asaas_checkout_id: asaasResponse.id },
+                update: {
+                    internal_checkout_id: internalCheckoutId,
+                    user_id: session.user.id,
+                },
+                create: {
+                    asaas_checkout_id: asaasResponse.id,
+                    internal_checkout_id: internalCheckoutId,
+                    user_id: session.user.id,
+                }
+            });
         } catch (e) {
             console.error('[Checkout] Failed to persist checkout session mapping:', e);
+            return NextResponse.json({ error: 'Falha ao persistir mapeamento do checkout' }, { status: 500 });
         }
 
         return NextResponse.json({

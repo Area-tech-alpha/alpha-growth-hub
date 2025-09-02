@@ -17,7 +17,7 @@ export async function POST(request: Request) {
         console.log('Webhook do Asaas recebido:', { event, paymentId: asaasPaymentId, externalReference });
 
         if (!event || !asaasPaymentId) {
-            return NextResponse.json({ ok: true }, { status: 200 });
+            return NextResponse.json({ error: 'Evento/pagamento inválido' }, { status: 400 });
         }
 
         // Process only successful payment events
@@ -45,16 +45,14 @@ export async function POST(request: Request) {
         }
 
         if (!userId) {
-            console.warn(`[Asaas Webhook] externalReference sem uid para pagamento ${asaasPaymentId}:`, externalReference);
-            return NextResponse.json({ ok: true }, { status: 200 });
+            console.warn(`[Asaas Webhook] Não foi possível resolver userId para pagamento ${asaasPaymentId}.`);
+            return NextResponse.json({ error: 'Usuário não identificado' }, { status: 500 });
         }
 
         if (paidValue === undefined || Number.isNaN(paidValue)) {
             console.warn(`[Asaas Webhook] valor inválido no pagamento ${asaasPaymentId}:`, payment?.value);
-            return NextResponse.json({ ok: true }, { status: 200 });
+            return NextResponse.json({ error: 'Valor inválido' }, { status: 400 });
         }
-
-        const creditsToAdd = Math.floor(paidValue);
 
         // Idempotent processing using unique asaas_payment_id
         const alreadyProcessed = await prisma.credit_transactions.findUnique({
@@ -65,34 +63,37 @@ export async function POST(request: Request) {
             return NextResponse.json({ ok: true, alreadyProcessed: true }, { status: 200 });
         }
 
-        await prisma.$transaction(async (tx) => {
-            await tx.credit_transactions.create({
+        // Enfileira job para o worker no DB (PGMQ)
+        const payload = {
+            event,
+            payment,
+            userId,
+            enqueuedAt: new Date().toISOString(),
+        };
+
+        let msgId: bigint | number | undefined;
+        try {
+            const result = await prisma.$queryRaw<{ msg_id: bigint }[]>`SELECT pgmq.send('credit_jobs', ${JSON.stringify(payload)}::jsonb) AS msg_id`;
+            msgId = result?.[0]?.msg_id as unknown as bigint;
+        } catch (e) {
+            console.error('[Asaas Webhook] Falha ao enfileirar job no PGMQ:', e);
+            return NextResponse.json({ error: 'Falha ao enfileirar job' }, { status: 500 });
+        }
+
+        try {
+            await prisma.processed_webhooks.create({
                 data: {
-                    asaas_payment_id: asaasPaymentId,
-                    user_id: userId,
-                    amount_paid: paidValue.toFixed(2),
-                    credits_purchased: creditsToAdd.toFixed(2),
-                    metadata: payment ?? {},
-                    status: 'completed',
+                    event_key: asaasPaymentId,
+                    status: 'queued',
                 }
             });
+        } catch (e) {
+            // Se já existir, seguimos como idempotente
+            console.warn('[Asaas Webhook] processed_webhooks create falhou (provável duplicado).', e);
+        }
 
-            // Increment user's credit balance
-            await tx.users.update({
-                where: { id: userId },
-                data: {
-                    credit_balance: {
-                        // Decimal increment accepts number for Prisma Decimal
-                        increment: creditsToAdd
-                    },
-                    updated_at: new Date()
-                }
-            });
-        });
-
-        console.log(`[Asaas Webhook] Créditos adicionados (${creditsToAdd}) para userId=${userId} pagamento=${asaasPaymentId}`);
-
-        return NextResponse.json({ ok: true }, { status: 200 });
+        console.log(`[Asaas Webhook] Job enfileirado (msg_id=${String(msgId)}) para userId=${userId} pagamento=${asaasPaymentId}`);
+        return NextResponse.json({ ok: true, queued: true, msgId: String(msgId ?? '') }, { status: 200 });
 
     } catch (error) {
         console.error('Erro no processamento do webhook do Asaas:', error);
