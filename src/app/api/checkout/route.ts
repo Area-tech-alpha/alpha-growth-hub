@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../../../auth';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 
 const ASAAS_API_URL = process.env.ASAAS_API_URL!;
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY!;
@@ -71,7 +71,6 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Resposta inválida do Asaas (sem id do checkout)' }, { status: 502 });
         }
         try {
-            const prisma = new PrismaClient();
             await prisma.checkout_sessions.upsert({
                 where: { asaas_checkout_id: asaasResponse.id },
                 update: {

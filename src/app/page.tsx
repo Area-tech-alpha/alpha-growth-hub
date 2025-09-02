@@ -3,7 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../auth";
 import type { Lead as AuctionLead } from "@/components/dashboard/leads/types";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 
 export default async function Home() {
   const session = await getServerSession(authOptions);
@@ -86,7 +86,6 @@ export default async function Home() {
   let purchasedLeads: AuctionLead[] = [];
   if (session?.user?.id) {
     try {
-      const prisma = new PrismaClient();
       const owned = await prisma.leads.findMany({
         where: { owner_id: session.user.id },
         orderBy: { updated_at: 'desc' }

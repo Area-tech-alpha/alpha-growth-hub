@@ -3,9 +3,8 @@
 import { type NextAuthOptions } from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 import { PrismaAdapter } from "@auth/prisma-adapter"
-import { PrismaClient } from "@prisma/client"
+import { prisma } from "@/lib/prisma"
 
-const prisma = new PrismaClient()
 
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
