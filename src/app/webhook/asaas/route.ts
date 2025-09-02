@@ -15,6 +15,7 @@ export async function POST(request: Request) {
         const paidValue: number | undefined = typeof payment?.value === 'number' ? payment.value : Number(payment?.value);
 
         console.log('Webhook do Asaas recebido:', { event, paymentId: asaasPaymentId, externalReference });
+        console.log('[Webhook][Debug] Payload bruto:', JSON.stringify(body));
 
         if (!event || !asaasPaymentId) {
             return NextResponse.json({ error: 'Evento/pagamento inválido' }, { status: 400 });
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
         );
 
         if (!isPaidEvent) {
+            console.log('[Webhook][Debug] Evento ignorado (não pago):', event);
             return NextResponse.json({ ok: true, ignored: true }, { status: 200 });
         }
 
@@ -37,12 +39,14 @@ export async function POST(request: Request) {
         if (uidMatch?.[1]) {
             userId = uidMatch[1];
         } else if (typeof checkoutSessionId === 'string') {
+            console.log('[Webhook][Debug] Tentando resolver userId via checkout_sessions:', checkoutSessionId);
             const mapping = await prisma.checkout_sessions.findFirst({
                 where: { asaas_checkout_id: checkoutSessionId },
                 select: { user_id: true },
             });
             userId = mapping?.user_id;
         }
+        console.log('[Webhook][Debug] externalReference:', externalReference, 'checkoutSessionId:', checkoutSessionId, 'userId resolvido:', userId);
 
         if (!userId) {
             console.warn(`[Asaas Webhook] Não foi possível resolver userId para pagamento ${asaasPaymentId}.`);
@@ -82,8 +86,10 @@ export async function POST(request: Request) {
 
         let msgId: bigint | number | undefined;
         try {
+            console.log('[Webhook][Debug] Enfileirando job no PGMQ com payload:', JSON.stringify(payload));
             const result = await prisma.$queryRaw<{ msg_id: bigint }[]>`SELECT pgmq.send('credit_jobs', ${JSON.stringify(payload)}::jsonb) AS msg_id`;
             msgId = result?.[0]?.msg_id as unknown as bigint;
+            console.log('[Webhook][Debug] Job enfileirado com msg_id:', String(msgId ?? ''));
         } catch (e) {
             console.error('[Asaas Webhook] Falha ao enfileirar job no PGMQ:', e);
             return NextResponse.json({ error: 'Falha ao enfileirar job' }, { status: 500 });
@@ -96,13 +102,40 @@ export async function POST(request: Request) {
                     status: 'queued',
                 }
             });
+            console.log('[Webhook][Debug] processed_webhooks registrado como queued para', asaasPaymentId);
         } catch (e) {
             // Se já existir, seguimos como idempotente
             console.warn('[Asaas Webhook] processed_webhooks create falhou (provável duplicado).', e);
         }
 
-        console.log(`[Asaas Webhook] Job enfileirado (msg_id=${String(msgId)}) para userId=${userId} pagamento=${asaasPaymentId}`);
-        return NextResponse.json({ ok: true, queued: true, msgId: String(msgId ?? '') }, { status: 200 });
+        // Processa imediatamente uma vez para reduzir latência
+        try {
+            type WorkerRow = { result: unknown };
+            const workerCall = await prisma.$queryRaw<WorkerRow[]>`SELECT public.process_credit_jobs_worker() AS result`;
+            const workerRaw = workerCall?.[0]?.result as unknown;
+            let workerStatus: string | undefined;
+            if (typeof workerRaw === 'string') {
+                try {
+                    const parsed = JSON.parse(workerRaw);
+                    workerStatus = parsed?.status;
+                } catch {
+                    // mantém indefinido
+                }
+            } else if (workerRaw && typeof workerRaw === 'object') {
+                workerStatus = (workerRaw as Record<string, unknown>).status as string | undefined;
+            }
+            console.log('[Webhook][Debug] Resultado do worker imediato:', workerRaw);
+            if (workerStatus !== 'success') {
+                console.warn('[Webhook] Worker não retornou success. Status:', workerStatus);
+                return NextResponse.json({ error: 'Worker não concluiu com sucesso', msgId: String(msgId ?? '') }, { status: 500 });
+            }
+        } catch (e) {
+            console.error('[Webhook] Erro ao executar worker imediato:', e);
+            return NextResponse.json({ error: 'Falha ao processar job imediatamente', msgId: String(msgId ?? '') }, { status: 500 });
+        }
+
+        console.log(`[Asaas Webhook] Job processado imediatamente (msg_id=${String(msgId)}) para userId=${userId} pagamento=${asaasPaymentId}`);
+        return NextResponse.json({ ok: true, queued: true, processedNow: true, msgId: String(msgId ?? '') }, { status: 200 });
 
     } catch (error) {
         console.error('Erro no processamento do webhook do Asaas:', error);
