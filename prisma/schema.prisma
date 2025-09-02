@@ -8,7 +8,7 @@ datasource db {
 }
 
 model Account {
-  id                String     @id @default(dbgenerated("gen_random_uuid()"))
+  id                String  @id @default(dbgenerated("gen_random_uuid()"))
   userId            String
   type              String
   provider          String
@@ -20,18 +20,20 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId], map: "provider_unique_id")
   @@index([userId])
 }
 
 model Session {
-  id           String     @id @default(dbgenerated("gen_random_uuid()"))
-  sessionToken String     @unique
+  id           String   @id @default(dbgenerated("gen_random_uuid()"))
+  sessionToken String   @unique
   userId       String
-  expires      DateTime   @db.Timestamptz(6)
-  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  expires      DateTime @db.Timestamptz(6)
+  users        users?   @relation(fields: [usersId], references: [id])
+  usersId      String?
 
   @@index([userId])
 }
@@ -44,39 +46,23 @@ model VerificationToken {
   @@unique([identifier, token], map: "token_identifier_unique")
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model auctions {
-  id                                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  lead_id                            String    @db.Uuid
-  minimum_bid                        Decimal   @db.Decimal(10, 2)
-  status                             String    @default("open") @db.VarChar(20)
-  winning_bid_id                     String?   @unique @db.Uuid
-  expired_at                         DateTime  @db.Timestamptz(6)
-  created_at                         DateTime? @default(now()) @db.Timestamptz(6)
-  leads                              leads     @relation(fields: [lead_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  bids_auctions_winning_bid_idTobids bids?     @relation("auctions_winning_bid_idTobids", fields: [winning_bid_id], references: [id], onUpdate: NoAction, map: "fk_winning_bid")
-  bids_bids_auction_idToauctions     bids[]    @relation("bids_auction_idToauctions")
+  id                                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lead_id                            String         @db.Uuid
+  minimum_bid                        Decimal        @db.Decimal(10, 2)
+  status                             String         @default("open") @db.VarChar(20)
+  winning_bid_id                     String?        @unique @db.Uuid
+  expired_at                         DateTime       @db.Timestamptz(6)
+  created_at                         DateTime?      @default(now()) @db.Timestamptz(6)
+  leads                              leads          @relation(fields: [lead_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  bids_auctions_winning_bid_idTobids bids?          @relation("auctions_winning_bid_idTobids", fields: [winning_bid_id], references: [id], onUpdate: NoAction, map: "fk_winning_bid")
+  bids_bids_auction_idToauctions     bids[]         @relation("bids_auction_idToauctions")
+  credit_holds                       credit_holds[]
 
   @@index([lead_id])
+  @@index([status, expired_at], map: "idx_auctions_status_expired_at")
 }
 
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime? @db.Timestamptz(6)
-  image         String?
-  Account       Account[]
-  Session       Session[]
-  users         users?
-
-  @@map("auth_users")
-}
-
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model bids {
   id                                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   auction_id                             String    @db.Uuid
@@ -89,11 +75,9 @@ model bids {
 
   @@index([auction_id])
   @@index([user_id])
+  @@index([auction_id, created_at(sort: Desc)], map: "idx_bids_auction_id_created_at")
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model credit_transactions {
   id                BigInt           @id @default(autoincrement())
   asaas_payment_id  String           @unique
@@ -109,8 +93,6 @@ model credit_transactions {
   @@index([user_id])
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model leads {
   id                   String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   company_name         String     @db.VarChar(255)
@@ -132,10 +114,9 @@ model leads {
 
   @@index([owner_id])
   @@index([status])
+  @@index([owner_id], map: "idx_leads_owner_id")
 }
 
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model ledger_entries {
   id                  BigInt              @id @default(autoincrement())
   transaction_id      BigInt
@@ -150,29 +131,53 @@ model ledger_entries {
   @@index([user_id])
 }
 
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model processed_webhooks {
   event_key  String              @id
   status     webhook_status_enum @default(queued)
   created_at DateTime?           @default(now()) @db.Timestamptz(6)
 }
 
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model users {
   id                  String                @id
-  name                String?
-  email               String?
-  email_verified      DateTime?             @db.Timestamptz(6)
-  avatar_url          String?
   credit_balance      Decimal               @default(0.00) @db.Decimal(10, 2)
   created_at          DateTime              @default(now()) @db.Timestamptz(6)
   updated_at          DateTime              @default(now()) @db.Timestamptz(6)
+  name                String?
+  email               String?               @unique // 👈 Adicione @unique para o email
+  email_verified      DateTime?             @db.Timestamptz(6)
+  avatar_url          String?
   bids                bids[]
   credit_transactions credit_transactions[]
   leads               leads[]
   ledger_entries      ledger_entries[]
-  user                User                  @relation(fields: [id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  accounts Account[]
+  sessions Session[]
+
+  @@map("users")
+}
+
+model User {
+  id            String    @id
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime? @db.Timestamptz(6)
+  image         String?
+}
+
+model credit_holds {
+  id         BigInt                  @id @default(autoincrement())
+  user_id    String
+  auction_id String                  @db.Uuid
+  amount     Decimal                 @db.Decimal(10, 2)
+  status     credit_hold_status_enum @default(active)
+  created_at DateTime?               @default(now()) @db.Timestamptz(6)
+  updated_at DateTime?               @default(now()) @db.Timestamptz(6)
+  auctions   auctions                @relation(fields: [auction_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, auction_id], map: "credit_holds_user_auction_unique")
+  @@index([auction_id], map: "idx_credit_holds_auction_id")
+  @@index([user_id], map: "idx_credit_holds_user_id")
 }
 
 enum account_type_enum {
@@ -184,4 +189,10 @@ enum webhook_status_enum {
   queued
   processed
   failed
+}
+
+enum credit_hold_status_enum {
+  active
+  released
+  consumed
 }
