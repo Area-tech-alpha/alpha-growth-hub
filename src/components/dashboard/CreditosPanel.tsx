@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { LuCoins } from "react-icons/lu";
-import { useState, ChangeEvent } from "react";
+import { useState, ChangeEvent, useEffect } from "react";
 
 type CreditosPanelProps = {
     currentCredits?: number;
@@ -16,9 +16,26 @@ export default function CreditosPanel({
     defaultAmount = 50,
 }: CreditosPanelProps) {
     const { data: session } = useSession();
+    const [credits, setCredits] = useState<number>(currentCredits);
     const [amount, setAmount] = useState<number>(defaultAmount);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        const loadBalance = async () => {
+            if (!session?.user?.id) return;
+            try {
+                const res = await fetch('/api/me/credits', { method: 'GET' });
+                if (!res.ok) return;
+                const data = await res.json();
+                if (typeof data.creditBalance === 'number') {
+                    setCredits(data.creditBalance);
+                }
+            } catch (e) {
+            }
+        };
+        loadBalance();
+    }, [session?.user?.id]);
 
     const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
         const value = Number(e.target.value);
@@ -27,7 +44,7 @@ export default function CreditosPanel({
     };
 
     const handleBuy = async () => {
-        if (!session?.user?.email || !session?.user?.name) {
+        if (!session?.user?.id) {
             setError('Você precisa estar logado para comprar créditos.');
             return;
         }
@@ -42,8 +59,6 @@ export default function CreditosPanel({
                 },
                 body: JSON.stringify({
                     amount: Number(amount),
-                    customerEmail: session.user.email,
-                    customerName: session.user.name,
                 }),
             });
 
@@ -75,7 +90,7 @@ export default function CreditosPanel({
                         <div>
                             <CardTitle className="text-xl">Comprar Créditos</CardTitle>
                             <CardDescription>
-                                <span className="text-sm font-semibold text-foreground">Saldo atual: {currentCredits.toLocaleString("pt-BR")} créditos</span>
+                                <span className="text-sm font-semibold text-foreground">Saldo atual: {credits.toLocaleString("pt-BR")} créditos</span>
                             </CardDescription>
                         </div>
                     </div>
@@ -100,7 +115,7 @@ export default function CreditosPanel({
                             />
                         </div>
                         <p id="valor-help" className="text-xs text-muted-foreground">
-                            Você receberá <span className="font-medium">{(amount * 2).toLocaleString("pt-BR")} créditos</span>
+                            Você receberá <span className="font-medium">{amount.toLocaleString("pt-BR")} créditos</span>
                         </p>
                     </div>
                     {error && <p className="text-red-500 text-sm mt-2">{error}</p>}

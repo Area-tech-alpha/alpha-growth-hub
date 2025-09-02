@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { memoryStore } from '@/lib/memory-store';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '../../../../auth';
 
 const ASAAS_API_URL = process.env.ASAAS_API_URL!;
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY!;
@@ -8,23 +9,26 @@ const SITE_URL = process.env.NEXTAUTH_URL!;
 
 export async function POST(request: Request) {
     try {
-        const { amount, customerEmail, customerName } = await request.json();
+        const { amount } = await request.json();
+
+        const session = await getServerSession(authOptions);
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+        }
 
         if (!amount || amount < 10 || amount > 50000) {
             return NextResponse.json({ error: 'Valor inválido. Deve ser entre R$ 10,00 e R$ 50.000,00' }, { status: 400 });
         }
-        if (!customerEmail || !customerName) {
-            return NextResponse.json({ error: 'Email e nome do cliente são obrigatórios' }, { status: 400 });
-        }
+        const customerName = (session.user.name ?? 'Cliente').substring(0, 30);
 
-        const credits = Math.floor(amount * 2);
+        const credits = Math.floor(amount);
         const internalCheckoutId = uuidv4();
-        const externalReference = `${internalCheckoutId}|${customerEmail}`;
+        const externalReference = `ck:${internalCheckoutId}|uid:${session.user.id}`;
 
         const checkoutData = {
             billingTypes: ['CREDIT_CARD', 'PIX'],
             chargeTypes: ['DETACHED'],
-            name: customerName.substring(0, 30),
+            name: customerName,
             dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             externalReference: externalReference,
             callback: {
@@ -60,10 +64,6 @@ export async function POST(request: Request) {
         }
 
         const asaasResponse = await response.json();
-
-        if (asaasResponse.id) {
-            memoryStore.checkoutToEmail[asaasResponse.id] = customerEmail;
-        }
 
         return NextResponse.json({
             success: true,
