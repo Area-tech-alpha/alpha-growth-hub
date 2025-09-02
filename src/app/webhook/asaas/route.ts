@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+const ASAAS_API_URL = process.env.ASAAS_API_URL!;
+const ASAAS_API_KEY = process.env.ASAAS_API_KEY!;
+
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
@@ -49,6 +52,46 @@ export async function POST(request: Request) {
         console.log('[Webhook][Debug] externalReference:', externalReference, 'checkoutSessionId:', checkoutSessionId, 'userId resolvido:', userId);
 
         if (!userId) {
+            // Fallback: tentar resolver pelo customer do Asaas
+            const customerId: string | undefined = payment?.customer;
+            if (customerId && ASAAS_API_URL && ASAAS_API_KEY) {
+                try {
+                    console.log('[Webhook][Debug] Tentando resolver via Asaas Customer:', customerId);
+                    const custRes = await fetch(`${ASAAS_API_URL}/customers/${customerId}`, {
+                        method: 'GET',
+                        headers: {
+                            'accept': 'application/json',
+                            'access_token': ASAAS_API_KEY,
+                        },
+                    });
+                    console.log('[Webhook][Debug] Customer fetch status:', custRes.status);
+                    if (custRes.ok) {
+                        const cust = await custRes.json();
+                        const custExtRef: string | undefined = cust?.externalReference ?? cust?.external_reference;
+                        const custEmail: string | undefined = cust?.email;
+                        console.log('[Webhook][Debug] Customer payload (sanitizado):', { custExtRef, hasEmail: Boolean(custEmail) });
+                        if (!userId && typeof custExtRef === 'string') {
+                            const m = custExtRef.match(/uid:([^|]+)/);
+                            if (m?.[1]) {
+                                userId = m[1];
+                                console.log('[Webhook][Debug] userId resolvido via customer.externalReference:', userId);
+                            }
+                        }
+                        if (!userId && typeof custEmail === 'string') {
+                            const userByEmail = await prisma.users.findUnique({ where: { email: custEmail }, select: { id: true } });
+                            if (userByEmail?.id) {
+                                userId = userByEmail.id;
+                                console.log('[Webhook][Debug] userId resolvido via customer.email -> users.email:', userId);
+                            }
+                        }
+                    } else {
+                        console.warn('[Webhook] Falha ao obter customer do Asaas:', await custRes.text());
+                    }
+                } catch (e) {
+                    console.error('[Webhook] Erro ao consultar customer no Asaas:', e);
+                }
+            }
+
             console.warn(`[Asaas Webhook] Não foi possível resolver userId para pagamento ${asaasPaymentId}.`);
             try {
                 await prisma.processed_webhooks.upsert({
