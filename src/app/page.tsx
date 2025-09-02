@@ -40,47 +40,62 @@ export default async function Home() {
   };
 
   const toLead = (row: DbLead): AuctionLead => {
-    const statusRaw = String(row.status ?? 'cold');
-    const allowed = ['hot', 'high_frozen', 'low_frozen', 'cold', 'sold'] as const;
-    const status = (allowed as readonly string[]).includes(statusRaw) ? (statusRaw as AuctionLead['status']) : 'cold';
+    const statusRaw = String(row.status ?? "cold");
+    const allowed = [
+      "hot",
+      "high_frozen",
+      "low_frozen",
+      "cold",
+      "sold",
+    ] as const;
+    const status = (allowed as readonly string[]).includes(statusRaw)
+      ? (statusRaw as AuctionLead["status"])
+      : "cold";
     return {
       id: String(row.id),
-      name: String(row.name ?? row.company_name ?? ''),
-      description: String(row.description ?? ''),
+      name: String(row.name ?? row.company_name ?? ""),
+      description: String(row.description ?? ""),
       status,
-      expires_at: String(row.expires_at ?? row.expired_at ?? new Date().toISOString()),
-      location: String(row.location ?? ''),
-      channel: String(row.channel ?? ''),
+      expires_at: String(
+        row.expires_at ?? row.expired_at ?? new Date().toISOString()
+      ),
+      location: String(row.location ?? ""),
+      channel: String(row.channel ?? ""),
       revenue: Number(row.revenue ?? 0),
       marketingInvestment: Number(row.marketing_investment ?? 0),
-      companyName: String(row.company_name ?? ''),
-      contactName: String(row.contact_name ?? ''),
-      phone: String(row.phone ?? ''),
-      email: String(row.email ?? ''),
-      maskedCompanyName: String(row.masked_company_name ?? row.company_name ?? ''),
-      niche: String(row.segment ?? row.niche ?? ''),
-      maskedContactName: String(row.masked_contact_name ?? row.contact_name ?? ''),
-      maskedPhone: String(row.masked_phone ?? row.phone ?? ''),
-      maskedEmail: String(row.masked_email ?? row.email ?? ''),
+      companyName: String(row.company_name ?? ""),
+      contactName: String(row.contact_name ?? ""),
+      phone: String(row.phone ?? ""),
+      email: String(row.email ?? ""),
+      maskedCompanyName: String(
+        row.masked_company_name ?? row.company_name ?? ""
+      ),
+      niche: String(row.segment ?? row.niche ?? ""),
+      maskedContactName: String(
+        row.masked_contact_name ?? row.contact_name ?? ""
+      ),
+      maskedPhone: String(row.masked_phone ?? row.phone ?? ""),
+      maskedEmail: String(row.masked_email ?? row.email ?? ""),
       currentBid: Number(row.current_bid ?? row.currentBid ?? 0),
       owner_id: row.owner_id ? String(row.owner_id) : undefined,
       bidders: Number(row.bidders ?? 0),
-      category: String(row.category ?? ''),
+      category: String(row.category ?? ""),
       tags: Array.isArray(row.tags) ? (row.tags as string[]) : [],
-      updated_at: row.updated_at ? new Date(row.updated_at as string).toISOString() : undefined,
+      updated_at: row.updated_at
+        ? new Date(row.updated_at as string).toISOString()
+        : undefined,
     } as AuctionLead;
   };
-
   const { data: initialAuctions, error: auctionError } = await supabase
-    .from('auctions')
-    .select('*, leads(*)')
-    .eq('status', 'open')
-    .gt('expired_at', new Date().toISOString());
+    .from("auctions")
+    .select("*, leads(*)")
+    .eq("status", "open")
+    .gt("expired_at", new Date().toISOString());
 
   if (auctionError) {
     console.error("[Home] Erro ao buscar leilões:", auctionError.message);
   } else {
-    console.log('[Home] initialAuctions count:', initialAuctions?.length ?? 0)
+    console.log("[Home] initialAuctions count:", initialAuctions?.length ?? 0);
   }
 
   let purchasedLeads: AuctionLead[] = [];
@@ -89,12 +104,15 @@ export default async function Home() {
       const prisma = new PrismaClient();
       const owned = await prisma.leads.findMany({
         where: { owner_id: session.user.id },
-        orderBy: { updated_at: 'desc' }
+        orderBy: { updated_at: "desc" },
       });
       purchasedLeads = (owned || []).map(toLead);
-      console.log('[Home] purchasedLeads count (SSR via Prisma):', purchasedLeads.length)
+      console.log(
+        "[Home] purchasedLeads count (SSR via Prisma):",
+        purchasedLeads.length
+      );
     } catch (e) {
-      console.error('[Home] Prisma leads fetch error:', e);
+      console.error("[Home] Prisma leads fetch error:", e);
     }
   }
 
@@ -107,3 +125,4 @@ export default async function Home() {
     </>
   );
 }
+

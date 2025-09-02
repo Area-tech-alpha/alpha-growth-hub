@@ -7,9 +7,7 @@ import { AuctionModal } from "./leiloes/AuctionModal";
 import type { AuctionWithLead, Bid } from "./leiloes/types";
 import { useRealtimeStore } from "@/store/realtime-store";
 import type { RealtimeState } from "@/store/realtime-store";
-
-
-// Tipagem para um Leilão que inclui os dados do Lead aninhados
+import { toast } from "sonner";
 type AuctionWithLeadLocal = AuctionWithLead;
 
 export default function LeiloesPanel() {
@@ -20,19 +18,19 @@ export default function LeiloesPanel() {
     const [selectedAuction, setSelectedAuction] = useState<AuctionWithLeadLocal | null>(null);
 
     const handleExpire = (auctionId: string) => {
-        // Remove o leilão da lista quando o timer expira e solicita fechamento no backend
         removeAuctionById(auctionId);
+        toast.info("Leilão expirado", { description: "Processando o resultado final do leilão..." });
         fetch(`/api/auctions/${auctionId}/close`, { method: 'POST' })
             .then(async (res) => {
                 const json = await res.json().catch(() => ({}))
                 console.log('[LeiloesPanel] close result:', res.status, json)
+                 toast.error("Falha ao fechar leilão", { description: "Houve um problema ao processar o resultado." });
             })
             .catch((e) => console.error('[LeiloesPanel] close request failed:', e))
+              toast.error("Erro de rede", { description: "Não foi possível comunicar com o servidor para fechar o leilão." });
     };
 
     const user = { id: session?.user?.id, name: session?.user?.name || "Você" };
-
-    // Calcula os stats com base nos leilões ativos
     const totalValue = useMemo(() => activeAuctions.reduce((sum, auction) => sum + (auction.leads.currentBid || 0), 0), [activeAuctions]);
     const activeAuctionsCount = activeAuctions.length;
     const totalBidders = useMemo(() => activeAuctions.reduce((sum, auction) => sum + (auction.leads.bidders || 0), 0), [activeAuctions]);
@@ -46,7 +44,6 @@ export default function LeiloesPanel() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mt-6">
-                {/* Mapeia a lista de leilões */}
                 {activeAuctions.map((auction) => (
                     <LeadCard
                         key={auction.id} // A chave agora é o ID do leilão

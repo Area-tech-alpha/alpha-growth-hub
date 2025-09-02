@@ -1,53 +1,180 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { FiShoppingBag } from "react-icons/fi";
+import { Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { PurchasedLeadCard } from "./leads/PurchasedLeadCard";
 import type { Lead } from "./leads/types";
 import { useRealtimeStore } from "@/store/realtime-store";
 import type { RealtimeState } from "@/store/realtime-store";
+import { toast } from "sonner";
+
+const escapeCsvCell = (
+  cellData: string | number | null | undefined
+): string => {
+  if (cellData === null || cellData === undefined) {
+    return '""';
+  }
+  const stringData = String(cellData);
+  if (/[",\n\r]/.test(stringData)) {
+    return `"${stringData.replace(/"/g, '""')}"`;
+  }
+  return `"${stringData}"`;
+};
 
 export default function MeusLeadsPanel() {
-    const purchasedLeads = useRealtimeStore((s: RealtimeState) => s.purchasedLeads) as Lead[];
+  const purchasedLeads = useRealtimeStore(
+    (s: RealtimeState) => s.purchasedLeads
+  ) as Lead[];
+  const [isExporting, setIsExporting] = useState(false);
 
-    useEffect(() => {
-        console.log('[MeusLeadsPanel] purchasedLeads length:', purchasedLeads.length);
-        if (purchasedLeads.length > 0) {
-            const first = purchasedLeads[0] as Lead & { owner_id?: string };
-            console.log('[MeusLeadsPanel] first lead sample:', { id: first?.id, owner: first?.owner_id });
-        }
-    }, [purchasedLeads.length, purchasedLeads]);
-
-    return (
-        <>
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-2xl font-bold text-foreground">Meus Leads Comprados</h2>
-                    <p className="text-muted-foreground">Leads que você adquiriu nos leilões com informações completas</p>
-                </div>
-                <div className="text-right">
-                    <div className="text-2xl font-bold text-yellow-600">{purchasedLeads.length}</div>
-                    <div className="text-sm text-muted-foreground">leads comprados</div>
-                </div>
-            </div>
-            {purchasedLeads.length > 0 ? (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-                    {purchasedLeads.map((purchasedLead) => (
-                        <PurchasedLeadCard
-                            key={purchasedLead.id}
-                            lead={purchasedLead}
-                            purchaseDate={new Date((purchasedLead.updated_at as string) || purchasedLead.expires_at)}
-                            purchasePrice={purchasedLead.currentBid}
-                        />
-                    ))}
-                </div>
-            ) : (
-                <div className="text-center py-12">
-                    <FiShoppingBag className="h-16 w-16 text-muted-foreground/50 mx-auto mb-4" />
-                    <div className="text-muted-foreground text-lg mb-2">Nenhum lead comprado ainda</div>
-                    <p className="text-muted-foreground">Participe dos leilões para adquirir leads qualificados</p>
-                </div>
-            )}
-        </>
+  useEffect(() => {
+    console.log(
+      "[MeusLeadsPanel] purchasedLeads length:",
+      purchasedLeads.length
     );
+    if (purchasedLeads.length > 0) {
+      const first = purchasedLeads[0] as Lead & { owner_id?: string };
+      console.log("[MeusLeadsPanel] first lead sample:", {
+        id: first?.id,
+        owner: first?.owner_id,
+      });
+    }
+  }, [purchasedLeads]);
+
+  const handleExportAll = () => {
+    if (purchasedLeads.length === 0) {
+      toast.error("Nenhum lead para exportar.");
+      return;
+    }
+
+    setIsExporting(true);
+    toast.info("Gerando seu arquivo CSV...");
+
+    try {
+      const headers = [
+        "ID do Lead",
+        "Nome da Empresa",
+        "Nome do Contato",
+        "Telefone",
+        "Email",
+        "Localizacao",
+        "Nicho",
+        "Faturamento Anual (R$)",
+        "Investimento em Marketing (R$)",
+        "Canal",
+        "Data da Compra",
+      ];
+
+      const rows = purchasedLeads.map((lead) => {
+        const purchaseDateSource = lead.updated_at || lead.expires_at;
+        const purchaseDate =
+          purchaseDateSource && typeof purchaseDateSource === "string"
+            ? new Date(purchaseDateSource).toLocaleString("pt-BR")
+            : "N/A";
+
+        return [
+          escapeCsvCell(lead.id),
+          escapeCsvCell(lead.companyName),
+          escapeCsvCell(lead.contactName),
+          escapeCsvCell(lead.phone),
+          escapeCsvCell(lead.email),
+          escapeCsvCell(lead.location),
+          escapeCsvCell(lead.niche),
+          escapeCsvCell(lead.revenue),
+          escapeCsvCell(lead.marketingInvestment),
+          escapeCsvCell(lead.channel),
+          escapeCsvCell(purchaseDate),
+        ].join(",");
+      });
+
+      const csvContent = [headers.join(","), ...rows].join("\n");
+      const blob = new Blob([`\uFEFF${csvContent}`], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+
+      a.href = url;
+      a.download = `meus_leads_comprados_${new Date()
+        .toLocaleDateString("pt-BR")
+        .replace(/\//g, "-")}.csv`;
+
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      toast.success("Exportação concluída!");
+    } catch (error) {
+      toast.error("Ocorreu um erro ao gerar o arquivo CSV.");
+      console.error(error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-foreground">
+              Meus Leads Comprados
+            </h2>
+            <p className="text-muted-foreground">
+              Leads que você adquiriu nos leilões
+            </p>
+          </div>
+          <Button
+            onClick={handleExportAll}
+            disabled={isExporting || purchasedLeads.length === 0}
+            variant="outline"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            {isExporting ? "Exportando..." : "Exportar Tudo (.csv)"}
+          </Button>
+        </div>
+
+        <div className="text-right">
+          <div className="text-2xl font-bold text-yellow-600">
+            {purchasedLeads.length}
+          </div>
+          <div className="text-sm text-muted-foreground">leads comprados</div>
+        </div>
+      </div>
+
+      {purchasedLeads.length > 0 ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+          {purchasedLeads.map((purchasedLead) => {
+            const validDateSource =
+              purchasedLead.updated_at || purchasedLead.expires_at;
+            const purchaseDate =
+              validDateSource && typeof validDateSource === "string"
+                ? new Date(validDateSource)
+                : new Date();
+            return (
+              <PurchasedLeadCard
+                key={purchasedLead.id}
+                lead={purchasedLead}
+                purchaseDate={purchaseDate}
+                purchasePrice={purchasedLead.currentBid}
+              />
+            );
+          })}
+        </div>
+      ) : (
+        <div className="text-center py-12 border-2 border-dashed rounded-lg">
+          <FiShoppingBag className="h-16 w-16 text-muted-foreground/50 mx-auto mb-4" />
+          <div className="text-muted-foreground text-lg mb-2">
+            Nenhum lead comprado ainda
+          </div>
+          <p className="text-muted-foreground">
+            Participe dos leilões para adquirir leads qualificados
+          </p>
+        </div>
+      )}
+    </>
+  );
 }
