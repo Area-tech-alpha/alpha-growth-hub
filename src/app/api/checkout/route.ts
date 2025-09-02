@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../../../auth';
+import { PrismaClient } from '@prisma/client';
 
 const ASAAS_API_URL = process.env.ASAAS_API_URL!;
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY!;
@@ -64,6 +65,27 @@ export async function POST(request: Request) {
         }
 
         const asaasResponse = await response.json();
+
+        // Persist linkage between Asaas checkout and our user for webhook correlation
+        try {
+            if (asaasResponse?.id) {
+                const prisma = new PrismaClient();
+                await prisma.checkout_sessions.upsert({
+                    where: { asaas_checkout_id: asaasResponse.id },
+                    update: {
+                        internal_checkout_id: internalCheckoutId,
+                        user_id: session.user.id,
+                    },
+                    create: {
+                        asaas_checkout_id: asaasResponse.id,
+                        internal_checkout_id: internalCheckoutId,
+                        user_id: session.user.id,
+                    }
+                });
+            }
+        } catch (e) {
+            console.error('[Checkout] Failed to persist checkout session mapping:', e);
+        }
 
         return NextResponse.json({
             success: true,

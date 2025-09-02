@@ -11,6 +11,7 @@ export async function POST(request: Request) {
 
         const asaasPaymentId: string | undefined = payment?.id;
         const externalReference: string | undefined = payment?.externalReference ?? payment?.external_reference;
+        const checkoutSessionId: string | undefined = payment?.checkoutSession;
         const paidValue: number | undefined = typeof payment?.value === 'number' ? payment.value : Number(payment?.value);
 
         console.log('Webhook do Asaas recebido:', { event, paymentId: asaasPaymentId, externalReference });
@@ -30,9 +31,18 @@ export async function POST(request: Request) {
             return NextResponse.json({ ok: true, ignored: true }, { status: 200 });
         }
 
-        // Extract userId from externalReference: format set in checkout as `ck:<id>|uid:<userId>`
+        // Resolve userId: prefer externalReference uid, fallback to DB mapping by checkoutSession
+        let userId: string | undefined;
         const uidMatch = typeof externalReference === 'string' ? externalReference.match(/uid:([^|]+)/) : null;
-        const userId = uidMatch?.[1];
+        if (uidMatch?.[1]) {
+            userId = uidMatch[1];
+        } else if (typeof checkoutSessionId === 'string') {
+            const mapping = await prisma.checkout_sessions.findFirst({
+                where: { asaas_checkout_id: checkoutSessionId },
+                select: { user_id: true },
+            });
+            userId = mapping?.user_id;
+        }
 
         if (!userId) {
             console.warn(`[Asaas Webhook] externalReference sem uid para pagamento ${asaasPaymentId}:`, externalReference);
