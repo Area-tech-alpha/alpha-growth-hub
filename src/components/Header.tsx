@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { Button } from "./ui/button";
 import ThemeSwitcher from "./ThemeSwitcher";
@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } 
 import { useSession } from "next-auth/react";
 import LogoutButton from "./LogoutButton";
 import { useTheme } from "next-themes";
+import { useRealtimeStore } from "@/store/realtime-store";
 
 const LOGO_DARK_MODE_URL = `https://nfwfolrcpaxqwgkzzfok.supabase.co/storage/v1/object/public/Images/logo%20dark%20mode.png`;
 const LOGO_LIGHT_MODE_URL = `https://nfwfolrcpaxqwgkzzfok.supabase.co/storage/v1/object/public/Images/logo%20light%20mode.png`;
@@ -44,6 +45,20 @@ export default function Header({
     const emailToShow = session?.user?.email ?? userEmail;
     const avatarToShow = session?.user?.image ?? userAvatarUrl;
     const displayInitial = (nameToShow?.[0] || "U").toUpperCase();
+    const realtimeCredits = useRealtimeStore(s => s.userCredits);
+    const subscribeToUserCredits = useRealtimeStore(s => s.subscribeToUserCredits);
+
+    useEffect(() => {
+        if (session?.user?.id) {
+            console.log('[Header] Subscribing to user credits by id', { userId: session.user.id });
+            subscribeToUserCredits(session.user.id);
+        } else {
+            console.log('[Header] No session user id for credits subscription');
+        }
+    }, [session?.user?.id, subscribeToUserCredits]);
+
+    const displayCredits = session?.user?.id ? realtimeCredits : userCredits;
+    console.log('[Header] Render credits', { displayCredits, realtimeCredits, fallback: userCredits });
 
     const Logo = ({ width, height }: { width: number, height: number }) => {
         if (!mounted) {
@@ -76,7 +91,7 @@ export default function Header({
                         <div className="flex items-center gap-2 bg-yellow-50 dark:bg-yellow-900/20 px-3 py-1 rounded-lg border border-yellow-200 dark:border-yellow-700">
                             <LuCoins className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                             <span className="font-semibold text-yellow-900 dark:text-yellow-200">
-                                {userCredits.toLocaleString()} <span className="max-[375px]:sr-only">créditos</span>
+                                {displayCredits.toLocaleString()} <span className="max-[375px]:sr-only">créditos</span>
                             </span>
                         </div>
 
@@ -128,7 +143,7 @@ export default function Header({
                                         <div className="flex items-center gap-2 bg-yellow-50 dark:bg-yellow-900/20 px-3 py-1 rounded-lg border border-yellow-200 dark:border-yellow-700">
                                             <LuCoins className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                                             <span className="font-semibold text-yellow-900 dark:text-yellow-200">
-                                                {userCredits.toLocaleString()} <span className="max-[375px]:sr-only">créditos</span>
+                                                {displayCredits.toLocaleString()} <span className="max-[375px]:sr-only">créditos</span>
                                             </span>
                                         </div>
                                     </div>
