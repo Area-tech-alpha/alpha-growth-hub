@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import type { Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 
 export async function POST(
     _request: Request,
@@ -13,6 +13,16 @@ export async function POST(
 
     try {
         const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+            const toNum = (v: unknown): number => {
+                if (v == null) return 0
+                const anyV = v as { toNumber?: () => number }
+                if (anyV && typeof anyV.toNumber === 'function') {
+                    const n = anyV.toNumber()
+                    return Number.isFinite(n) ? n : 0
+                }
+                const n = typeof v === 'string' ? parseFloat(v as string) : Number(v)
+                return Number.isFinite(n) ? n : 0
+            }
             const auction = await tx.auctions.findUnique({
                 where: { id: auctionId },
                 include: { leads: true }
@@ -45,6 +55,16 @@ export async function POST(
                     })
                 ])
 
+                // Release all active holds for this auction
+                const before = await tx.credit_holds.findMany({ where: { auction_id: auctionId, status: 'active' }, select: { id: true, user_id: true, amount: true, status: true } })
+                console.log('[close-auction] no-bids active holds before:', before.length, before.map(h => h.id))
+                const upd = await tx.credit_holds.updateMany({
+                    where: { auction_id: auctionId, status: 'active' },
+                    data: { status: 'released', updated_at: new Date() as unknown as Date }
+                })
+                const after = await tx.credit_holds.findMany({ where: { auction_id: auctionId, status: 'active' }, select: { id: true } })
+                console.log('[close-auction] no-bids holds update count:', upd.count, 'remaining active:', after.length)
+
                 return { status: 200 as const, body: { auction: updatedAuction, lead: updatedLead, outcome: 'expired_no_bids' as const } }
             }
 
@@ -59,6 +79,30 @@ export async function POST(
                     data: { status: 'sold', owner_id: topBid.user_id }
                 })
             ])
+
+            // Consume winner's hold and release others
+            const beforeWinner = await tx.credit_holds.findMany({ where: { auction_id: auctionId, user_id: topBid.user_id, status: 'active' }, select: { id: true, amount: true } })
+            const beforeOthers = await tx.credit_holds.findMany({ where: { auction_id: auctionId, user_id: { not: topBid.user_id }, status: 'active' }, select: { id: true, amount: true } })
+            console.log('[close-auction] winner holds before count:', beforeWinner.length, 'ids:', beforeWinner.map(h => h.id))
+            console.log('[close-auction] others holds before count:', beforeOthers.length, 'ids:', beforeOthers.map(h => h.id))
+
+            const updWinner = await tx.credit_holds.updateMany({
+                where: { auction_id: auctionId, user_id: topBid.user_id, status: 'active' },
+                data: { status: 'consumed', updated_at: new Date() as unknown as Date }
+            })
+            const updOthers = await tx.credit_holds.updateMany({
+                where: { auction_id: auctionId, user_id: { not: topBid.user_id }, status: 'active' },
+                data: { status: 'released', updated_at: new Date() as unknown as Date }
+            })
+            const remaining = await tx.credit_holds.findMany({ where: { auction_id: auctionId, status: 'active' }, select: { id: true, user_id: true } })
+            console.log('[close-auction] holds updated - winner consumed:', updWinner.count, 'others released:', updOthers.count, 'remaining active:', remaining.length)
+
+            // Deduct credits from winner's balance (proportional to winning bid)
+            const winner = await tx.users.findUnique({ where: { id: topBid.user_id }, select: { credit_balance: true } })
+            const winnerBalance = toNum(winner?.credit_balance as unknown)
+            const winningAmount = toNum(topBid.amount as unknown)
+            const nextBalance = new Prisma.Decimal(winnerBalance).minus(new Prisma.Decimal(winningAmount))
+            await tx.users.update({ where: { id: topBid.user_id }, data: { credit_balance: nextBalance } })
 
             return { status: 200 as const, body: { auction: updatedAuction, lead: updatedLead, outcome: 'won' as const, winningBidId: topBid.id } }
         })
