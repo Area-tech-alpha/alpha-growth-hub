@@ -56,6 +56,15 @@ export default function Dashboard({
   const addPurchasedLeadIfMissing = useRealtimeStore(
     (s: RealtimeState) => s.addPurchasedLeadIfMissing
   );
+  const fetchUserLeads = useRealtimeStore(
+    (s: RealtimeState) => s.fetchUserLeads
+  );
+  const subscribeToUserLeads = useRealtimeStore(
+    (s: RealtimeState) => s.subscribeToUserLeads
+  );
+  const unsubscribeFromUserLeads = useRealtimeStore(
+    (s: RealtimeState) => s.unsubscribeFromUserLeads
+  );
   const setBidsForAuction = useRealtimeStore(
     (s: RealtimeState) => s.setBidsForAuction
   );
@@ -315,33 +324,13 @@ export default function Dashboard({
       console.warn("[Dashboard] Skip leads realtime: no userId");
       return;
     }
-    console.log("[Dashboard] Subscribing leads realtime for owner:", userId);
-    const channel = supabase
-      .channel("dashboard-realtime-leads")
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "leads",
-          filter: `owner_id=eq.${userId}`,
-        },
-        (payload: { new: Lead & { owner_id?: string } }) => {
-          console.log("[Dashboard] leads UPDATE payload:", {
-            id: payload.new?.id,
-            owner_id: payload.new?.owner_id,
-          });
-          addPurchasedLeadIfMissing(payload.new as unknown as Lead);
-        }
-      )
-      .subscribe((status) => {
-        console.log("[Dashboard] leads channel status:", status);
-      });
+    console.log('[Dashboard] Fetch + Subscribe user leads');
+    fetchUserLeads(userId, 200);
+    subscribeToUserLeads(userId);
     return () => {
-      console.log("[Dashboard] Unsubscribing leads realtime");
-      supabase.removeChannel(channel);
+      unsubscribeFromUserLeads();
     };
-  }, [supabase, userId, addPurchasedLeadIfMissing]);
+  }, [userId, fetchUserLeads, subscribeToUserLeads, unsubscribeFromUserLeads]);
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
       <Tabs defaultValue="leiloes" className="w-full">

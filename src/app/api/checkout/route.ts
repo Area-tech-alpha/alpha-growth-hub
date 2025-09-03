@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../../../auth';
 import { prisma } from '@/lib/prisma';
+import { createClient as createSupabaseServerClient } from '@/utils/supabase/server';
 
 const ASAAS_API_URL = process.env.ASAAS_API_URL!;
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY!;
@@ -88,22 +89,48 @@ export async function POST(request: Request) {
         if (!asaasResponse?.id) {
             return NextResponse.json({ error: 'Resposta inválida do Asaas (sem id do checkout)' }, { status: 502 });
         }
+        // Persist with retry, fallback to Supabase if Prisma cannot reach DB
         try {
-            await prisma.checkout_sessions.upsert({
-                where: { asaas_checkout_id: asaasResponse.id },
-                update: {
-                    internal_checkout_id: internalCheckoutId,
-                    user_id: session.user.id,
-                },
-                create: {
-                    asaas_checkout_id: asaasResponse.id,
-                    internal_checkout_id: internalCheckoutId,
-                    user_id: session.user.id,
+            const persist = async () => {
+                await prisma.checkout_sessions.upsert({
+                    where: { asaas_checkout_id: asaasResponse.id },
+                    update: {
+                        internal_checkout_id: internalCheckoutId,
+                        user_id: session.user.id,
+                    },
+                    create: {
+                        asaas_checkout_id: asaasResponse.id,
+                        internal_checkout_id: internalCheckoutId,
+                        user_id: session.user.id,
+                    }
+                });
+            };
+            let lastErr: unknown = null;
+            for (let i = 0; i < 2; i++) {
+                try { await persist(); lastErr = null; break; } catch (err) {
+                    lastErr = err; await new Promise(r => setTimeout(r, 300 * (i + 1)));
                 }
-            });
+            }
+            if (lastErr) throw lastErr;
         } catch (e) {
-            console.error('[Checkout] Failed to persist checkout session mapping:', e);
-            return NextResponse.json({ error: 'Falha ao persistir mapeamento do checkout' }, { status: 500 });
+            console.error('[Checkout] Prisma persist failed, trying Supabase upsert:', e);
+            try {
+                const supabase = await createSupabaseServerClient();
+                const { error } = await supabase
+                    .from('checkout_sessions')
+                    .upsert({
+                        asaas_checkout_id: asaasResponse.id,
+                        internal_checkout_id: internalCheckoutId,
+                        user_id: session.user.id,
+                    }, { onConflict: 'asaas_checkout_id' });
+                if (error) {
+                    console.error('[Checkout] Supabase upsert fallback failed:', error);
+                    return NextResponse.json({ error: 'Falha ao persistir mapeamento do checkout' }, { status: 500 });
+                }
+            } catch (err2) {
+                console.error('[Checkout] Supabase client init failed:', err2);
+                return NextResponse.json({ error: 'Falha ao persistir mapeamento do checkout' }, { status: 500 });
+            }
         }
 
         const payload = {
