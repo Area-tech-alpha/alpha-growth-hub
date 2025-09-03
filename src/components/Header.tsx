@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { Button } from "./ui/button";
 import ThemeSwitcher from "./ThemeSwitcher";
@@ -8,6 +8,10 @@ import { LuCoins, LuMenu } from "react-icons/lu";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from "./ui/dialog";
 import { useSession } from "next-auth/react";
 import LogoutButton from "./LogoutButton";
+import { useTheme } from "next-themes";
+
+const LOGO_DARK_MODE_URL = `https://nfwfolrcpaxqwgkzzfok.supabase.co/storage/v1/object/public/Images/logo%20dark%20mode.png`;
+const LOGO_LIGHT_MODE_URL = `https://nfwfolrcpaxqwgkzzfok.supabase.co/storage/v1/object/public/Images/logo%20light%20mode.png`;
 
 type HeaderProps = {
     userName?: string;
@@ -25,10 +29,38 @@ export default function Header({
     showThemeSwitch = true,
 }: HeaderProps) {
     const { data: session } = useSession();
+    const { theme, systemTheme } = useTheme();
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    const currentTheme = theme === 'system' ? systemTheme : theme;
+    const isDarkMode = currentTheme === 'dark';
+    const logoSrc = isDarkMode ? LOGO_DARK_MODE_URL : LOGO_LIGHT_MODE_URL;
+
     const nameToShow = (session?.user?.name ?? userName) || "Usuário";
     const emailToShow = session?.user?.email ?? userEmail;
     const avatarToShow = session?.user?.image ?? userAvatarUrl;
     const displayInitial = (nameToShow?.[0] || "U").toUpperCase();
+
+    const Logo = ({ width, height }: { width: number, height: number }) => {
+        if (!mounted) {
+            return <div style={{ width: `${width}px`, height: `${height}px` }} />;
+        }
+        return (
+            <Image
+                src={logoSrc}
+                alt="Alpha Assessoria Logo"
+                width={width}
+                height={height}
+                className="h-auto"
+                priority
+            />
+        );
+    };
+
 
     return (
         <header className="w-full bg-background border-b border-border/40 shadow-sm fixed top-0 z-50">
@@ -36,14 +68,7 @@ export default function Header({
                 <div className="flex justify-between items-center h-16">
                     <div className="flex items-center space-x-3">
                         <a href="#home" className="relative group flex items-center">
-                            <Image
-                                src="https://assessorialpha.com/wp-content/uploads/2023/04/01-61.png"
-                                alt="Alpha Assessoria Logo"
-                                width={120}
-                                height={40}
-                                className="h-auto"
-                                priority
-                            />
+                            <Logo width={120} height={40} />
                         </a>
                     </div>
 
@@ -86,7 +111,6 @@ export default function Header({
 
                         <LogoutButton />
 
-                        {/* Mobile dropdown trigger */}
                         <div className="sm:hidden">
                             <Dialog>
                                 <DialogTrigger asChild>
@@ -99,14 +123,7 @@ export default function Header({
                                     <DialogDescription className="sr-only">Ações do usuário</DialogDescription>
                                     <div className="flex items-center justify-between pb-3 border-b pr-10">
                                         <a href="#home" className="relative group flex items-center">
-                                            <Image
-                                                src="https://assessorialpha.com/wp-content/uploads/2023/04/01-61.png"
-                                                alt="Alpha Assessoria Logo"
-                                                width={110}
-                                                height={36}
-                                                className="h-auto"
-                                                priority
-                                            />
+                                            <Logo width={110} height={36} />
                                         </a>
                                         <div className="flex items-center gap-2 bg-yellow-50 dark:bg-yellow-900/20 px-3 py-1 rounded-lg border border-yellow-200 dark:border-yellow-700">
                                             <LuCoins className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
@@ -156,4 +173,3 @@ export default function Header({
         </header>
     );
 }
-

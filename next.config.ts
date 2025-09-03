@@ -1,8 +1,20 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   images: {
-    domains: ['assessorialpha.com', "izmzxqzcsnaykofpcjjh.supabase.co", "lh3.googleusercontent.com"],
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "nfwfolrcpaxqwgkzzfok.supabase.co", 
+      },
+      {
+        protocol: "https",
+        hostname: "assessorialpha.com", 
+      },
+      {
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com", 
+      },
+    ],
   },
 };
 
