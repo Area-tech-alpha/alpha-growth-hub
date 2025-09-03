@@ -117,31 +117,34 @@ export default function MeusLeadsPanel() {
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-foreground">
-              Meus Leads Comprados
-            </h2>
-            <p className="text-muted-foreground">
-              Leads que você adquiriu nos leilões
-            </p>
-          </div>
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-foreground">
+            Meus Leads Comprados
+          </h2>
+          <p className="text-muted-foreground">
+            Leads que você adquiriu nos leilões
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between gap-4 sm:justify-end sm:gap-6">
           <Button
             onClick={handleExportAll}
             disabled={isExporting || purchasedLeads.length === 0}
-            variant="outline"
+            className="w-full sm:w-auto bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-black shadow-md transition-all duration-200"
           >
             <Download className="h-4 w-4 mr-2" />
             {isExporting ? "Exportando..." : "Exportar Tudo (.csv)"}
           </Button>
-        </div>
 
-        <div className="text-right">
-          <div className="text-2xl font-bold text-yellow-600">
-            {purchasedLeads.length}
+          <div className="flex-shrink-0 text-right">
+            <div className="text-2xl font-bold text-yellow-600">
+              {purchasedLeads.length}
+            </div>
+            <div className="text-sm text-muted-foreground whitespace-nowrap">
+              leads comprados
+            </div>
           </div>
-          <div className="text-sm text-muted-foreground">leads comprados</div>
         </div>
       </div>
 
@@ -165,7 +168,7 @@ export default function MeusLeadsPanel() {
           })}
         </div>
       ) : (
-        <div className="text-center py-12 border-2 border-dashed rounded-lg">
+        <div className="text-center py-12 border-2 border-dashed rounded-lg bg-card text-card-foreground">
           <FiShoppingBag className="h-16 w-16 text-muted-foreground/50 mx-auto mb-4" />
           <div className="text-muted-foreground text-lg mb-2">
             Nenhum lead comprado ainda
