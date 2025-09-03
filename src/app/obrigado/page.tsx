@@ -1,66 +1,93 @@
+// app/obrigado/page.tsx
 "use client";
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import useSWR from 'swr';
+
+// Função auxiliar para o SWR fazer as requisições
+const fetcher = (url: string) => fetch(url).then(res => res.json());
 
 function ObrigadoContent() {
     const searchParams = useSearchParams();
-    const status = searchParams.get('status')?.toLowerCase();
+    // Pegamos o checkoutId, que é nosso identificador único da transação
+    const checkoutId = searchParams.get('checkoutId');
 
-    const [message, setMessage] = useState<{ title: string; subtitle: string }>({
-        title: 'Obrigado',
-        subtitle: 'Recebemos seu retorno.',
+    const [uiState, setUiState] = useState<{ title: string; subtitle: string; loading: boolean }>({
+        title: 'Verificando seu pagamento...',
+        subtitle: 'Por favor, aguarde um instante.',
+        loading: true,
     });
-    const [isLoading, setIsLoading] = useState(true);
-    const timeoutRef = useRef<number | null>(null);
+
+    // SWR vai chamar nossa API a cada 3 segundos para verificar o status
+    const { data, error } = useSWR(
+        checkoutId ? `/api/check-status?checkoutId=${checkoutId}` : null,
+        fetcher,
+        {
+            refreshInterval: 3000, // 3 segundos
+            revalidateOnFocus: false,
+            revalidateOnReconnect: false,
+        }
+    );
 
     useEffect(() => {
-        if (timeoutRef.current) {
-            window.clearTimeout(timeoutRef.current);
-            timeoutRef.current = null;
-        }
-
-        if (status) {
-            if (status === 'success') {
-                setMessage({
-                    title: 'Pagamento confirmado!',
-                    subtitle: 'Seus créditos foram adicionados. Você já pode usar a plataforma.',
-                });
-            } else {
-                setMessage({
-                    title: 'Obrigado',
-                    subtitle: 'Recebemos seu retorno.',
-                });
-            }
-            setIsLoading(false);
+        // Estado de erro na API
+        if (error) {
+            setUiState({
+                title: 'Ocorreu um problema',
+                subtitle: 'Não foi possível verificar o status do seu pagamento. Por favor, contate o suporte.',
+                loading: false,
+            });
             return;
         }
 
-        timeoutRef.current = window.setTimeout(() => {
-            setIsLoading(false);
-        }, 600);
+        // A API retornou que o processamento foi concluído com sucesso
+        if (data?.status === 'SUCCESS') {
+            setUiState({
+                title: 'Pagamento confirmado! 🎉',
+                subtitle: 'Seus créditos foram adicionados com sucesso. Você já pode usar a plataforma.',
+                loading: false,
+            });
+        }
+        // A API retornou que o pagamento ainda está pendente de processamento no nosso sistema
+        else if (data?.status === 'PENDING') {
+            setUiState({
+                title: 'Pagamento aprovado!',
+                subtitle: 'Estamos processando seus créditos. Esta página será atualizada automaticamente.',
+                loading: true, // Mantém o visual de "carregando"
+            });
+        }
 
-        return () => {
-            if (timeoutRef.current) {
-                window.clearTimeout(timeoutRef.current);
-            }
-        };
-    }, [status]);
+    }, [data, error]);
 
-    if (isLoading) {
-        return <p className="text-gray-400">Carregando...</p>;
+    // O SWR ainda está na primeira requisição (isLoading não está disponível diretamente no SWR v2, então usamos nosso próprio estado)
+    if (!data && !error && uiState.loading) {
+        return (
+            <div className="flex flex-col items-center text-center">
+                <svg className="animate-spin h-8 w-8 text-yellow-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <h1 className="text-2xl md:text-3xl font-semibold text-white mb-2">{uiState.title}</h1>
+                <p className="text-gray-300 mb-6">{uiState.subtitle}</p>
+            </div>
+        );
     }
 
+    // Renderização final (Sucesso ou Erro)
     return (
         <>
-            <h1 className="text-2xl md:text-3xl font-semibold text-white mb-2">{message.title}</h1>
-            <p className="text-gray-300 mb-6">{message.subtitle}</p>
-            <Link href="/" className="px-4 py-2 rounded bg-yellow-500 text-black hover:bg-yellow-400 transition">Ir para o Dashboard</Link>
+            <h1 className="text-2xl md:text-3xl font-semibold text-white mb-2">{uiState.title}</h1>
+            <p className="text-gray-300 mb-6">{uiState.subtitle}</p>
+            <Link href="/" className="px-4 py-2 rounded bg-yellow-500 text-black hover:bg-yellow-400 transition">
+                Ir para o Dashboard
+            </Link>
         </>
     );
 }
 
+// Componente principal da página, com Suspense para carregar os parâmetros da URL
 export default function ObrigadoPage() {
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-black relative overflow-hidden">
@@ -75,5 +102,3 @@ export default function ObrigadoPage() {
         </div>
     );
 }
-
-
