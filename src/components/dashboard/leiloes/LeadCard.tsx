@@ -27,13 +27,18 @@ interface LeadCardProps {
 }
 
 export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
-  const formatCurrency = (value: number) => {
+  const formatCurrency = (value: number | undefined | null) => {
+    const numericValue = typeof value === "number" && !isNaN(value) ? value : 0;
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
       currency: "BRL",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(value);
+    }).format(numericValue);
+  };
+
+  const formatNumber = (value: number | undefined | null) => {
+    return typeof value === "number" && !isNaN(value) ? value.toString() : "0";
   };
 
   const isHot = lead.status === "hot";
@@ -152,7 +157,7 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
             </div>
             <div className="text-center">
               <div className="text-lg font-bold text-foreground">
-                {lead.bidders}
+                {formatNumber(lead.bidders)}
               </div>
               <div className="text-xs text-muted-foreground">Lances</div>
             </div>
