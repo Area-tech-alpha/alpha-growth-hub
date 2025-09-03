@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRealtimeStore } from "@/store/realtime-store";
 import {
   Card,
@@ -23,8 +23,7 @@ type Purchase = {
 };
 
 export default function PurchaseHistoryPanel() {
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const purchases = useRealtimeStore(s => s.userPurchases) as Purchase[];
 
   useEffect(() => {
@@ -64,8 +63,6 @@ export default function PurchaseHistoryPanel() {
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
           </div>
-        ) : error ? (
-          <p className="text-red-500 text-sm text-center">{error}</p>
         ) : purchases.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
             Nenhuma compra realizada ainda.
