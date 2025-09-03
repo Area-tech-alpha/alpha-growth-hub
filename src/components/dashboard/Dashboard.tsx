@@ -59,11 +59,31 @@ export default function Dashboard({
   const setBidsForAuction = useRealtimeStore(
     (s: RealtimeState) => s.setBidsForAuction
   );
+  const userCredits = useRealtimeStore((s: RealtimeState) => s.userCredits);
+  const subscribeToUserCredits = useRealtimeStore(
+    (s: RealtimeState) => s.subscribeToUserCredits
+  );
+  const subscribeToUserPurchases = useRealtimeStore(
+    (s: RealtimeState) => s.subscribeToUserPurchases
+  );
+  const fetchLatestUserPurchases = useRealtimeStore(
+    (s: RealtimeState) => s.fetchLatestUserPurchases
+  );
 
   useEffect(() => {
     userIdRef.current = userId;
     console.log("[Dashboard] userId:", userId);
   }, [userId]);
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      console.log('[Dashboard] Subscribing to user credits by id', { userId: session.user.id });
+      subscribeToUserCredits(session.user.id);
+      console.log('[Dashboard] Subscribing to user purchases + fetch initial');
+      fetchLatestUserPurchases({ userId: session?.user?.id, limit: 10 });
+      subscribeToUserPurchases({ userId: session?.user?.id });
+    }
+  }, [session?.user?.id, subscribeToUserCredits, fetchLatestUserPurchases, subscribeToUserPurchases]);
 
   const normalizedInitialAuctions: AuctionWithLead[] = useMemo(() => {
     const mapped = (initialAuctions || []).map((auction) => ({
@@ -226,7 +246,7 @@ export default function Dashboard({
                       );
                       addPurchasedLeadIfMissing(data as unknown as Lead);
                     }
-                  } catch {}
+                  } catch { }
                 })();
               } else if (auctionBids.some((b) => b.userId === currentUserId)) {
                 toast("Leilão encerrado", {
@@ -342,7 +362,7 @@ export default function Dashboard({
           </div>
         </TabsList>
         <TabsContent value="creditos">
-          <CreditosPanel />
+          <CreditosPanel currentCredits={userCredits} />
         </TabsContent>
         <TabsContent value="meus-leads">
           <MeusLeadsPanel />

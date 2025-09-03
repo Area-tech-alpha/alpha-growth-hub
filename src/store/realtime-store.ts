@@ -1,7 +1,7 @@
-import { create } from 'zustand'
-import type { AuctionWithLead, Bid } from '@/components/dashboard/leiloes/types'
-import type { Lead } from '@/components/dashboard/leads/types'
-import { createClient } from '@/utils/supabase/client'
+import { create } from 'zustand';
+import type { AuctionWithLead, Bid } from '@/components/dashboard/leiloes/types';
+import type { Lead } from '@/components/dashboard/leads/types';
+import { createClient } from '@/utils/supabase/client';
 
 export interface RealtimeState {
     activeAuctions: AuctionWithLead[];
@@ -24,20 +24,24 @@ export interface RealtimeState {
 
     setUserCredits: (credits: number) => void;
     subscribeToUserCredits: (userId: string) => void;
-    subscribeToUserCreditsBy: (params: { userId?: string; email?: string }) => void;
     unsubscribeFromUserCredits: () => void;
+
+    // Credit purchases (history)
+    userPurchases: Array<{ id: string | number; created_at: string; amount_credits?: number; credits_purchased?: number; amount_paid?: number; status?: string;[key: string]: unknown }>;
+    setUserPurchases: (rows: Array<{ id: string | number; created_at: string;[key: string]: unknown }>) => void;
+    fetchLatestUserPurchases: (params: { userId: string; limit?: number }) => Promise<void>;
+    subscribeToUserPurchases: (params: { userId: string }) => void;
+    unsubscribeFromUserPurchases: () => void;
 }
 
 const supabase = createClient();
 let userCreditsChannel: ReturnType<typeof supabase.channel> | null = null;
 let subscribedKey: string | null = null;
+let purchasesChannel: ReturnType<typeof supabase.channel> | null = null;
+let purchasesSubscribedKey: string | null = null;
 
-function isUuidLike(value?: string): boolean {
-    if (!value) return false;
-    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-}
 
-export const useRealtimeStore = create<RealtimeState>()((set) => ({
+export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
     activeAuctions: [],
     bidsByAuction: {},
     purchasedLeads: [],
@@ -106,17 +110,9 @@ export const useRealtimeStore = create<RealtimeState>()((set) => ({
     setUserCredits: (credits: number) => set({ userCredits: credits }),
 
     subscribeToUserCredits: (userId: string) => {
-        useRealtimeStore.getState().subscribeToUserCreditsBy({ userId });
-    },
-
-    subscribeToUserCreditsBy: ({ userId, email }: { userId?: string; email?: string }) => {
-        const preferId = isUuidLike(userId);
-        const filterField = preferId ? 'id' : (email ? 'email' : undefined);
-        const filterValue = preferId ? (userId as string) : (email as string);
-        const nextKey = filterField && filterValue ? `${filterField}:${filterValue}` : null;
-
-        console.log('[Store] subscribeToUserCreditsBy invoked', { userId, email, preferId, filterField, filterValue, alreadySubscribed: subscribedKey === nextKey });
-        if (!filterField || !filterValue) return;
+        const nextKey = userId ? `id:${userId}` : null;
+        console.log('[Store] subscribeToUserCredits invoked', { userId, alreadySubscribed: subscribedKey === nextKey });
+        if (!nextKey) return;
         if (subscribedKey === nextKey && userCreditsChannel) return;
 
         // Tear down previous subscription if switching users
@@ -129,14 +125,15 @@ export const useRealtimeStore = create<RealtimeState>()((set) => ({
             subscribedKey = null;
         }
 
-        const channelName = `users-credits-${filterField}-${filterValue}`;
-        console.log('[Store] Subscribing user credits channel', { channelName, filterField, filterValue });
+        const channelName = `users-credits-id-${userId}`;
+        console.log('[Store] Subscribing user credits channel', { channelName, userId });
         userCreditsChannel = supabase
             .channel(channelName)
             .on(
                 'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'users', filter: `${filterField}=eq.${filterValue}` },
+                { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${userId}` },
                 (payload: { new?: { credit_balance?: number | string } }) => {
+                    console.log('[Store] Received UPDATE payload for users (credits)', payload);
                     const raw = (payload?.new as unknown as { credit_balance?: number | string })?.credit_balance;
                     const parsed = typeof raw === 'string' ? parseFloat(raw) : (raw ?? 0);
                     const next = Number.isFinite(parsed as number) ? Number(parsed) : 0;
@@ -149,16 +146,19 @@ export const useRealtimeStore = create<RealtimeState>()((set) => ({
             });
         subscribedKey = nextKey;
 
-        // Seed with initial value via internal API (avoids RLS/type mismatches)
-        fetch('/api/me/credits')
-            .then(res => res.ok ? res.json() : null)
-            .then(data => {
-                if (!data) return;
-                const value = typeof data.creditBalance === 'string' ? parseFloat(data.creditBalance) : data.creditBalance;
-                const next = Number.isFinite(value) ? Number(value) : 0;
-                set({ userCredits: next });
-            })
-            .catch(() => { });
+        // Seed with initial value via Supabase (by id)
+        console.log('[Store] Fetching initial credit_balance via RPC', { userId });
+        supabase
+            .rpc('get_user_credit_balance', { p_user_id: userId })
+            .then(({ data, error }) => {
+                if (error) {
+                    console.warn('[Store] Failed to fetch initial credit_balance via RPC', { message: error.message, userId });
+                    return;
+                }
+                const next = Number(data ?? 0);
+                console.log('[Store] Setting initial userCredits (RPC)', { next });
+                set({ userCredits: Number.isFinite(next) ? next : 0 });
+            });
     },
 
     unsubscribeFromUserCredits: () => {
@@ -170,7 +170,92 @@ export const useRealtimeStore = create<RealtimeState>()((set) => ({
             userCreditsChannel = null;
             subscribedKey = null;
         }
+    },
+
+    // Purchases (credit_transactions)
+    userPurchases: [],
+    setUserPurchases: (rows) => set({ userPurchases: rows }),
+
+    // Buscar últimas transações via RPC (security definer), com fallback ao SELECT se a RPC não existir
+    fetchLatestUserPurchases: async ({ userId, limit = 5 }: { userId: string; limit?: number }) => {
+        console.log('[Store] fetchLatestUserPurchases invoked', { userId, limit });
+        if (!userId) {
+            console.warn('[Store] fetchLatestUserPurchases requires a userId.');
+            return;
+        }
+        // Primeiro tenta RPC
+        const rpcRes = await supabase.rpc('get_user_credit_transactions', { p_user_id: userId, p_limit: limit });
+        if (!rpcRes.error && Array.isArray(rpcRes.data)) {
+            console.log('[Store] fetchLatestUserPurchases RPC rows', { count: rpcRes.data.length });
+            set({ userPurchases: (rpcRes.data as Array<{ id: string | number; created_at: string;[key: string]: unknown }>) });
+            return;
+        }
+        if (rpcRes.error) {
+            console.warn('[Store] RPC get_user_credit_transactions failed, falling back to SELECT', { message: rpcRes.error.message });
+        }
+        // Fallback SELECT
+        const { data, error } = await supabase
+            .from('credit_transactions')
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(limit);
+        if (error) {
+            console.warn('[Store] fetchLatestUserPurchases SELECT error', { message: error.message });
+            return;
+        }
+        console.log('[Store] fetchLatestUserPurchases SELECT rows', { count: (data || []).length });
+        set({ userPurchases: ((data || []) as Array<{ id: string | number; created_at: string;[key: string]: unknown }>) });
+    },
+
+    // Assinatura realtime por userId (inserções)
+    subscribeToUserPurchases: ({ userId }: { userId: string }) => {
+        const nextKey = userId;
+        if (!userId) {
+            console.warn('[Store] subscribeToUserPurchases requires a userId.');
+            return;
+        }
+        if (purchasesSubscribedKey === nextKey && purchasesChannel) return;
+
+        if (purchasesChannel) {
+            try {
+                console.log('[Store] Unsubscribing previous purchases channel', { purchasesSubscribedKey });
+                supabase.removeChannel(purchasesChannel);
+            } catch { }
+            purchasesChannel = null;
+            purchasesSubscribedKey = null;
+        }
+
+        const channelName = `credit_transactions_user_${userId}`;
+        console.log('[Store] Subscribing purchases channel', { channelName, userId });
+        purchasesChannel = supabase
+            .channel(channelName)
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'credit_transactions', filter: `user_id=eq.${userId}` },
+                (payload) => {
+                    console.log('[Store] Realtime INSERT credit_transactions payload', payload);
+                    const row = payload?.new as { id?: string | number } & Record<string, unknown>;
+                    if (!row?.id) return;
+                    const current = get().userPurchases || [];
+                    if (current.some(p => p.id === row.id)) return;
+                    set({ userPurchases: [row as { id: string | number; created_at: string;[key: string]: unknown }, ...current] });
+                }
+            )
+            .subscribe((status) => {
+                console.log('[Store] purchases channel status:', status);
+            });
+        purchasesSubscribedKey = nextKey;
+    },
+
+    unsubscribeFromUserPurchases: () => {
+        if (purchasesChannel) {
+            try {
+                console.log('[Store] Unsubscribing purchases channel', { purchasesSubscribedKey });
+                supabase.removeChannel(purchasesChannel);
+            } catch { }
+            purchasesChannel = null;
+            purchasesSubscribedKey = null;
+        }
     }
 }));
-
-

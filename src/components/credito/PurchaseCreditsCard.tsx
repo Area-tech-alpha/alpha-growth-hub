@@ -29,16 +29,17 @@ export default function PurchaseCreditsCard({
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const realtimeCredits = useRealtimeStore(s => s.userCredits);
-    const subscribeToUserCreditsBy = useRealtimeStore(s => s.subscribeToUserCreditsBy);
+    const subscribeToUserCredits = useRealtimeStore(s => s.subscribeToUserCredits);
 
     useEffect(() => {
-        if (session?.user?.id || session?.user?.email) {
-            console.log('[PurchaseCreditsCard] Subscribing to user credits', { userId: session?.user?.id, email: session?.user?.email });
-            subscribeToUserCreditsBy({ userId: session?.user?.id, email: session?.user?.email || undefined });
+        console.log("realTimeCreditsss", realtimeCredits);
+        if (session?.user?.id) {
+            console.log('[PurchaseCreditsCard] Subscribing to user credits by id', { userId: session.user.id });
+            subscribeToUserCredits(session.user.id);
         } else {
             console.log('[PurchaseCreditsCard] No session user id for credits subscription');
         }
-    }, [session?.user?.id, session?.user?.email, subscribeToUserCreditsBy]);
+    }, [session?.user?.id, subscribeToUserCredits, realtimeCredits]);
 
     const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
         const value = Number(e.target.value);
