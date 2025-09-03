@@ -11,8 +11,6 @@ import LogoutButton from "./LogoutButton";
 import { useTheme } from "next-themes";
 import { useRealtimeStore } from "@/store/realtime-store";
 
-const LOGO_DARK_MODE_URL = `https://nfwfolrcpaxqwgkzzfok.supabase.co/storage/v1/object/public/Images/logo%20dark%20mode.png`;
-const LOGO_LIGHT_MODE_URL = `https://nfwfolrcpaxqwgkzzfok.supabase.co/storage/v1/object/public/Images/logo%20light%20mode.png`;
 
 type HeaderProps = {
     userName?: string;
@@ -30,16 +28,21 @@ export default function Header({
     showThemeSwitch = true,
 }: HeaderProps) {
     const { data: session } = useSession();
-    const { theme, systemTheme } = useTheme();
+    const { theme, resolvedTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
+    const [logoURL, setLogoURL] = useState("");
+    const LOGO_DARK_MODE_URL = `https://nfwfolrcpaxqwgkzzfok.supabase.co/storage/v1/object/public/Images/logo%20dark%20mode.png`;
+    const LOGO_LIGHT_MODE_URL = `https://nfwfolrcpaxqwgkzzfok.supabase.co/storage/v1/object/public/Images/logo%20light%20mode.png`;
 
     useEffect(() => {
         setMounted(true);
     }, []);
 
-    const currentTheme = theme === 'system' ? systemTheme : theme;
-    const isDarkMode = currentTheme === 'dark';
-    const logoSrc = isDarkMode ? LOGO_DARK_MODE_URL : LOGO_LIGHT_MODE_URL;
+    useEffect(() => {
+        const current = resolvedTheme || theme;
+        setLogoURL(current === "dark" ? LOGO_DARK_MODE_URL : LOGO_LIGHT_MODE_URL);
+    }, [resolvedTheme, theme, LOGO_DARK_MODE_URL, LOGO_LIGHT_MODE_URL])
+
 
     const nameToShow = (session?.user?.name ?? userName) || "Usuário";
     const emailToShow = session?.user?.email ?? userEmail;
@@ -66,7 +69,7 @@ export default function Header({
         }
         return (
             <Image
-                src={logoSrc}
+                src={logoURL}
                 alt="Alpha Assessoria Logo"
                 width={width}
                 height={height}
