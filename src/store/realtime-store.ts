@@ -21,6 +21,9 @@ export interface RealtimeState {
     updateAuctionStatsFromBid: (auctionId: string, amount: number) => void;
 
     addPurchasedLeadIfMissing: (lead: Lead) => void;
+    fetchUserLeads: (userId: string, limit?: number) => Promise<void>;
+    subscribeToUserLeads: (userId: string) => void;
+    unsubscribeFromUserLeads: () => void;
 
     setUserCredits: (credits: number) => void;
     subscribeToUserCredits: (userId: string) => void;
@@ -39,6 +42,8 @@ let userCreditsChannel: ReturnType<typeof supabase.channel> | null = null;
 let subscribedKey: string | null = null;
 let purchasesChannel: ReturnType<typeof supabase.channel> | null = null;
 let purchasesSubscribedKey: string | null = null;
+let leadsChannel: ReturnType<typeof supabase.channel> | null = null;
+let leadsSubscribedKey: string | null = null;
 
 
 export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
@@ -106,6 +111,95 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
         if (exists) return {};
         return { purchasedLeads: [lead, ...state.purchasedLeads] };
     }),
+
+    // Fetch purchased leads (owner_id = userId)
+    fetchUserLeads: async (userId: string, limit: number = 100) => {
+        if (!userId) return;
+        console.log('[Store] Fetch user leads start', { userId, limit });
+        // Try RPC first for RLS-friendly access if defined
+        const rpc = await supabase.rpc('get_user_leads', { p_user_id: userId, p_limit: limit });
+        if (!rpc.error && Array.isArray(rpc.data)) {
+            console.log('[Store] Fetch user leads RPC rows', { count: rpc.data.length });
+            set({ purchasedLeads: (rpc.data as unknown as Lead[]) || [] });
+            return;
+        }
+        if (rpc.error) {
+            console.warn('[Store] get_user_leads RPC failed, falling back to SELECT', { message: rpc.error.message });
+        }
+        const { data, error } = await supabase
+            .from('leads')
+            .select('*')
+            .eq('owner_id', userId)
+            .order('updated_at', { ascending: false })
+            .limit(limit);
+        if (error) {
+            console.warn('[Store] Fetch user leads SELECT error', { message: error.message });
+            return;
+        }
+        console.log('[Store] Fetch user leads SELECT rows', { count: (data || []).length });
+        set({ purchasedLeads: (data as unknown as Lead[]) || [] });
+    },
+
+    // Subscribe to user leads changes
+    subscribeToUserLeads: (userId: string) => {
+        const nextKey = userId || null;
+        if (!nextKey) return;
+        if (leadsSubscribedKey === nextKey && leadsChannel) return;
+
+        if (leadsChannel) {
+            try {
+                console.log('[Store] Unsubscribing previous leads channel', { leadsSubscribedKey });
+                supabase.removeChannel(leadsChannel);
+            } catch { }
+            leadsChannel = null;
+            leadsSubscribedKey = null;
+        }
+
+        const channelName = `leads_user_${userId}`;
+        console.log('[Store] Subscribing leads channel', { channelName, userId });
+        leadsChannel = supabase
+            .channel(channelName)
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'leads', filter: `owner_id=eq.${userId}` },
+                (payload: { new: Lead }) => {
+                    const row = payload?.new;
+                    if (!row?.id) return;
+                    set((state: RealtimeState) => {
+                        const exists = state.purchasedLeads.some(l => l.id === row.id);
+                        return { purchasedLeads: exists ? state.purchasedLeads : [row, ...state.purchasedLeads] };
+                    });
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'leads', filter: `owner_id=eq.${userId}` },
+                (payload: { new: Lead }) => {
+                    const updated = payload?.new;
+                    if (!updated?.id) return;
+                    set((state: RealtimeState) => ({
+                        purchasedLeads: state.purchasedLeads.some((l: Lead) => l.id === updated.id)
+                            ? state.purchasedLeads.map((l: Lead) => (l.id === updated.id ? { ...l, ...updated } as Lead : l))
+                            : [updated, ...state.purchasedLeads]
+                    }));
+                }
+            )
+            .subscribe((status) => {
+                console.log('[Store] leads channel status:', status);
+            });
+        leadsSubscribedKey = nextKey;
+    },
+
+    unsubscribeFromUserLeads: () => {
+        if (leadsChannel) {
+            try {
+                console.log('[Store] Unsubscribing leads channel', { leadsSubscribedKey });
+                supabase.removeChannel(leadsChannel);
+            } catch { }
+            leadsChannel = null;
+            leadsSubscribedKey = null;
+        }
+    },
 
     setUserCredits: (credits: number) => set({ userCredits: credits }),
 
