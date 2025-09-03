@@ -1,30 +1,48 @@
 import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { memoryStore } from '@/lib/memory-store';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '../../../../auth';
+import { prisma } from '@/lib/prisma';
 
 const ASAAS_API_URL = process.env.ASAAS_API_URL!;
 const ASAAS_API_KEY = process.env.ASAAS_API_KEY!;
 const SITE_URL = process.env.NEXTAUTH_URL!;
 
+export const runtime = 'nodejs';
+
 export async function POST(request: Request) {
     try {
-        const { amount, customerEmail, customerName } = await request.json();
+        const { amount } = await request.json();
+
+        const session = await getServerSession(authOptions);
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+        }
 
         if (!amount || amount < 10 || amount > 50000) {
             return NextResponse.json({ error: 'Valor inválido. Deve ser entre R$ 10,00 e R$ 50.000,00' }, { status: 400 });
         }
-        if (!customerEmail || !customerName) {
-            return NextResponse.json({ error: 'Email e nome do cliente são obrigatórios' }, { status: 400 });
-        }
+        const customerName = (session.user.name ?? 'Cliente').substring(0, 30);
 
-        const credits = Math.floor(amount * 2);
+        console.log('[Checkout] Start', {
+            amount,
+            userId: session.user.id,
+            requestUrl: request.url,
+            env_NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+            env_SITE_URL: process.env.SITE_URL,
+            asaasUrl: ASAAS_API_URL,
+            hasApiKey: Boolean(ASAAS_API_KEY)
+        });
+
+        const credits = Math.floor(amount);
         const internalCheckoutId = uuidv4();
-        const externalReference = `${internalCheckoutId}|${customerEmail}`;
+        const externalReference = `ck:${internalCheckoutId}|uid:${session.user.id}`;
+        console.log('[Checkout] Computed refs', { internalCheckoutId, externalReference, SITE_URL });
 
         const checkoutData = {
             billingTypes: ['CREDIT_CARD', 'PIX'],
             chargeTypes: ['DETACHED'],
-            name: customerName.substring(0, 30),
+            name: customerName,
             dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             externalReference: externalReference,
             callback: {
@@ -43,6 +61,7 @@ export async function POST(request: Request) {
             ]
         };
 
+        console.log('[Checkout] checkoutData (sanitized):', checkoutData);
         const response = await fetch(`${ASAAS_API_URL}/checkouts`, {
             method: 'POST',
             headers: {
@@ -52,26 +71,50 @@ export async function POST(request: Request) {
             },
             body: JSON.stringify(checkoutData),
         });
+        console.log('[Checkout] Asaas response status:', response.status);
 
         if (!response.ok) {
             const errorData = await response.json();
-            console.error('Erro da API Asaas:', errorData);
+            console.error('[Checkout] Erro da API Asaas:', errorData);
             return NextResponse.json({ error: 'Falha ao criar checkout no Asaas', details: errorData }, { status: response.status });
         }
 
         const asaasResponse = await response.json();
+        console.log('[Checkout] Asaas response body:', {
+            asaasResponse
+        });
 
-        if (asaasResponse.id) {
-            memoryStore.checkoutToEmail[asaasResponse.id] = customerEmail;
+        // Persist linkage between Asaas checkout and our user for webhook correlation
+        if (!asaasResponse?.id) {
+            return NextResponse.json({ error: 'Resposta inválida do Asaas (sem id do checkout)' }, { status: 502 });
+        }
+        try {
+            await prisma.checkout_sessions.upsert({
+                where: { asaas_checkout_id: asaasResponse.id },
+                update: {
+                    internal_checkout_id: internalCheckoutId,
+                    user_id: session.user.id,
+                },
+                create: {
+                    asaas_checkout_id: asaasResponse.id,
+                    internal_checkout_id: internalCheckoutId,
+                    user_id: session.user.id,
+                }
+            });
+        } catch (e) {
+            console.error('[Checkout] Failed to persist checkout session mapping:', e);
+            return NextResponse.json({ error: 'Falha ao persistir mapeamento do checkout' }, { status: 500 });
         }
 
-        return NextResponse.json({
+        const payload = {
             success: true,
             checkoutUrl: asaasResponse.link,
             checkoutId: internalCheckoutId,
             amount: amount,
             credits: credits,
-        });
+        };
+        console.log('[Checkout] Success payload:', payload);
+        return NextResponse.json(payload);
 
     } catch (error) {
         console.error('Erro interno ao criar checkout:', error);
