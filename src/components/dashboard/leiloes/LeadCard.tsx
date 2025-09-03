@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { CountdownTimer } from "../leads/CountdownTimer";
 import { Lead } from "../leads/types";
+import { maskName, maskPhone } from "@/lib/mask";
 
 interface LeadCardProps {
   lead: Lead;
@@ -59,7 +60,6 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
         }
         .hot-lead-card {
           animation: hot-glow 2.5s ease-in-out infinite;
-          /* A borda é simulada pelo brilho, então a removemos para o efeito funcionar */
           border-color: transparent;
         }
       `}</style>
@@ -123,7 +123,7 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
                 <div>
                   <div className="text-muted-foreground">Empresa</div>
                   <div className="font-semibold text-muted-foreground">
-                    {lead.maskedCompanyName}
+                    {maskName(lead.companyName)}
                   </div>
                 </div>
               </div>
@@ -132,7 +132,7 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
                 <div>
                   <div className="text-muted-foreground">Contato</div>
                   <div className="font-semibold text-muted-foreground">
-                    {lead.maskedContactName}
+                    {maskName(lead.contactName)}
                   </div>
                 </div>
               </div>
@@ -141,7 +141,7 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
                 <div>
                   <div className="text-muted-foreground">Telefone</div>
                   <div className="font-semibold text-muted-foreground">
-                    {lead.maskedPhone}
+                    {maskPhone(lead.phone)}
                   </div>
                 </div>
               </div>
