@@ -1,44 +1,15 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import crypto from 'crypto';
 
-// Variáveis de ambiente essenciais para o webhook
-const ASAAS_WEBHOOK_SECRET = process.env.ASAAS_WEBHOOK_SECRET;
-
-/**
- * Valida a assinatura do webhook para garantir que a requisição veio do Asaas.
- * @param rawBody O corpo da requisição como texto puro.
- * @param signature O valor do header 'Asaas-Signature'.
- * @returns {boolean} True se a assinatura for válida, false caso contrário.
- */
-function verifyAsaasSignature(rawBody: string, signature: string | null): boolean {
-    if (!ASAAS_WEBHOOK_SECRET || !signature) {
-        console.error('[Webhook Security] Secret de webhook ou assinatura ausente.');
-        return false;
-    }
-
-    const hmac = crypto.createHmac('sha256', ASAAS_WEBHOOK_SECRET);
-    const computedSignature = hmac.update(rawBody).digest('hex');
-
-    return computedSignature === signature;
-}
-
-
-// O Next.js recomenda o runtime 'nodejs' para usar APIs do Node como 'crypto'
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
-    // 1. SEGURANÇA: Obter o corpo como texto para validar a assinatura ANTES de fazer o parse
+    // 1. Omitindo a validação da assinatura
+    // O Next.js recomenda o runtime 'nodejs' para usar APIs do Node como 'crypto'
     const rawBody = await request.text();
-    const signature = request.headers.get('Asaas-Signature');
-
-    if (!verifyAsaasSignature(rawBody, signature)) {
-        console.warn('[Webhook] Assinatura inválida. Requisição bloqueada.');
-        return NextResponse.json({ error: 'Assinatura inválida' }, { status: 403 });
-    }
 
     try {
-        // Agora que a assinatura é válida, podemos fazer o parse do JSON
+        // Agora podemos fazer o parse do JSON
         const body = JSON.parse(rawBody);
         const { event, payment } = body;
 
