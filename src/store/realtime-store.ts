@@ -1,11 +1,13 @@
 import { create } from 'zustand'
 import type { AuctionWithLead, Bid } from '@/components/dashboard/leiloes/types'
 import type { Lead } from '@/components/dashboard/leads/types'
+import { createClient } from '@/utils/supabase/client'
 
 export interface RealtimeState {
     activeAuctions: AuctionWithLead[];
     bidsByAuction: Record<string, Bid[]>;
     purchasedLeads: Lead[];
+    userCredits: number;
 
     setInitialAuctions: (auctions: AuctionWithLead[]) => void;
     setInitialPurchasedLeads: (leads: Lead[]) => void;
@@ -19,12 +21,21 @@ export interface RealtimeState {
     updateAuctionStatsFromBid: (auctionId: string, amount: number) => void;
 
     addPurchasedLeadIfMissing: (lead: Lead) => void;
+
+    setUserCredits: (credits: number) => void;
+    subscribeToUserCredits: (userId: string) => void;
+    unsubscribeFromUserCredits: () => void;
 }
+
+const supabase = createClient();
+let userCreditsChannel: ReturnType<typeof supabase.channel> | null = null;
+let subscribedUserId: string | null = null;
 
 export const useRealtimeStore = create<RealtimeState>()((set) => ({
     activeAuctions: [],
     bidsByAuction: {},
     purchasedLeads: [],
+    userCredits: 0,
 
     setInitialAuctions: (auctions: AuctionWithLead[]) => set({ activeAuctions: auctions }),
     setInitialPurchasedLeads: (leads: Lead[]) => set({ purchasedLeads: leads }),
@@ -84,7 +95,72 @@ export const useRealtimeStore = create<RealtimeState>()((set) => ({
         console.log('[Store] addPurchasedLeadIfMissing', { id: lead.id, exists });
         if (exists) return {};
         return { purchasedLeads: [lead, ...state.purchasedLeads] };
-    })
+    }),
+
+    setUserCredits: (credits: number) => set({ userCredits: credits }),
+
+    subscribeToUserCredits: (userId: string) => {
+        if (!userId) return;
+        if (subscribedUserId === userId && userCreditsChannel) return;
+
+        // Tear down previous subscription if switching users
+        if (userCreditsChannel) {
+            try {
+                console.log('[Store] Unsubscribing previous user credits channel', { subscribedUserId });
+                supabase.removeChannel(userCreditsChannel);
+            } catch { }
+            userCreditsChannel = null;
+            subscribedUserId = null;
+        }
+
+        const channelName = `users-credits-${userId}`;
+        console.log('[Store] Subscribing user credits channel', { channelName, userId });
+        userCreditsChannel = supabase
+            .channel(channelName)
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${userId}` },
+                (payload: { new?: { credit_balance?: number | string } }) => {
+                    const raw = (payload?.new as unknown as { credit_balance?: number | string })?.credit_balance;
+                    const parsed = typeof raw === 'string' ? parseFloat(raw) : (raw ?? 0);
+                    const next = Number.isFinite(parsed as number) ? Number(parsed) : 0;
+                    console.log('[Store] Realtime users.credit_balance UPDATE', { next });
+                    set({ userCredits: next });
+                }
+            )
+            .subscribe((status) => {
+                console.log('[Store] users credits channel status:', status);
+            });
+        subscribedUserId = userId;
+
+        // Seed with initial value
+        supabase
+            .from('users')
+            .select('credit_balance')
+            .eq('id', userId)
+            .single()
+            .then(({ data, error }) => {
+                if (error) {
+                    console.warn('[Store] Failed to fetch initial credit_balance', { error: error.message });
+                    return;
+                }
+                const raw = (data as unknown as { credit_balance?: number | string })?.credit_balance;
+                const parsed = typeof raw === 'string' ? parseFloat(raw) : (raw ?? 0);
+                const next = Number.isFinite(parsed as number) ? Number(parsed) : 0;
+                set({ userCredits: next });
+            });
+    },
+
+    unsubscribeFromUserCredits: () => {
+        if (userCreditsChannel) {
+            try {
+                console.log('[Store] Unsubscribing user credits channel', { subscribedUserId });
+                supabase.removeChannel(userCreditsChannel);
+            } catch { }
+            userCreditsChannel = null;
+            subscribedUserId = null;
+        }
+    }
 }));
 
 

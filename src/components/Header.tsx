@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import Image from "next/image";
 import { Button } from "./ui/button";
 import ThemeSwitcher from "./ThemeSwitcher";
@@ -8,6 +8,7 @@ import { LuCoins, LuMenu } from "react-icons/lu";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from "./ui/dialog";
 import { useSession } from "next-auth/react";
 import LogoutButton from "./LogoutButton";
+import { useRealtimeStore } from "@/store/realtime-store";
 
 type HeaderProps = {
     userName?: string;
@@ -29,6 +30,16 @@ export default function Header({
     const emailToShow = session?.user?.email ?? userEmail;
     const avatarToShow = session?.user?.image ?? userAvatarUrl;
     const displayInitial = (nameToShow?.[0] || "U").toUpperCase();
+    const realtimeCredits = useRealtimeStore(s => s.userCredits);
+    const subscribeToUserCredits = useRealtimeStore(s => s.subscribeToUserCredits);
+
+    useEffect(() => {
+        if (session?.user?.id) {
+            subscribeToUserCredits(session.user.id);
+        }
+    }, [session?.user?.id, subscribeToUserCredits]);
+
+    const displayCredits = session?.user?.id ? realtimeCredits : userCredits;
 
     return (
         <header className="w-full bg-background border-b border-border/40 shadow-sm fixed top-0 z-50">
@@ -51,7 +62,7 @@ export default function Header({
                         <div className="flex items-center gap-2 bg-yellow-50 dark:bg-yellow-900/20 px-3 py-1 rounded-lg border border-yellow-200 dark:border-yellow-700">
                             <LuCoins className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                             <span className="font-semibold text-yellow-900 dark:text-yellow-200">
-                                {userCredits.toLocaleString()} <span className="max-[375px]:sr-only">créditos</span>
+                                {displayCredits.toLocaleString()} <span className="max-[375px]:sr-only">créditos</span>
                             </span>
                         </div>
 
@@ -111,7 +122,7 @@ export default function Header({
                                         <div className="flex items-center gap-2 bg-yellow-50 dark:bg-yellow-900/20 px-3 py-1 rounded-lg border border-yellow-200 dark:border-yellow-700">
                                             <LuCoins className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                                             <span className="font-semibold text-yellow-900 dark:text-yellow-200">
-                                                {userCredits.toLocaleString()} <span className="max-[375px]:sr-only">créditos</span>
+                                                {displayCredits.toLocaleString()} <span className="max-[375px]:sr-only">créditos</span>
                                             </span>
                                         </div>
                                     </div>
