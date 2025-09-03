@@ -49,16 +49,18 @@ export default function Header({
     const avatarToShow = session?.user?.image ?? userAvatarUrl;
     const displayInitial = (nameToShow?.[0] || "U").toUpperCase();
     const realtimeCredits = useRealtimeStore(s => s.userCredits);
+    const subscribeToUserCreditHolds = useRealtimeStore(s => s.subscribeToUserCreditHolds);
     const subscribeToUserCredits = useRealtimeStore(s => s.subscribeToUserCredits);
 
     useEffect(() => {
         if (session?.user?.id) {
             console.log('[Header] Subscribing to user credits by id', { userId: session.user.id });
             subscribeToUserCredits(session.user.id);
+            subscribeToUserCreditHolds(session.user.id);
         } else {
             console.log('[Header] No session user id for credits subscription');
         }
-    }, [session?.user?.id, subscribeToUserCredits]);
+    }, [session?.user?.id, subscribeToUserCredits, subscribeToUserCreditHolds]);
 
     const displayCredits = session?.user?.id ? realtimeCredits : userCredits;
     console.log('[Header] Render credits', { displayCredits, realtimeCredits, fallback: userCredits });

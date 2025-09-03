@@ -72,6 +72,9 @@ export default function Dashboard({
   const subscribeToUserCredits = useRealtimeStore(
     (s: RealtimeState) => s.subscribeToUserCredits
   );
+  const subscribeToUserCreditHolds = useRealtimeStore(
+    (s: RealtimeState) => s.subscribeToUserCreditHolds
+  );
   const subscribeToUserPurchases = useRealtimeStore(
     (s: RealtimeState) => s.subscribeToUserPurchases
   );
@@ -88,11 +91,12 @@ export default function Dashboard({
     if (session?.user?.id) {
       console.log('[Dashboard] Subscribing to user credits by id', { userId: session.user.id });
       subscribeToUserCredits(session.user.id);
+      subscribeToUserCreditHolds(session.user.id);
       console.log('[Dashboard] Subscribing to user purchases + fetch initial');
       fetchLatestUserPurchases({ userId: session?.user?.id, limit: 5 });
       subscribeToUserPurchases({ userId: session?.user?.id });
     }
-  }, [session?.user?.id, subscribeToUserCredits, fetchLatestUserPurchases, subscribeToUserPurchases]);
+  }, [session?.user?.id, subscribeToUserCredits, subscribeToUserCreditHolds, fetchLatestUserPurchases, subscribeToUserPurchases]);
 
   const normalizedInitialAuctions: AuctionWithLead[] = useMemo(() => {
     const mapped = (initialAuctions || []).map((auction) => ({

@@ -7,7 +7,12 @@ export interface RealtimeState {
     activeAuctions: AuctionWithLead[];
     bidsByAuction: Record<string, Bid[]>;
     purchasedLeads: Lead[];
+    // userCredits represents AVAILABLE credits (balance - active holds)
     userCredits: number;
+    // raw balance from users.credit_balance (without subtracting holds)
+    rawUserCredits: number;
+    // total amount currently held across active credit_holds for the user
+    heldCredits: number;
 
     setInitialAuctions: (auctions: AuctionWithLead[]) => void;
     setInitialPurchasedLeads: (leads: Lead[]) => void;
@@ -29,6 +34,12 @@ export interface RealtimeState {
     subscribeToUserCredits: (userId: string) => void;
     unsubscribeFromUserCredits: () => void;
 
+    // Holds management (realtime)
+    setHeldCredits: (amount: number) => void;
+    subscribeToUserCreditHolds: (userId: string) => void;
+    unsubscribeFromUserCreditHolds: () => void;
+    fetchAndSetUserActiveHoldsTotal: (userId: string) => Promise<void>;
+
     // Credit purchases (history)
     userPurchases: Array<{ id: string | number; created_at: string; amount_credits?: number; credits_purchased?: number; amount_paid?: number; status?: string;[key: string]: unknown }>;
     setUserPurchases: (rows: Array<{ id: string | number; created_at: string;[key: string]: unknown }>) => void;
@@ -39,7 +50,9 @@ export interface RealtimeState {
 
 const supabase = createClient();
 let userCreditsChannel: ReturnType<typeof supabase.channel> | null = null;
+let creditHoldsChannel: ReturnType<typeof supabase.channel> | null = null;
 let subscribedKey: string | null = null;
+let holdsSubscribedKey: string | null = null;
 let purchasesChannel: ReturnType<typeof supabase.channel> | null = null;
 let purchasesSubscribedKey: string | null = null;
 let leadsChannel: ReturnType<typeof supabase.channel> | null = null;
@@ -51,6 +64,8 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
     bidsByAuction: {},
     purchasedLeads: [],
     userCredits: 0,
+    rawUserCredits: 0,
+    heldCredits: 0,
 
     setInitialAuctions: (auctions: AuctionWithLead[]) => set({ activeAuctions: auctions }),
     setInitialPurchasedLeads: (leads: Lead[]) => set({ purchasedLeads: leads }),
@@ -201,7 +216,10 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
         }
     },
 
-    setUserCredits: (credits: number) => set({ userCredits: credits }),
+    setUserCredits: (credits: number) => set((state) => ({
+        rawUserCredits: credits,
+        userCredits: Math.max(0, Number(credits) - Number(state.heldCredits || 0))
+    })),
 
     subscribeToUserCredits: (userId: string) => {
         const nextKey = userId ? `id:${userId}` : null;
@@ -232,7 +250,10 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
                     const parsed = typeof raw === 'string' ? parseFloat(raw) : (raw ?? 0);
                     const next = Number.isFinite(parsed as number) ? Number(parsed) : 0;
                     console.log('[Store] Realtime users.credit_balance UPDATE', { next });
-                    set({ userCredits: next });
+                    set((state: RealtimeState) => ({
+                        rawUserCredits: next,
+                        userCredits: Math.max(0, Number(next) - Number(state.heldCredits || 0))
+                    }));
                 }
             )
             .subscribe((status) => {
@@ -251,8 +272,14 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
                 }
                 const next = Number(data ?? 0);
                 console.log('[Store] Setting initial userCredits (RPC)', { next });
-                set({ userCredits: Number.isFinite(next) ? next : 0 });
+                set((state: RealtimeState) => ({
+                    rawUserCredits: Number.isFinite(next) ? Number(next) : 0,
+                    userCredits: Math.max(0, Number.isFinite(next) ? Number(next) : 0 - Number(state.heldCredits || 0))
+                }));
             });
+
+        // Also subscribe to credit holds for accurate available credits
+        get().subscribeToUserCreditHolds(userId);
     },
 
     unsubscribeFromUserCredits: () => {
@@ -264,6 +291,110 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
             userCreditsChannel = null;
             subscribedKey = null;
         }
+    },
+
+    setHeldCredits: (amount: number) => set((state: RealtimeState) => ({
+        heldCredits: Number(amount) || 0,
+        userCredits: Math.max(0, Number(state.rawUserCredits || 0) - (Number(amount) || 0))
+    })),
+
+    subscribeToUserCreditHolds: (userId: string) => {
+        const nextKey = userId || null;
+        if (!nextKey) return;
+        if (holdsSubscribedKey === nextKey && creditHoldsChannel) return;
+
+        // Teardown previous
+        if (creditHoldsChannel) {
+            try {
+                console.log('[Store] Unsubscribing previous credit holds channel', { holdsSubscribedKey });
+                supabase.removeChannel(creditHoldsChannel);
+            } catch { }
+            creditHoldsChannel = null;
+            holdsSubscribedKey = null;
+        }
+
+        const channelName = `credit_holds_user_${userId}`;
+        console.log('[Store] Subscribing credit holds channel', { channelName, userId });
+        creditHoldsChannel = supabase
+            .channel(channelName)
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'credit_holds', filter: `user_id=eq.${userId}` },
+                () => {
+                    // Recompute total holds
+                    get().fetchAndSetUserActiveHoldsTotal(userId);
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'credit_holds', filter: `user_id=eq.${userId}` },
+                () => {
+                    get().fetchAndSetUserActiveHoldsTotal(userId);
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'DELETE', schema: 'public', table: 'credit_holds', filter: `user_id=eq.${userId}` },
+                () => {
+                    get().fetchAndSetUserActiveHoldsTotal(userId);
+                }
+            )
+            .subscribe((status) => {
+                console.log('[Store] credit_holds channel status:', status);
+            });
+        holdsSubscribedKey = nextKey;
+
+        // Seed initial holds
+        get().fetchAndSetUserActiveHoldsTotal(userId);
+    },
+
+    unsubscribeFromUserCreditHolds: () => {
+        if (creditHoldsChannel) {
+            try {
+                console.log('[Store] Unsubscribing credit holds channel', { holdsSubscribedKey });
+                supabase.removeChannel(creditHoldsChannel);
+            } catch { }
+            creditHoldsChannel = null;
+            holdsSubscribedKey = null;
+        }
+    },
+
+    // helper: fetch active holds total and set
+    fetchAndSetUserActiveHoldsTotal: async (userId: string) => {
+        try {
+            // Try RPC if exists
+            const rpc = await supabase.rpc('get_user_active_credit_holds', { p_user_id: userId });
+            if (!rpc.error && typeof rpc.data !== 'undefined') {
+                const sum = Number(rpc.data || 0);
+                console.log('[Store] RPC active holds sum', { sum });
+                set((state: RealtimeState) => ({
+                    heldCredits: sum,
+                    userCredits: Math.max(0, Number(state.rawUserCredits || 0) - Number(sum || 0))
+                }));
+                return;
+            }
+            if (rpc.error) {
+                console.warn('[Store] RPC get_user_active_credit_holds failed, fallback SELECT', { message: rpc.error.message });
+            }
+        } catch { }
+
+        // Fallback: sum via SELECT
+        const { data, error } = await supabase
+            .from('credit_holds')
+            .select('amount, status, auctions!inner(status)')
+            .eq('user_id', userId)
+            .eq('status', 'active')
+            .eq('auctions.status', 'open');
+        if (error) {
+            console.warn('[Store] Failed to fetch active holds via SELECT', { message: error.message });
+            return;
+        }
+        const sum = (data || []).reduce((acc, row: { amount: number | string }) => acc + (typeof row.amount === 'string' ? parseFloat(row.amount) : Number(row.amount || 0)), 0);
+        console.log('[Store] SELECT active holds sum', { sum });
+        set((state: RealtimeState) => ({
+            heldCredits: sum,
+            userCredits: Math.max(0, Number(state.rawUserCredits || 0) - Number(sum || 0))
+        }));
     },
 
     // Purchases (credit_transactions)
