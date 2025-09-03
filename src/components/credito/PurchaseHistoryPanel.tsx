@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect } from "react";
-import { createClient } from "@/utils/supabase/client";
 import { useRealtimeStore } from "@/store/realtime-store";
 import {
   Card,
@@ -23,35 +22,17 @@ type Purchase = {
   status?: "completed" | "pending" | "failed";
 };
 
-export default function PurchaseHistoryPanel({ userId }: { userId: string }) {
+export default function PurchaseHistoryPanel() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const supabase = createClient();
   const purchases = useRealtimeStore(s => s.userPurchases) as Purchase[];
-  const fetchLatestUserPurchases = useRealtimeStore(s => s.fetchLatestUserPurchases);
-  const subscribeToUserPurchases = useRealtimeStore(s => s.subscribeToUserPurchases);
-  const unsubscribeFromUserPurchases = useRealtimeStore(s => s.unsubscribeFromUserPurchases);
 
   useEffect(() => {
-    console.log("[PurchaseHistory] subscribe/fetch for userId:", userId);
-    const load = async () => {
-      try {
-        setLoading(true);
-        await fetchLatestUserPurchases({ userId, limit: 10 });
-        subscribeToUserPurchases({ userId });
-      } catch {
-        setError('Não foi possível carregar o histórico.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    load();
-
-    return () => {
-      unsubscribeFromUserPurchases();
-    };
-  }, [userId, supabase, fetchLatestUserPurchases, subscribeToUserPurchases, unsubscribeFromUserPurchases]);
+    // Apenas controla o estado visual; fetch/subscribe acontecem globalmente (ex.: Dashboard)
+    if (Array.isArray(purchases)) {
+      setLoading(false);
+    }
+  }, [purchases]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("pt-BR", {

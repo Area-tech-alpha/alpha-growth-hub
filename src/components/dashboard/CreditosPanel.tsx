@@ -22,7 +22,7 @@ export default function CreditosPanel({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start max-w-4xl mx-auto">
       <PurchaseCreditsCard currentCredits={currentCredits} defaultAmount={defaultAmount} />
-      {userId && <PurchaseHistoryPanel userId={userId} />}
+      {userId && <PurchaseHistoryPanel />}
     </div>
   );
 }

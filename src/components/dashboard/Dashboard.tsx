@@ -80,7 +80,7 @@ export default function Dashboard({
       console.log('[Dashboard] Subscribing to user credits by id', { userId: session.user.id });
       subscribeToUserCredits(session.user.id);
       console.log('[Dashboard] Subscribing to user purchases + fetch initial');
-      fetchLatestUserPurchases({ userId: session?.user?.id, limit: 10 });
+      fetchLatestUserPurchases({ userId: session?.user?.id, limit: 5 });
       subscribeToUserPurchases({ userId: session?.user?.id });
     }
   }, [session?.user?.id, subscribeToUserCredits, fetchLatestUserPurchases, subscribeToUserPurchases]);
