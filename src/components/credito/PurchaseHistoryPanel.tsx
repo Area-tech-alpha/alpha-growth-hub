@@ -31,7 +31,7 @@ export default function PurchaseHistoryPanel({ userId }: { userId: string }) {
     const fetchPurchases = async () => {
       setLoading(true);
       const { data, error } = await supabase
-        .from("credit_purchases")
+        .from("credit_transactions")
         .select("*")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
