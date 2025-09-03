@@ -12,6 +12,7 @@ import { CountdownTimer } from '../leads/CountdownTimer';
 import { Lead } from '../leads/types';
 import { Bid } from './types';
 import { toast } from 'sonner';
+import { useRealtimeStore } from '@/store/realtime-store';
 
 interface AuctionModalProps {
     auctionId: string;
@@ -30,7 +31,9 @@ export const AuctionModal = ({ auctionId, lead, onClose, user, initialBids }: Au
     const [bids, setBids] = useState<Bid[]>(initialBids || []);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [hasWon, setHasWon] = useState(false);
-    const [userCredits] = useState(1500);
+    const userCredits = useRealtimeStore(s => s.userCredits);
+
+    // No explicit subscription here; Header/Card handle subscription lifecycle
 
     const handleExpire = () => {
         setIsAuctionActive(false);

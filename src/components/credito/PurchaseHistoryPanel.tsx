@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { createClient } from "@/utils/supabase/client";
+import { useEffect, useState } from "react";
+import { useRealtimeStore } from "@/store/realtime-store";
 import {
   Card,
   CardContent,
@@ -14,63 +14,24 @@ import { LuHistory } from "react-icons/lu";
 import { CheckCircle } from "lucide-react";
 
 type Purchase = {
-  id: string;
+  id: string | number;
   created_at: string;
-  amount_credits: number;
-  amount_paid: number;
-  status: "completed" | "pending" | "failed";
+  amount_credits?: number;
+  credits_purchased?: number;
+  amount_paid?: number;
+  status?: "completed" | "pending" | "failed";
 };
 
-export default function PurchaseHistoryPanel({ userId }: { userId: string }) {
-  const [purchases, setPurchases] = useState<Purchase[]>([]);
+export default function PurchaseHistoryPanel() {
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const supabase = createClient();
+  const purchases = useRealtimeStore(s => s.userPurchases) as Purchase[];
 
   useEffect(() => {
-    const fetchPurchases = async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("credit_transactions")
-        .select("*")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(10);
-
-      if (error) {
-        console.error("Erro ao buscar histórico de compras:", error);
-        setError("Não foi possível carregar o histórico.");
-      } else {
-        setPurchases(data as Purchase[]);
-      }
+    // Apenas controla o estado visual; fetch/subscribe acontecem globalmente (ex.: Dashboard)
+    if (Array.isArray(purchases)) {
       setLoading(false);
-    };
-
-    fetchPurchases();
-
-    const channel = supabase
-      .channel(`credit_purchases_user_${userId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "credit_purchases",
-          filter: `user_id=eq.${userId}`,
-        },
-        (payload) => {
-          setPurchases((currentPurchases) => [
-            payload.new as Purchase,
-            ...currentPurchases,
-          ]);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [userId, supabase]);
+    }
+  }, [purchases]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("pt-BR", {
@@ -102,8 +63,6 @@ export default function PurchaseHistoryPanel({ userId }: { userId: string }) {
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
           </div>
-        ) : error ? (
-          <p className="text-red-500 text-sm text-center">{error}</p>
         ) : purchases.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
             Nenhuma compra realizada ainda.
@@ -119,7 +78,7 @@ export default function PurchaseHistoryPanel({ userId }: { userId: string }) {
                   <CheckCircle className="h-5 w-5 text-green-500" />
                   <div>
                     <p className="font-semibold">
-                      {purchase.amount_credits.toLocaleString("pt-BR")} créditos
+                      {(purchase.amount_credits ?? purchase.credits_purchased ?? 0).toLocaleString("pt-BR")} créditos
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {formatDate(purchase.created_at)}
@@ -127,7 +86,7 @@ export default function PurchaseHistoryPanel({ userId }: { userId: string }) {
                   </div>
                 </div>
                 <div className="font-medium">
-                  R$ {purchase.amount_paid.toLocaleString("pt-BR")}
+                  R$ {(purchase.amount_paid ?? 0).toLocaleString("pt-BR")}
                 </div>
               </li>
             ))}

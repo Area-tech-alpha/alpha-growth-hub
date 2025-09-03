@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, ChangeEvent } from "react";
+import { useEffect, useState, ChangeEvent } from "react";
 import { useSession } from "next-auth/react";
 import {
     Card,
@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { LuCoins } from "react-icons/lu";
 import { toast } from "sonner";
+import { useRealtimeStore } from "@/store/realtime-store";
 
 type PurchaseCreditsCardProps = {
     currentCredits?: number;
@@ -27,6 +28,18 @@ export default function PurchaseCreditsCard({
     const [amount, setAmount] = useState<number>(defaultAmount);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const realtimeCredits = useRealtimeStore(s => s.userCredits);
+    const subscribeToUserCredits = useRealtimeStore(s => s.subscribeToUserCredits);
+
+    useEffect(() => {
+        console.log("realTimeCreditsss", realtimeCredits);
+        if (session?.user?.id) {
+            console.log('[PurchaseCreditsCard] Subscribing to user credits by id', { userId: session.user.id });
+            subscribeToUserCredits(session.user.id);
+        } else {
+            console.log('[PurchaseCreditsCard] No session user id for credits subscription');
+        }
+    }, [session?.user?.id, subscribeToUserCredits, realtimeCredits]);
 
     const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
         const value = Number(e.target.value);
@@ -88,7 +101,7 @@ export default function PurchaseCreditsCard({
                         <div>
                             <CardTitle className="text-xl">Comprar Créditos</CardTitle>
                             <CardDescription>
-                                <span className="text-sm font-semibold text-foreground">Saldo atual: {currentCredits.toLocaleString("pt-BR")} créditos</span>
+                                <span className="text-sm font-semibold text-foreground">Saldo atual: {(session?.user?.id ? realtimeCredits : currentCredits).toLocaleString("pt-BR")} créditos</span>
                             </CardDescription>
                         </div>
                     </div>
