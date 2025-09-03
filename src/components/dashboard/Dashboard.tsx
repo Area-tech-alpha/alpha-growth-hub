@@ -335,10 +335,15 @@ export default function Dashboard({
               <FiShoppingBag className="size-4" />
               Meus Leads
             </TabsTrigger>
-            <TabsTrigger value="leiloes" className="flex items-center gap-2">
-              <IoMdTrendingUp className="size-4" />
-              Leilões
-            </TabsTrigger>
+           <TabsTrigger value="leiloes" className="flex items-center">
+            <IoMdTrendingUp className="mr-2" />
+            <span>Leilões</span>
+            {initialAuctions.length > 0 && (
+              <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-yellow-400 text-xs font-semibold text-white">
+                {initialAuctions.length}
+              </span>
+            )}
+          </TabsTrigger>
           </div>
         </TabsList>
         <TabsContent value="creditos">
