@@ -32,13 +32,8 @@ export const AuctionModal = ({ auctionId, lead, onClose, user, initialBids }: Au
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [hasWon, setHasWon] = useState(false);
     const userCredits = useRealtimeStore(s => s.userCredits);
-    const subscribeToUserCredits = useRealtimeStore(s => s.subscribeToUserCredits);
 
-    useEffect(() => {
-        if (user?.id) {
-            subscribeToUserCredits(user.id);
-        }
-    }, [user?.id, subscribeToUserCredits]);
+    // No explicit subscription here; Header/Card handle subscription lifecycle
 
     const handleExpire = () => {
         setIsAuctionActive(false);

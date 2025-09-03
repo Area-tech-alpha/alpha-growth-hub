@@ -31,15 +31,19 @@ export default function Header({
     const avatarToShow = session?.user?.image ?? userAvatarUrl;
     const displayInitial = (nameToShow?.[0] || "U").toUpperCase();
     const realtimeCredits = useRealtimeStore(s => s.userCredits);
-    const subscribeToUserCredits = useRealtimeStore(s => s.subscribeToUserCredits);
+    const subscribeToUserCreditsBy = useRealtimeStore(s => s.subscribeToUserCreditsBy);
 
     useEffect(() => {
-        if (session?.user?.id) {
-            subscribeToUserCredits(session.user.id);
+        if (session?.user?.id || session?.user?.email) {
+            console.log('[Header] Subscribing to user credits', { userId: session?.user?.id, email: session?.user?.email });
+            subscribeToUserCreditsBy({ userId: session?.user?.id, email: session?.user?.email || undefined });
+        } else {
+            console.log('[Header] No session user id/email for credits subscription');
         }
-    }, [session?.user?.id, subscribeToUserCredits]);
+    }, [session?.user?.id, session?.user?.email, subscribeToUserCreditsBy]);
 
     const displayCredits = session?.user?.id ? realtimeCredits : userCredits;
+    console.log('[Header] Render credits', { displayCredits, realtimeCredits, fallback: userCredits });
 
     return (
         <header className="w-full bg-background border-b border-border/40 shadow-sm fixed top-0 z-50">

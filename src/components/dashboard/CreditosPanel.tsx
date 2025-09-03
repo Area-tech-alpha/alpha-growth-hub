@@ -19,6 +19,7 @@ export default function CreditosPanel({
   const [credits, setCredits] = useState<number>(currentCredits);
 
   useEffect(() => {
+    console.log("abobora", session);
     const loadBalance = async () => {
       if (!session?.user?.id) return;
       try {
