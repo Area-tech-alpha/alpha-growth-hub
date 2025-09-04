@@ -60,6 +60,17 @@ export const AuctionModal = ({
     const userCredits = useRealtimeStore((s) => s.userCredits);
     const setHeldCredits = useRealtimeStore((s) => s.setHeldCredits);
     const rawUserCredits = useRealtimeStore((s) => s.rawUserCredits);
+    const handleBidAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        const onlyNums = /^[0-9]*$/; 
+        if (value === "") {
+            setBidAmount("");
+            return;
+        }
+        if (onlyNums.test(value)) {
+            setBidAmount(value);
+        }
+    };
 
     const handleExpire = () => {
         setIsAuctionActive(false);
@@ -287,10 +298,12 @@ export const AuctionModal = ({
                                 </div>
                                 <div className="flex gap-2">
                                     <Input
-                                        type="number"
+                                        type="text"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
                                         placeholder="Seu lance"
                                         value={bidAmount}
-                                        onChange={(e) => setBidAmount(e.target.value)}
+                                        onChange={handleBidAmountChange}
                                         className="flex-1"
                                     />
                                     <Button
@@ -325,8 +338,8 @@ export const AuctionModal = ({
                                         <div
                                             key={bid.id}
                                             className={`p-3 rounded-lg border flex justify-between items-center ${index === 0
-                                                ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200"
-                                                : "bg-muted"
+                                                    ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200"
+                                                    : "bg-muted"
                                                 }`}
                                         >
                                             <div className="font-bold text-yellow-600">
@@ -365,4 +378,4 @@ export const AuctionModal = ({
             </DialogContent>
         </Dialog>
     );
-};
+}
