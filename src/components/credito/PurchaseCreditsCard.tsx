@@ -25,7 +25,7 @@ export default function PurchaseCreditsCard({
     defaultAmount = 50,
 }: PurchaseCreditsCardProps) {
     const { data: session } = useSession();
-    const [amount, setAmount] = useState<number>(defaultAmount);
+    const [amount, setAmount] = useState<string>(String(defaultAmount));
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const realtimeCredits = useRealtimeStore(s => s.userCredits);
@@ -42,11 +42,18 @@ export default function PurchaseCreditsCard({
             console.log('[PurchaseCreditsCard] No session user id for credits subscription');
         }
     }, [session?.user?.id, subscribeToUserCredits, subscribeToUserCreditHolds, realtimeCredits]);
-
     const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
-        const value = Number(e.target.value);
-        if (Number.isNaN(value)) return;
-        setAmount(Math.max(10, Math.floor(value)));
+        const value = e.target.value;
+        const onlyNums = /^[0-9]*$/; 
+
+        if (value === "") {
+            setAmount("");
+            return;
+        }
+
+        if (onlyNums.test(value)) {
+            setAmount(value);
+        }
     };
 
     const handleBuy = async () => {
@@ -117,10 +124,11 @@ export default function PurchaseCreditsCard({
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
                             <input
                                 id="valor"
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 min={10}
                                 max={50000}
-                                step={1}
                                 value={amount}
                                 onChange={handleChange}
                                 className="flex h-11 w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -128,7 +136,7 @@ export default function PurchaseCreditsCard({
                             />
                         </div>
                         <p id="valor-help" className="text-xs text-muted-foreground">
-                            Você receberá <span className="font-medium">{amount.toLocaleString("pt-BR")} créditos</span>
+                            Você receberá <span className="font-medium">{(Number(amount) || 0).toLocaleString("pt-BR")} créditos</span>
                         </p>
                     </div>
                     {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
@@ -147,5 +155,3 @@ export default function PurchaseCreditsCard({
         </div>
     );
 }
-
-
