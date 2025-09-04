@@ -333,7 +333,7 @@ export default function Dashboard({
   }, [userId, fetchUserLeads, subscribeToUserLeads, unsubscribeFromUserLeads]);
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      <Tabs defaultValue="leiloes" className="w-full">
+      <Tabs defaultValue={activeAuctions.length > 0 ? "leiloes" : "creditos"} className="w-full">
         <TabsList className="pb-3 px-4 mt-2 w-full justify-center sm:justify-start">
           <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-start [--tab-row-gap:0.5rem]">
             <TabsTrigger value="creditos" className="flex items-center gap-2">
