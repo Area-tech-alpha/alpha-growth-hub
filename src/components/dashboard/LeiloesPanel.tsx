@@ -50,12 +50,18 @@ export default function LeiloesPanel() {
         const json = await res.json().catch(() => ({}));
         console.log("[LeiloesPanel] close result:", res.status, json);
         if (!res.ok) {
-          ToastBus.error("Falha ao fechar leilão", "Houve um problema ao processar o resultado.");
+          ToastBus.error(
+            "Falha ao fechar leilão",
+            "Houve um problema ao processar o resultado."
+          );
         }
       })
       .catch((e) => {
         console.error("[LeiloesPanel] close request failed:", e);
-        ToastBus.error("Erro de rede", "Não foi possível comunicar com o servidor para fechar o leilão.");
+        ToastBus.error(
+          "Erro de rede",
+          "Não foi possível comunicar com o servidor para fechar o leilão."
+        );
       });
   };
 
@@ -84,28 +90,28 @@ export default function LeiloesPanel() {
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="flex overflow-x-auto md:grid md:grid-cols-3 gap-6">
         <StatsCards
           title="Leilões Ativos"
           icon={<Clock />}
           contentTitle={activeAuctionsCount.toString()}
-          contentDescription="leads disponíveis agora"
+          contentDescription="leads disponíveis"
         />
         <StatsCards
           title="Valor Total"
           icon={<TrendingUp />}
-          contentTitle={totalValue.toLocaleString("pt-BR")}
-          contentDescription="em leads disponíveis"
+          contentTitle={`R$ ${totalValue.toLocaleString("pt-BR")}`}
+          contentDescription="leads disponíveis"
         />
         <StatsCards
           title="Participantes"
           icon={<Users />}
           contentTitle={totalBidders.toString()}
-          contentDescription="lances realizados"
+          contentDescription="Número de lances"
         />
       </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mt-6">
+ 
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mt-6">
         {sortedAuctions.map((auction) => (
           <LeadCard
             key={auction.id}
