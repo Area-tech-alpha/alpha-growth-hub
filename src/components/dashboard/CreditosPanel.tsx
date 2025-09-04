@@ -19,7 +19,7 @@ export default function CreditosPanel({
   const userId = session?.user?.id;
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 items-start w-full">
+    <div className="flex flex-col lg:flex-row gap-6 items-stretch w-full">
       <div className="w-full md:w-2/5 lg:w-1/3 flex-shrink-0">
         <PurchaseCreditsCard
           currentCredits={currentCredits}

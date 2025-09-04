@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRealtimeStore } from "@/store/realtime-store";
 import {
   Card,
@@ -24,13 +24,15 @@ type Purchase = {
 
 export default function PurchaseHistoryPanel() {
   const [loading, setLoading] = useState(true);
-  const purchases = useRealtimeStore(s => s.userPurchases) as Purchase[];
+  const purchases = useRealtimeStore((s) => s.userPurchases) as Purchase[];
 
   useEffect(() => {
-    // Apenas controla o estado visual; fetch/subscribe acontecem globalmente (ex.: Dashboard)
-    if (Array.isArray(purchases)) {
-      setLoading(false);
-    }
+    const timer = setTimeout(() => {
+      if (Array.isArray(purchases)) {
+        setLoading(false);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
   }, [purchases]);
 
   const formatDate = (dateString: string) => {
@@ -42,7 +44,7 @@ export default function PurchaseHistoryPanel() {
   };
 
   return (
-    <Card>
+    <Card className="h-full flex flex-col">
       <CardHeader>
         <div className="flex items-center gap-3">
           <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700">
@@ -56,7 +58,7 @@ export default function PurchaseHistoryPanel() {
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex-grow min-h-0 overflow-y-auto pr-4">
         {loading ? (
           <div className="space-y-3">
             <Skeleton className="h-10 w-full" />
@@ -72,20 +74,25 @@ export default function PurchaseHistoryPanel() {
             {purchases.map((purchase) => (
               <li
                 key={purchase.id}
-                className="flex items-center justify-between text-sm"
+                className="flex items-center justify-between text-sm p-3 rounded-lg bg-yellow-900/30 hover:bg-yellow-900/50 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
                   <div>
                     <p className="font-semibold">
-                      {(purchase.amount_credits ?? purchase.credits_purchased ?? 0).toLocaleString("pt-BR")} créditos
+                      {(
+                        purchase.amount_credits ??
+                        purchase.credits_purchased ??
+                        0
+                      ).toLocaleString("pt-BR")}{" "}
+                      créditos
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {formatDate(purchase.created_at)}
                     </p>
                   </div>
                 </div>
-                <div className="font-medium">
+                <div className="font-medium text-right pl-2">
                   R$ {(purchase.amount_paid ?? 0).toLocaleString("pt-BR")}
                 </div>
               </li>
