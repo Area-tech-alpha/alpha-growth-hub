@@ -31,11 +31,23 @@ export const maskEmail = (email: string | null | undefined): string => {
 
   const mask = (part: string) => {
     if (!part) return "***";
-    if (part.length <= 3) return part.charAt(0) + "**";
-    // Mostra os 2 primeiros e 1 último caractere, mas limita a máscara
-    const start = part.slice(0, 2);
-    const end = part.slice(-1);
-    return `${start}*${end}`;
+    const len = part.length;
+    // Regras para ver mais caracteres reais, mantendo a contagem correta de '*'
+    // len<=2: mostra 1, mascara o restante
+    // 3-4: mostra 1 começo, 1 fim
+    // 5-6: mostra 2 começo, 1 fim
+    // >=7: mostra 3 começo, 2 fim
+    let keepStart = 1;
+    let keepEnd = 0;
+    if (len <= 2) { keepStart = 1; keepEnd = 0; }
+    else if (len <= 4) { keepStart = 1; keepEnd = 1; }
+    else if (len <= 6) { keepStart = 2; keepEnd = 1; }
+    else { keepStart = 3; keepEnd = 2; }
+
+    const start = part.slice(0, keepStart);
+    const end = keepEnd > 0 ? part.slice(-keepEnd) : "";
+    const maskedCount = Math.max(0, len - keepStart - keepEnd);
+    return `${start}${"*".repeat(maskedCount)}${end}`;
   };
 
   const domainParts = domain.split(".");

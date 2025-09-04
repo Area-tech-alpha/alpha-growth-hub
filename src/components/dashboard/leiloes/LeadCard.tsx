@@ -20,7 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { CountdownTimer } from "../leads/CountdownTimer";
 import { Lead } from "../leads/types";
-import { maskName, maskPhone } from "@/lib/mask";
+import { maskPhone } from "@/lib/mask";
 import { useEffect } from "react";
 
 interface LeadCardProps {
@@ -137,7 +137,7 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
                 <div>
                   <div className="text-muted-foreground">Contato</div>
                   <div className="font-semibold">
-                    {maskName(lead.contact_name)}
+                    {lead.contact_name}
                   </div>
                 </div>
               </div>
