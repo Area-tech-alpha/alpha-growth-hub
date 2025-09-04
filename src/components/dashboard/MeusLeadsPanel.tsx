@@ -8,7 +8,7 @@ import { PurchasedLeadCard } from "./leads/PurchasedLeadCard";
 import type { Lead } from "./leads/types";
 import { useRealtimeStore } from "@/store/realtime-store";
 import type { RealtimeState } from "@/store/realtime-store";
-import { toast } from "sonner";
+import { ToastBus } from "@/lib/toastBus";
 
 const escapeCsvCell = (
   cellData: string | number | null | undefined
@@ -45,12 +45,12 @@ export default function MeusLeadsPanel() {
 
   const handleExportAll = () => {
     if (purchasedLeads.length === 0) {
-      toast.error("Nenhum lead para exportar.");
+      ToastBus.csvNoneToExport();
       return;
     }
 
     setIsExporting(true);
-    toast.info("Gerando seu arquivo CSV...");
+    ToastBus.csvGenerating();
 
     try {
       const headers = [
@@ -106,9 +106,9 @@ export default function MeusLeadsPanel() {
       a.remove();
       URL.revokeObjectURL(url);
 
-      toast.success("Exportação concluída!");
+      ToastBus.csvSuccess();
     } catch (error) {
-      toast.error("Ocorreu um erro ao gerar o arquivo CSV.");
+      ToastBus.csvError("Ocorreu um erro ao gerar o arquivo CSV.");
       console.error(error);
     } finally {
       setIsExporting(false);
@@ -151,6 +151,7 @@ export default function MeusLeadsPanel() {
       {purchasedLeads.length > 0 ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
           {purchasedLeads.map((purchasedLead) => {
+            console.log("[MeusLeadsPanel] purchasedLead:", purchasedLead);
             const validDateSource =
               purchasedLead.updated_at || purchasedLead.expires_at;
             const purchaseDate =

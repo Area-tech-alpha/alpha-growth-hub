@@ -7,7 +7,7 @@ import { AuctionModal } from "./leiloes/AuctionModal";
 import type { AuctionWithLead, Bid } from "./leiloes/types";
 import { useRealtimeStore } from "@/store/realtime-store";
 import type { RealtimeState } from "@/store/realtime-store";
-import { toast } from "sonner";
+import { ToastBus } from "@/lib/toastBus";
 import { sortLeads } from "@/lib/sortLeads";
 
 type AuctionWithLeadLocal = AuctionWithLead;
@@ -44,25 +44,18 @@ export default function LeiloesPanel() {
 
   const handleExpire = (auctionId: string) => {
     removeAuctionById(auctionId);
-    toast.info("Leilão expirado", {
-      description: "Processando o resultado final do leilão...",
-    });
+    ToastBus.notifyAuctionExpired(auctionId);
     fetch(`/api/auctions/${auctionId}/close`, { method: "POST" })
       .then(async (res) => {
         const json = await res.json().catch(() => ({}));
         console.log("[LeiloesPanel] close result:", res.status, json);
         if (!res.ok) {
-          toast.error("Falha ao fechar leilão", {
-            description: "Houve um problema ao processar o resultado.",
-          });
+          ToastBus.error("Falha ao fechar leilão", "Houve um problema ao processar o resultado.");
         }
       })
       .catch((e) => {
         console.error("[LeiloesPanel] close request failed:", e);
-        toast.error("Erro de rede", {
-          description:
-            "Não foi possível comunicar com o servidor para fechar o leilão.",
-        });
+        ToastBus.error("Erro de rede", "Não foi possível comunicar com o servidor para fechar o leilão.");
       });
   };
 

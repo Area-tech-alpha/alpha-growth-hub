@@ -26,7 +26,7 @@ import {
 import { CountdownTimer } from "../leads/CountdownTimer";
 import { Lead } from "../leads/types";
 import { Bid } from "./types";
-import { toast } from "sonner";
+import { ToastBus } from "@/lib/toastBus";
 import { useRealtimeStore } from "@/store/realtime-store";
 
 import { maskEmail, maskName, maskPhone } from "@/lib/mask";
@@ -62,7 +62,7 @@ export const AuctionModal = ({
     const rawUserCredits = useRealtimeStore((s) => s.rawUserCredits);
     const handleBidAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
-        const onlyNums = /^[0-9]*$/; 
+        const onlyNums = /^[0-9]*$/;
         if (value === "") {
             setBidAmount("");
             return;
@@ -147,35 +147,20 @@ export const AuctionModal = ({
 
     const handleBid = async () => {
         if (!isAuctionActive) {
-            toast.error("Leilão encerrado", {
-                description: "Não é possível enviar lances após o término.",
-            });
+            ToastBus.bidAuctionClosed();
             return;
         }
         const amount = parseFloat(bidAmount);
         if (!amount || amount <= currentBid) {
-            toast.error("Lance inválido", {
-                description: `Seu lance deve ser maior que ${formatCurrency(
-                    currentBid
-                )}`,
-            });
+            ToastBus.bidInvalid(currentBid);
             return;
         }
         if (amount < (lead.minimumBid as number)) {
-            toast.error("Lance muito baixo", {
-                description: `O lance mínimo é ${formatCurrency(
-                    lead.minimumBid as number
-                )}`,
-            });
+            ToastBus.bidTooLow(lead.minimumBid as number);
             return;
         }
         if (amount > userCredits) {
-            console.log("abobora", amount, userCredits)
-            toast.error("Créditos insuficientes", {
-                description: `Você precisa de pelo menos ${formatCurrency(
-                    amount
-                )} em créditos.`,
-            });
+            ToastBus.bidInsufficientCredits(amount);
             return;
         }
         setIsSubmitting(true);
@@ -194,15 +179,11 @@ export const AuctionModal = ({
                 setHeldCredits(nextHeld);
             }
             setBidAmount("");
-            toast.success("Lance realizado com sucesso!", {
-                description: `Seu lance de ${formatCurrency(amount)} foi registrado.`,
-            });
+            ToastBus.bidSuccess(amount);
         } catch (e) {
             const message = (e as { message?: string })?.message || String(e);
             console.error("[AuctionModal] Insert bid error:", message);
-            toast.error("Falha ao enviar lance", {
-                description: message || "Tente novamente.",
-            });
+            ToastBus.bidFailed(message || "Tente novamente.");
         } finally {
             setIsSubmitting(false);
         }
@@ -338,8 +319,8 @@ export const AuctionModal = ({
                                         <div
                                             key={bid.id}
                                             className={`p-3 rounded-lg border flex justify-between items-center ${index === 0
-                                                    ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200"
-                                                    : "bg-muted"
+                                                ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200"
+                                                : "bg-muted"
                                                 }`}
                                         >
                                             <div className="font-bold text-yellow-600">

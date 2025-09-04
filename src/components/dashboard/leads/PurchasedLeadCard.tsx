@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Lead } from "./types";
-import { toast } from "sonner";
+import { ToastBus } from "@/lib/toastBus";
 
 interface PurchasedLeadCardProps {
   lead: Lead;
@@ -57,7 +57,7 @@ export const PurchasedLeadCard = ({
 
   const handleExport = async () => {
     setIsExporting(true);
-    toast.info("Preparando seu arquivo CSV...");
+    ToastBus.csvPreparing();
 
     try {
       const response = await fetch(`/api/leads/${lead.id}/export`);
@@ -86,13 +86,13 @@ export const PurchasedLeadCard = ({
       a.remove();
       window.URL.revokeObjectURL(url);
 
-      toast.success("Download iniciado!");
+      ToastBus.csvDownloadStarted();
     } catch (error) {
       const errorMessage =
         error instanceof Error
           ? error.message
           : "Não foi possível gerar o arquivo CSV.";
-      toast.error("Erro ao exportar", { description: errorMessage });
+      ToastBus.csvError(errorMessage);
     } finally {
       setIsExporting(false);
     }
@@ -123,7 +123,7 @@ export const PurchasedLeadCard = ({
 
   return (
     <Card className="flex flex-col h-full hover:shadow-lg transition-all duration-200 border border-border bg-card text-card-foreground">
-     <CardHeader className="border-b border-border p-4">
+      <CardHeader className="border-b border-border p-4">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
           <div className="flex-1">
             <CardTitle className="text-lg font-bold text-yellow-600 flex items-center gap-2">
@@ -193,7 +193,7 @@ export const PurchasedLeadCard = ({
           onClick={handleExport}
           disabled={isExporting}
           variant="outline"
-         className="w-full bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-black shadow-md transition-all duration-200"
+          className="w-full bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-black shadow-md transition-all duration-200"
         >
           <Download className="h-4 w-4 mr-2" />
           {isExporting ? "Exportando..." : "Exportar CSV"}

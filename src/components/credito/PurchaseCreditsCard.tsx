@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LuCoins } from "react-icons/lu";
-import { toast } from "sonner";
+import { ToastBus } from "@/lib/toastBus";
 import { useRealtimeStore } from "@/store/realtime-store";
 
 type PurchaseCreditsCardProps = {
@@ -44,7 +44,7 @@ export default function PurchaseCreditsCard({
     }, [session?.user?.id, subscribeToUserCredits, subscribeToUserCreditHolds, realtimeCredits]);
     const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
-        const onlyNums = /^[0-9]*$/; 
+        const onlyNums = /^[0-9]*$/;
 
         if (value === "") {
             setAmount("");
@@ -58,9 +58,7 @@ export default function PurchaseCreditsCard({
 
     const handleBuy = async () => {
         if (!session?.user?.email || !session?.user?.name) {
-            toast.error("Ação necessária", {
-                description: "Você precisa estar logado para comprar créditos.",
-            });
+            ToastBus.checkoutLoginRequired();
             return;
         }
         setLoading(true);
@@ -83,16 +81,13 @@ export default function PurchaseCreditsCard({
             }
 
             if (data.checkoutUrl) {
-                toast.success("Redirecionando para o pagamento...", {
-                    description: "Você será levado para a página de checkout.",
-                });
+                ToastBus.checkoutRedirecting();
                 window.location.href = data.checkoutUrl;
             }
         } catch (err: unknown) {
             const errorMessage =
                 err instanceof Error ? err.message : "Ocorreu um erro desconhecido";
-
-            toast.error("Falha ao iniciar pagamento", { description: errorMessage });
+            ToastBus.checkoutFailed(errorMessage);
             setError(errorMessage);
         } finally {
             setLoading(false);

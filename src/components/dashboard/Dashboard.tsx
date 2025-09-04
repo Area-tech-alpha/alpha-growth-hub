@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useSession } from "next-auth/react";
-import { toast } from "sonner";
+import { ToastBus } from "@/lib/toastBus";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CreditosPanel from "@/components/dashboard/CreditosPanel";
 import MeusLeadsPanel from "@/components/dashboard/MeusLeadsPanel";
@@ -243,9 +243,7 @@ export default function Dashboard({
             if (winningBidId) {
               const winningBid = auctionBids.find((b) => b.id === winningBidId);
               if (winningBid && winningBid.userId === currentUserId) {
-                toast.success("Parabéns! Você ganhou o leilão!", {
-                  description: "Veja o lead em Meus Leads.",
-                });
+                ToastBus.notifyAuctionWon(updated.id);
                 (async () => {
                   try {
                     const { data } = await supabase
@@ -263,10 +261,7 @@ export default function Dashboard({
                   } catch { }
                 })();
               } else if (auctionBids.some((b) => b.userId === currentUserId)) {
-                toast("Leilão encerrado", {
-                  description:
-                    "Outro usuário venceu. Seus créditos retornaram.",
-                });
+                ToastBus.notifyAuctionLost(updated.id);
               }
             }
           }
