@@ -25,13 +25,17 @@ export const maskPhone = (phone: string | null | undefined): string => {
 };
 
 export const maskEmail = (email: string | null | undefined): string => {
-  if (!email || email.indexOf("@") < 1) return "******@*****.***";
+  if (!email || email.indexOf("@") < 1) return "***@***.***";
 
   const [localPart, domain] = email.split("@");
 
   const mask = (part: string) => {
-    if (part.length <= 2) return part.charAt(0) + "****";
-    return part.substring(0, 2) + "*".repeat(part.length - 2);
+    if (!part) return "***";
+    if (part.length <= 3) return part.charAt(0) + "**";
+    // Mostra os 2 primeiros e 1 último caractere, mas limita a máscara
+    const start = part.slice(0, 2);
+    const end = part.slice(-1);
+    return `${start}*${end}`;
   };
 
   const domainParts = domain.split(".");

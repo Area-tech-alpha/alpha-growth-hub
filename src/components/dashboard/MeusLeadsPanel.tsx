@@ -90,6 +90,7 @@ export default function MeusLeadsPanel() {
         "Investimento em Marketing (R$)",
         "Canal",
         "Data da Compra",
+        "CNPJ",
       ];
 
       const rows = purchasedLeads.map((lead) => {
@@ -111,6 +112,7 @@ export default function MeusLeadsPanel() {
           escapeCsvCell(lead.marketing_investment),
           escapeCsvCell(lead.channel),
           escapeCsvCell(purchaseDate),
+          escapeCsvCell(lead.cnpj),
         ].join(",");
       });
 

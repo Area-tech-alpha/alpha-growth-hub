@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { createClient } from "@/utils/supabase/client";
+import { useState, useEffect, useRef } from "react";
 import {
     Dialog,
     DialogContent,
@@ -39,13 +38,14 @@ interface AuctionModalProps {
     initialBids?: Bid[];
 }
 
-const supabase = createClient();
+// Supabase client no longer needed locally for masked emails
 
 export const AuctionModal = ({
     auctionId,
     lead,
     onClose,
     user,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     initialBids,
 }: AuctionModalProps) => {
     const [isAuctionActive, setIsAuctionActive] = useState(
@@ -54,12 +54,16 @@ export const AuctionModal = ({
     const [bidAmount, setBidAmount] = useState("");
 
     const [currentBid, setCurrentBid] = useState(lead.currentBid ?? 0);
-    const [bids, setBids] = useState<Bid[]>(initialBids || []);
+    const bidsFromStore = useRealtimeStore((s) => (s.bidsByAuction[auctionId] || [])) as Bid[];
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [hasWon, setHasWon] = useState(false);
     const userCredits = useRealtimeStore((s) => s.userCredits);
     const setHeldCredits = useRealtimeStore((s) => s.setHeldCredits);
     const rawUserCredits = useRealtimeStore((s) => s.rawUserCredits);
+    const [userMaskedEmails, setUserMaskedEmails] = useState<Record<string, string>>({});
+    // Track loading per userId to optionally debug/loading state
+    // const [loadingEmails, setLoadingEmails] = useState<Record<string, boolean>>({});
+    const userEmailsRef = useRef<Record<string, string>>({});
     const handleBidAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
         const onlyNums = /^[0-9]*$/;
@@ -75,7 +79,7 @@ export const AuctionModal = ({
     const handleExpire = () => {
         setIsAuctionActive(false);
 
-        const sortedBids = [...bids].sort((a, b) => b.amount - a.amount);
+        const sortedBids = [...bidsFromStore].sort((a, b) => b.amount - a.amount);
         const lastBid = sortedBids[0];
         const currentUserId = user.id;
         if (currentUserId && lastBid && lastBid.userId === currentUserId) {
@@ -83,57 +87,45 @@ export const AuctionModal = ({
         }
     };
 
+    // Drive currentBid from store
     useEffect(() => {
-        if (initialBids && initialBids.length > 0) {
-            const top = initialBids[0]?.amount ?? lead.currentBid ?? 0;
-            setCurrentBid(top);
-        }
+        const top = bidsFromStore[0]?.amount ?? lead.currentBid ?? 0;
+        setCurrentBid(top);
+        console.log('[AuctionModal] bidsFromStore update', { auctionId, count: bidsFromStore.length, top });
+    }, [bidsFromStore, auctionId, lead.currentBid]);
 
-        const channel = supabase
-            .channel(`bids-auction-${auctionId}`)
-            .on(
-                "postgres_changes",
-                {
-                    event: "INSERT",
-                    schema: "public",
-                    table: "bids",
-                    filter: `auction_id=eq.${auctionId}`,
-                },
-                (payload: {
-                    new: {
-                        id: string;
-                        user_id: string;
-                        amount: number | string;
-                        created_at: string;
-                    };
-                }) => {
-                    const row = payload.new;
-                    const amount =
-                        typeof row.amount === "string"
-                            ? parseFloat(row.amount)
-                            : row.amount;
-                    const bid: Bid = {
-                        id: row.id,
-                        leadId: lead.id,
-                        userId: row.user_id,
-                        userName: "Participante",
-                        amount,
-                        timestamp: new Date(row.created_at),
-                    };
-                    setBids((prev) => {
-                        if (prev.some((b) => b.id === bid.id)) return prev;
-
-                        return [bid, ...prev].sort((a, b) => b.amount - a.amount);
+    // Preload masked emails for displayed bids (fetch missing only)
+    useEffect(() => {
+        const loadMissing = async () => {
+            try {
+                const ids = Array.from(new Set(bidsFromStore.map(b => b.userId).filter(Boolean)));
+                const missing = ids.filter((id) => !userEmailsRef.current[id]);
+                if (missing.length === 0) return;
+                // setLoadingEmails((m) => ({ ...m, ...Object.fromEntries(missing.map(id => [id, true])) }));
+                const res = await fetch('/api/users/masked-emails', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userIds: missing })
+                });
+                const json = await res.json();
+                const emails: Record<string, string> = (json?.emails || {}) as Record<string, string>;
+                if (Object.keys(emails).length > 0) {
+                    const maskedMap: Record<string, string> = {};
+                    Object.entries(emails).forEach(([id, email]) => {
+                        maskedMap[id] = maskEmail(String(email));
                     });
-                    setCurrentBid((prev) => Math.max(prev ?? 0, amount || 0));
+                    userEmailsRef.current = { ...userEmailsRef.current, ...maskedMap };
+                    setUserMaskedEmails((m) => ({ ...m, ...maskedMap }));
                 }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
+                // setLoadingEmails((m) => ({ ...m, ...Object.fromEntries(missing.map(id => [id, false])) }));
+            } catch { }
         };
-    }, [auctionId, lead.id, lead.currentBid, initialBids]);
+        loadMissing();
+    }, [bidsFromStore]);
+
+    useEffect(() => {
+        console.log('[AuctionModal] userMaskedEmails update', { userMaskedEmails });
+    }, [userMaskedEmails]);
 
     const formatCurrency = (value: number | undefined | null) => {
         const numericValue = typeof value === "number" && !isNaN(value) ? value : 0;
@@ -314,8 +306,8 @@ export const AuctionModal = ({
                         <div className="space-y-4">
                             <h3 className="text-lg font-semibold">Histórico de Lances</h3>
                             <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                                {bids.length > 0 ? (
-                                    bids.map((bid, index) => (
+                                {bidsFromStore.length > 0 ? (
+                                    bidsFromStore.map((bid, index) => (
                                         <div
                                             key={bid.id}
                                             className={`p-3 rounded-lg border flex justify-between items-center ${index === 0
@@ -323,8 +315,17 @@ export const AuctionModal = ({
                                                 : "bg-muted"
                                                 }`}
                                         >
-                                            <div className="font-bold text-yellow-600">
-                                                {formatCurrency(bid.amount)}
+                                            <div>
+                                                <div className="font-bold text-yellow-600">
+                                                    {formatCurrency(bid.amount)}
+                                                </div>
+                                                <div className="text-xs text-muted-foreground min-h-[1rem] flex items-center">
+                                                    {userMaskedEmails[bid.userId] ? (
+                                                        <>{userMaskedEmails[bid.userId]}</>
+                                                    ) : (
+                                                        <span className="inline-block h-3 w-24 rounded bg-muted animate-pulse" />
+                                                    )}
+                                                </div>
                                             </div>
                                             <div className="text-right">
                                                 {index === 0 && (
