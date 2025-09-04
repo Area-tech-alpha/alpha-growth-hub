@@ -28,6 +28,31 @@ export default function MeusLeadsPanel() {
     (s: RealtimeState) => s.purchasedLeads
   ) as Lead[];
   const [isExporting, setIsExporting] = useState(false);
+  const [purchasePrices, setPurchasePrices] = useState<Record<string, number>>({});
+  const [loadingPrices, setLoadingPrices] = useState(false);
+
+  useEffect(() => {
+    const loadPurchasePrices = async () => {
+      try {
+        setLoadingPrices(true);
+        const leadIds = Array.from(new Set(purchasedLeads.map(l => l.id)));
+        if (leadIds.length === 0) { setPurchasePrices({}); return; }
+        const res = await fetch('/api/leads/purchase-prices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ leadIds })
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error || 'Falha ao buscar preços de compra');
+        setPurchasePrices((json?.prices || {}) as Record<string, number>);
+      } catch (e) {
+        console.warn('[MeusLeadsPanel] loadPurchasePrices failed', e);
+      } finally {
+        setLoadingPrices(false);
+      }
+    };
+    loadPurchasePrices();
+  }, [purchasedLeads]);
 
   useEffect(() => {
     console.log(
@@ -163,7 +188,7 @@ export default function MeusLeadsPanel() {
                 key={purchasedLead.id}
                 lead={purchasedLead}
                 purchaseDate={purchaseDate}
-                purchasePrice={purchasedLead.currentBid}
+                purchasePrice={loadingPrices ? undefined : purchasePrices[purchasedLead.id]}
               />
             );
           })}

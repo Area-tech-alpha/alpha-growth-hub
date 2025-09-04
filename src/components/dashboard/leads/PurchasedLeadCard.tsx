@@ -19,13 +19,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Lead } from "./types";
 import { ToastBus } from "@/lib/toastBus";
 
 interface PurchasedLeadCardProps {
   lead: Lead;
   purchaseDate: Date;
-  purchasePrice: number;
+  purchasePrice?: number;
 }
 
 export const PurchasedLeadCard = ({
@@ -137,8 +138,12 @@ export const PurchasedLeadCard = ({
           </div>
           <div className="flex-shrink-0 text-left sm:text-right">
             <div className="text-sm text-muted-foreground">Comprado por</div>
-            <div className="text-lg font-bold text-yellow-600">
-              {formatCurrency(purchasePrice)}
+            <div className="text-lg font-bold text-yellow-600 min-h-[1.75rem] flex items-center">
+              {purchasePrice !== undefined ? (
+                <>{formatCurrency(purchasePrice)}</>
+              ) : (
+                <Skeleton className="h-5 w-24 rounded" />
+              )}
             </div>
           </div>
         </div>
