@@ -7,9 +7,10 @@ export interface Lead {
     location: string;
     channel: string;
     revenue: number;
-    marketingInvestment: number;
-    companyName: string;
-    contactName: string;
+    marketing_investment: number;
+    company_name: string;
+    contact_name: string;
+    cnpj: string;
     phone: string;
     email: string;
     maskedCompanyName: string;

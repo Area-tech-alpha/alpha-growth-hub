@@ -8,6 +8,7 @@ import {
   Megaphone,
   DollarSign,
   Flame,
+  Hash,
 } from "lucide-react";
 import {
   Card,
@@ -20,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { CountdownTimer } from "../leads/CountdownTimer";
 import { Lead } from "../leads/types";
 import { maskName, maskPhone } from "@/lib/mask";
+import { useEffect } from "react";
 
 interface LeadCardProps {
   lead: Lead;
@@ -37,6 +39,10 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
       maximumFractionDigits: 0,
     }).format(numericValue);
   };
+
+  useEffect(() => {
+    console.log("[LeadCard] lead:", lead);
+  }, [lead])
 
   const formatNumber = (value: number | undefined | null) => {
     return typeof value === "number" && !isNaN(value) ? value.toString() : "0";
@@ -65,11 +71,10 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
       `}</style>
 
       <Card
-        className={`flex flex-col h-full relative overflow-hidden transition-all duration-300 bg-card text-card-foreground ${
-          isHot
-            ? "hot-lead-card hover:shadow-lg hover:shadow-red-500/40"
-            : "border border-border hover:border-yellow-300"
-        }`}
+        className={`flex flex-col h-full relative overflow-hidden transition-all duration-300 bg-card text-card-foreground ${isHot
+          ? "hot-lead-card hover:shadow-lg hover:shadow-red-500/40"
+          : "border border-border hover:border-yellow-300"
+          }`}
       >
         <CardHeader className="pb-3">
           <div className="flex justify-between items-start gap-4">
@@ -81,7 +86,7 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
                 </div>
               )}
               <CardTitle className="text-lg font-bold text-yellow-600">
-                {lead.name}
+                {lead.company_name}
               </CardTitle>
             </div>
             <div className="flex-shrink-0">
@@ -110,11 +115,11 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Megaphone className="h-3 w-3 text-foreground" />
+                <Megaphone className="h-3 w-3 text-yellow-600 " />
                 <div>
                   <div className="text-muted-foreground">Invest. Marketing</div>
                   <div className="font-semibold">
-                    {formatCurrency(lead.marketingInvestment)}
+                    {formatCurrency(lead.marketing_investment)}
                   </div>
                 </div>
               </div>
@@ -122,29 +127,39 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
                 <Building className="h-3 w-3 text-yellow-600" />
                 <div>
                   <div className="text-muted-foreground">Empresa</div>
-                  <div className="font-semibold text-muted-foreground">
-                    {maskName(lead.companyName)}
+                  <div className="font-semibold">
+                    {lead.company_name}
                   </div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <User className="h-3 w-3 text-muted-foreground" />
+                <User className="h-3 w-3 text-yellow-600" />
                 <div>
                   <div className="text-muted-foreground">Contato</div>
-                  <div className="font-semibold text-muted-foreground">
-                    {maskName(lead.contactName)}
+                  <div className="font-semibold">
+                    {maskName(lead.contact_name)}
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2 col-span-2">
-                <Phone className="h-3 w-3 text-muted-foreground" />
+              <div className="flex items-center gap-2">
+                <Phone className="h-3 w-3 text-yellow-600" />
                 <div>
                   <div className="text-muted-foreground">Telefone</div>
-                  <div className="font-semibold text-muted-foreground">
+                  <div className="font-semibold">
                     {maskPhone(lead.phone)}
                   </div>
                 </div>
               </div>
+              <div className="flex items-center gap-2">
+                <Hash className="h-3 w-3 text-yellow-600" />
+                <div>
+                  <div className="text-muted-foreground">CNPJ</div>
+                  <div className="font-semibold">
+                    {(lead as unknown as { cnpj?: string })?.cnpj || "N/A"}
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
 

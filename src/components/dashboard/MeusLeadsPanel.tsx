@@ -101,14 +101,14 @@ export default function MeusLeadsPanel() {
 
         return [
           escapeCsvCell(lead.id),
-          escapeCsvCell(lead.companyName),
-          escapeCsvCell(lead.contactName),
+          escapeCsvCell(lead.company_name),
+          escapeCsvCell(lead.contact_name),
           escapeCsvCell(lead.phone),
           escapeCsvCell(lead.email),
           escapeCsvCell(lead.location),
           escapeCsvCell(lead.niche),
           escapeCsvCell(lead.revenue),
-          escapeCsvCell(lead.marketingInvestment),
+          escapeCsvCell(lead.marketing_investment),
           escapeCsvCell(lead.channel),
           escapeCsvCell(purchaseDate),
         ].join(",");

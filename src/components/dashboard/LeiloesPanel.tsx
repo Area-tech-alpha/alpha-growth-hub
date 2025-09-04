@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import StatsCards from "./leiloes/statsCards";
 import { Clock, TrendingUp, Users } from "lucide-react";
@@ -77,6 +77,10 @@ export default function LeiloesPanel() {
       ),
     [sortedAuctions]
   );
+
+  useEffect(() => {
+    console.log("[LeiloesPanel] sortedAuctions:", sortedAuctions);
+  }, [sortedAuctions])
 
   return (
     <>

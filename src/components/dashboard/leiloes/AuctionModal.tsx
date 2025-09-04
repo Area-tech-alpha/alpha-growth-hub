@@ -230,7 +230,7 @@ export const AuctionModal = ({
                                     <span className="text-sm">Invest. Marketing</span>
                                 </div>
                                 <div className="font-bold text-xl">
-                                    {formatCurrency(lead.marketingInvestment)}
+                                    {formatCurrency(lead.marketing_investment)}
                                 </div>
                             </div>
                         </div>
@@ -244,7 +244,7 @@ export const AuctionModal = ({
                                 <div className="flex items-center gap-3">
                                     <User className="h-4 w-4 flex-shrink-0" />
                                     <span>
-                                        {hasWon ? lead.contactName : maskName(lead.contactName)}
+                                        {hasWon ? lead.contact_name : maskName(lead.contact_name)}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-3">

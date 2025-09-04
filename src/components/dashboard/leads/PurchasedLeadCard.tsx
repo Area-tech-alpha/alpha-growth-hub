@@ -75,7 +75,7 @@ export const PurchasedLeadCard = ({
       a.href = url;
 
       const disposition = response.headers.get("content-disposition");
-      let filename = `lead_${lead.companyName?.replace(/\s+/g, "_")}.csv`;
+      let filename = `lead_${lead.company_name?.replace(/\s+/g, "_")}.csv`;
       if (disposition?.includes("filename=")) {
         filename = disposition.split("filename=")[1].replace(/"/g, "");
       }
@@ -129,7 +129,7 @@ export const PurchasedLeadCard = ({
           <div className="flex-1">
             <CardTitle className="text-lg font-bold text-yellow-600 flex items-center gap-2">
               <Building className="h-5 w-5" />
-              {lead.companyName || "Nome da Empresa"}
+              {lead.company_name || "Nome da Empresa"}
             </CardTitle>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
               <Clock className="h-3 w-3" />
@@ -163,7 +163,7 @@ export const PurchasedLeadCard = ({
             <InfoRow
               icon={Megaphone}
               label="Invest. Marketing"
-              value={formatCurrency(lead.marketingInvestment)}
+              value={formatCurrency(lead.marketing_investment)}
             />
           </div>
         </div>
@@ -176,7 +176,7 @@ export const PurchasedLeadCard = ({
             <InfoRow
               icon={User}
               label="Nome"
-              value={lead.contactName || "N/A"}
+              value={lead.contact_name || "N/A"}
             />
             <InfoRow
               icon={Phone}
