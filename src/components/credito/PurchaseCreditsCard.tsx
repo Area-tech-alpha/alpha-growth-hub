@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, ChangeEvent } from "react";
+import { useEffect, useState, ChangeEvent, useRef } from "react";
 import { useSession } from "next-auth/react";
 import {
     Card,
@@ -18,12 +18,15 @@ import { useRealtimeStore } from "@/store/realtime-store";
 type PurchaseCreditsCardProps = {
     currentCredits?: number;
     defaultAmount?: number;
+    onHeightReady: (height: number) => void;
 };
 
 export default function PurchaseCreditsCard({
     currentCredits = 0,
     defaultAmount = 50,
+    onHeightReady,
 }: PurchaseCreditsCardProps) {
+    const cardRef = useRef<HTMLDivElement>(null);
     const { data: session } = useSession();
     const [amount, setAmount] = useState<string>(String(defaultAmount));
     const [loading, setLoading] = useState(false);
@@ -31,6 +34,19 @@ export default function PurchaseCreditsCard({
     const realtimeCredits = useRealtimeStore(s => s.userCredits);
     const subscribeToUserCredits = useRealtimeStore(s => s.subscribeToUserCredits);
     const subscribeToUserCreditHolds = useRealtimeStore(s => s.subscribeToUserCreditHolds);
+
+    useEffect(() => {
+        if (cardRef.current) {
+            const observer = new ResizeObserver(entries => {
+                const height = entries[0]?.target?.getBoundingClientRect().height;
+                if (height) {
+                    onHeightReady(height);
+                }
+            });
+            observer.observe(cardRef.current);
+            return () => observer.disconnect();
+        }
+    }, [onHeightReady]);
 
     useEffect(() => {
         console.log("realTimeCreditsss", realtimeCredits);
@@ -42,6 +58,7 @@ export default function PurchaseCreditsCard({
             console.log('[PurchaseCreditsCard] No session user id for credits subscription');
         }
     }, [session?.user?.id, subscribeToUserCredits, subscribeToUserCreditHolds, realtimeCredits]);
+    
     const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
         const onlyNums = /^[0-9]*$/;
@@ -95,7 +112,7 @@ export default function PurchaseCreditsCard({
     };
 
     return (
-        <div className="max-w-lg mx-auto">
+        <div ref={cardRef}>
             <Card>
                 <CardHeader>
                     <div className="flex items-center gap-3">
