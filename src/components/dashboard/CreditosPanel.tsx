@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useSession } from "next-auth/react";
 import PurchaseHistoryPanel from "../credito/PurchaseHistoryPanel";
 import PurchaseCreditsCard from "../credito/PurchaseCreditsCard";
@@ -18,18 +18,20 @@ export default function CreditosPanel({
   const { data: session } = useSession();
   const userId = session?.user?.id;
 
+  const [cardHeight, setCardHeight] = useState<number | undefined>(undefined);
+
   return (
-    <div className="flex flex-col lg:flex-row gap-6 items-start w-full">
-      <div className="w-full md:w-2/5 lg:w-1/3 flex-shrink-0">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full items-start">
+      <div className="lg:col-span-1">
         <PurchaseCreditsCard
           currentCredits={currentCredits}
           defaultAmount={defaultAmount}
+          onHeightReady={setCardHeight}
         />
       </div>
-
-      <div className="w-full md:w-3/5 lg:w-2/3 flex-grow">
+      <div className="lg:col-span-2">
         {userId ? (
-          <PurchaseHistoryPanel />
+          <PurchaseHistoryPanel targetHeight={cardHeight} />
         ) : (
           <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg p-6 bg-card">
             <LuHistory className="h-10 w-10 mb-3 text-muted-foreground/60" />
