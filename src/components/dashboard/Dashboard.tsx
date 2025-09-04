@@ -10,12 +10,10 @@ import MeusLeadsPanel from "@/components/dashboard/MeusLeadsPanel";
 import { CiCreditCard1 } from "react-icons/ci";
 import { IoMdTrendingUp } from "react-icons/io";
 import { FiShoppingBag } from "react-icons/fi";
-import type { AuctionRecord, LeadForAuction } from "./leiloes/types";
-import type { AuctionWithLead } from "./leiloes/types";
 import type { Lead } from "./leads/types";
 import { useRealtimeStore } from "@/store/realtime-store";
 import type { RealtimeState } from "@/store/realtime-store";
-import type { Bid } from "./leiloes/types";
+import type { Bid, AuctionWithLead, AuctionRecord, LeadForAuction } from "./leiloes/types";
 import LeiloesPanel from "./LeiloesPanel";
 
 export default function Dashboard({
@@ -81,6 +79,9 @@ export default function Dashboard({
   const fetchLatestUserPurchases = useRealtimeStore(
     (s: RealtimeState) => s.fetchLatestUserPurchases
   );
+  const activeAuctions = useRealtimeStore(
+    (s: RealtimeState) => s.activeAuctions
+  ) as AuctionWithLead[];
 
   useEffect(() => {
     userIdRef.current = userId;
@@ -351,9 +352,9 @@ export default function Dashboard({
             <TabsTrigger value="leiloes" className="flex items-center">
               <IoMdTrendingUp className="mr-2" />
               <span>Leilões</span>
-              {initialAuctions.length > 0 && (
+              {activeAuctions.length > 0 && (
                 <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-yellow-400 text-xs font-semibold text-black">
-                  {initialAuctions.length}
+                  {activeAuctions.length}
                 </span>
               )}
             </TabsTrigger>
