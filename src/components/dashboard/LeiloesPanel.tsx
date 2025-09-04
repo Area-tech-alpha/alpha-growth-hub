@@ -9,6 +9,7 @@ import { useRealtimeStore } from "@/store/realtime-store";
 import type { RealtimeState } from "@/store/realtime-store";
 import { ToastBus } from "@/lib/toastBus";
 import { sortLeads } from "@/lib/sortLeads";
+import RevenueFilterSort, { RevenueFilterValue } from "./leiloes/RevenueFilterSort";
 
 type AuctionWithLeadLocal = AuctionWithLead;
 
@@ -25,14 +26,41 @@ export default function LeiloesPanel() {
   );
   const [selectedAuction, setSelectedAuction] =
     useState<AuctionWithLeadLocal | null>(null);
+  const [revFilter, setRevFilter] = useState<RevenueFilterValue>({ sort: "none" });
+  const normalizeStr = (s: string) =>
+    String(s || "")
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '');
   const sortedAuctions = useMemo(() => {
     if (!activeAuctions || activeAuctions.length === 0) {
       return [];
     }
 
-    const leads = activeAuctions.map((auction) => auction.leads);
+    let leads = activeAuctions.map((auction) => auction.leads);
 
-    const sortedLeads = sortLeads(leads);
+    // Apply revenue filter
+    if (revFilter.min != null) {
+      leads = leads.filter(l => (Number(l.revenue) || 0) >= (revFilter.min as number));
+    }
+    if (revFilter.max != null) {
+      leads = leads.filter(l => (Number(l.revenue) || 0) <= (revFilter.max as number));
+    }
+
+    // Location filter (prefix, case-insensitive)
+    if (revFilter.locationQuery && revFilter.locationQuery.trim() !== "") {
+      const q = normalizeStr(revFilter.locationQuery);
+      leads = leads.filter((l) => normalizeStr(l.location as string).startsWith(q));
+    }
+
+    // Sort base (existing criteria)
+    let sortedLeads = sortLeads(leads);
+    // Then override with revenue sort if requested
+    if (revFilter.sort === 'asc') {
+      sortedLeads = [...sortedLeads].sort((a, b) => (Number(a.revenue) || 0) - (Number(b.revenue) || 0));
+    } else if (revFilter.sort === 'desc') {
+      sortedLeads = [...sortedLeads].sort((a, b) => (Number(b.revenue) || 0) - (Number(a.revenue) || 0));
+    }
 
     const auctionMap = new Map(
       activeAuctions.map((auction) => [auction.leads.id, auction])
@@ -40,7 +68,18 @@ export default function LeiloesPanel() {
     return sortedLeads
       .map((lead) => auctionMap.get(lead.id))
       .filter(Boolean) as AuctionWithLead[];
+  }, [activeAuctions, revFilter]);
+
+  const locations = useMemo(() => {
+    const set = new Set<string>();
+    activeAuctions.forEach(a => {
+      const loc = String(a.leads.location || "").trim();
+      if (loc) set.add(loc);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [activeAuctions]);
+
+  const noResults = sortedAuctions.length === 0 && activeAuctions.length > 0 && (revFilter.locationQuery?.trim() || "").length > 0;
 
   const handleExpire = (auctionId: string) => {
     removeAuctionById(auctionId);
@@ -90,27 +129,36 @@ export default function LeiloesPanel() {
 
   return (
     <>
-      <div className="flex overflow-x-auto md:grid md:grid-cols-3 gap-6">
-        <StatsCards
-          title="Leilões Ativos"
-          icon={<Clock />}
-          contentTitle={activeAuctionsCount.toString()}
-          contentDescription="leads disponíveis"
-        />
-        <StatsCards
-          title="Valor Total"
-          icon={<TrendingUp />}
-          contentTitle={`R$ ${totalValue.toLocaleString("pt-BR")}`}
-          contentDescription="leads disponíveis"
-        />
-        <StatsCards
-          title="Participantes"
-          icon={<Users />}
-          contentTitle={totalBidders.toString()}
-          contentDescription="Número de lances"
-        />
-      </div>
- 
+      {activeAuctions.length > 0 && (
+        <>
+          <div className="flex overflow-x-auto md:grid md:grid-cols-3 gap-6">
+            <StatsCards
+              title="Leilões Ativos"
+              icon={<Clock />}
+              contentTitle={activeAuctionsCount.toString()}
+              contentDescription="leads disponíveis"
+            />
+            <StatsCards
+              title="Valor Total"
+              icon={<TrendingUp />}
+              contentTitle={`R$ ${totalValue.toLocaleString("pt-BR")}`}
+              contentDescription="leads disponíveis"
+            />
+            <StatsCards
+              title="Participantes"
+              icon={<Users />}
+              contentTitle={totalBidders.toString()}
+              contentDescription="Número de lances"
+            />
+          </div>
+          <div className="mt-4">
+            <RevenueFilterSort value={revFilter} onChange={setRevFilter} availableLocations={locations} />
+          </div>
+        </>
+      )}
+      {noResults && (
+        <div className="mt-6 text-center text-sm text-muted-foreground">Não existem leilões para a localidade informada no momento.</div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mt-6">
         {sortedAuctions.map((auction) => (
           <LeadCard
