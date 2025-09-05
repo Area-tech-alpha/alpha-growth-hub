@@ -192,8 +192,8 @@ export default function MeusLeadsPanel() {
           </p>
         </div>
 
-        <div className="flex items-center justify-between gap-4 sm:justify-end sm:gap-6">
-          {purchasedLeads.length > 0 && (
+        {purchasedLeads.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-stretch sm:justify-end gap-3 sm:gap-6 w-full">
             <Button
               onClick={handleExportAll}
               disabled={isExporting || purchasedLeads.length === 0}
@@ -202,17 +202,17 @@ export default function MeusLeadsPanel() {
               <Download className="h-4 w-4 mr-2" />
               {isExporting ? "Exportando..." : "Exportar Tudo (.csv)"}
             </Button>
-          )}
 
-          <div className="flex-shrink-0 text-right">
-            <div className="text-2xl font-bold text-yellow-600">
-              {purchasedLeads.length}
-            </div>
-            <div className="text-sm text-muted-foreground whitespace-nowrap">
-              leads comprados
+            <div className="flex-shrink-0 text-right self-end sm:self-auto">
+              <div className="text-2xl font-bold text-yellow-600">
+                {purchasedLeads.length}
+              </div>
+              <div className="text-sm text-muted-foreground whitespace-nowrap">
+                leads comprados
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Filtros */}
