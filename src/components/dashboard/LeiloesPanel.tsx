@@ -186,26 +186,28 @@ export default function LeiloesPanel() {
     <>
       {(activeAuctions.length + demoAuctions.length) > 0 && (
         <>
-          <div className="flex overflow-x-auto md:grid md:grid-cols-3 gap-6">
-            <StatsCards
-              title="Leilões Ativos"
-              icon={<Clock />}
-              contentTitle={activeAuctionsCount.toString()}
-              contentDescription={isFiltered ? "leads disponíveis (filtrados)" : "leads disponíveis"}
-            />
-            <StatsCards
-              title="Valor Total"
-              icon={<TrendingUp />}
-              contentTitle={`R$ ${totalValue.toLocaleString("pt-BR")}`}
-              contentDescription="leads disponíveis"
-            />
-            <StatsCards
-              title="Participantes"
-              icon={<Users />}
-              contentTitle={totalBidders.toString()}
-              contentDescription="Número de lances"
-            />
-          </div>
+          <StatsCards
+            items={[
+              {
+                title: "Leilões Ativos",
+                icon: <Clock />,
+                contentTitle: activeAuctionsCount.toString(),
+                contentDescription: isFiltered ? "leads disponíveis agora (filtrados)" : "leads disponíveis agora",
+              },
+              {
+                title: "Valor Total",
+                icon: <TrendingUp />,
+                contentTitle: `R$ ${totalValue.toLocaleString("pt-BR")}`,
+                contentDescription: "em leads disponíveis",
+              },
+              {
+                title: "Participantes",
+                icon: <Users />,
+                contentTitle: totalBidders.toString(),
+                contentDescription: "Número de lances",
+              },
+            ]}
+          />
           <div className="mt-4">
             <RevenueFilterSort value={revFilter} onChange={setRevFilter} availableLocations={locations} />
           </div>
