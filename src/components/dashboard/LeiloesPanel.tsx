@@ -10,6 +10,7 @@ import type { RealtimeState } from "@/store/realtime-store";
 import { ToastBus } from "@/lib/toastBus";
 import { sortLeads } from "@/lib/sortLeads";
 import RevenueFilterSort, { RevenueFilterValue } from "./leiloes/RevenueFilterSort";
+import DemoAuctionsButton from "./leiloes/DemoAuctionsButton";
 
 type AuctionWithLeadLocal = AuctionWithLead;
 
@@ -27,17 +28,22 @@ export default function LeiloesPanel() {
   const [selectedAuction, setSelectedAuction] =
     useState<AuctionWithLeadLocal | null>(null);
   const [revFilter, setRevFilter] = useState<RevenueFilterValue>({ sort: "none" });
+  const [demoAuctions, setDemoAuctions] = useState<AuctionWithLeadLocal[]>([]);
+  const bidsByAuctionStore = useRealtimeStore(
+    (s: RealtimeState) => s.bidsByAuction
+  ) as Record<string, Bid[]>;
   const normalizeStr = (s: string) =>
     String(s || "")
       .toLowerCase()
       .normalize('NFD')
       .replace(/\p{Diacritic}/gu, '');
   const sortedAuctions = useMemo(() => {
-    if (!activeAuctions || activeAuctions.length === 0) {
+    const source = [...activeAuctions, ...demoAuctions];
+    if (!source || source.length === 0) {
       return [];
     }
 
-    let leads = activeAuctions.map((auction) => auction.leads);
+    let leads = source.map((auction) => auction.leads);
 
     // Apply revenue filter
     if (revFilter.min != null) {
@@ -63,25 +69,47 @@ export default function LeiloesPanel() {
     }
 
     const auctionMap = new Map(
-      activeAuctions.map((auction) => [auction.leads.id, auction])
+      source.map((auction) => [auction.leads.id, auction])
     );
     return sortedLeads
       .map((lead) => auctionMap.get(lead.id))
       .filter(Boolean) as AuctionWithLead[];
-  }, [activeAuctions, revFilter]);
+  }, [activeAuctions, demoAuctions, revFilter]);
 
   const locations = useMemo(() => {
     const set = new Set<string>();
-    activeAuctions.forEach(a => {
+    [...activeAuctions, ...demoAuctions].forEach(a => {
       const loc = String(a.leads.location || "").trim();
       if (loc) set.add(loc);
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [activeAuctions]);
+  }, [activeAuctions, demoAuctions]);
 
-  const noResults = sortedAuctions.length === 0 && activeAuctions.length > 0 && (revFilter.locationQuery?.trim() || "").length > 0;
+  const noResults = sortedAuctions.length === 0 && (activeAuctions.length + demoAuctions.length) > 0 && (revFilter.locationQuery?.trim() || "").length > 0;
 
   const handleExpire = (auctionId: string) => {
+    // Demo auctions end locally
+    if (auctionId.startsWith('demo-')) {
+      ToastBus.notifyAuctionExpired(auctionId);
+      // Determine winner from local bids
+      const bids = bidsByAuctionStore[auctionId] || [];
+      const top = [...bids].sort((a, b) => b.amount - a.amount)[0];
+      const currentUserId = session?.user?.id;
+      const userParticipated = bids.some(b => b.userId === currentUserId);
+      if (top && currentUserId && top.userId === currentUserId) {
+        ToastBus.notifyAuctionWon(auctionId);
+      } else if (userParticipated) {
+        ToastBus.notifyAuctionLost(auctionId);
+      }
+      setDemoAuctions(prev => prev.filter(a => a.id !== auctionId));
+      // If no more demo auctions, clear demo mode to restore real credits in UI
+      setTimeout(() => {
+        const clearDemo = useRealtimeStore.getState().clearDemoMode;
+        clearDemo();
+      }, 0);
+      return;
+    }
+    // Real auctions follow server close
     removeAuctionById(auctionId);
     ToastBus.notifyAuctionExpired(auctionId);
     fetch(`/api/auctions/${auctionId}/close`, { method: "POST" })
@@ -127,9 +155,27 @@ export default function LeiloesPanel() {
     console.log("[LeiloesPanel] sortedAuctions:", sortedAuctions);
   }, [sortedAuctions])
 
+  // Sync demo auctions' currentBid and bidders from local bids store
+  useEffect(() => {
+    if (demoAuctions.length === 0) return;
+    let changed = false;
+    const next = demoAuctions.map(a => {
+      if (!a.id.startsWith('demo-')) return a;
+      const bids = bidsByAuctionStore[a.id] || [];
+      const topAmount = bids.length > 0 ? Math.max(...bids.map(b => b.amount || 0)) : (a.leads.currentBid || 0);
+      const count = bids.length;
+      if (topAmount !== a.leads.currentBid || count !== a.leads.bidders) {
+        changed = true;
+        return { ...a, leads: { ...a.leads, currentBid: topAmount, bidders: count } } as AuctionWithLeadLocal;
+      }
+      return a;
+    });
+    if (changed) setDemoAuctions(next);
+  }, [bidsByAuctionStore, demoAuctions]);
+
   return (
     <>
-      {activeAuctions.length > 0 && (
+      {(activeAuctions.length + demoAuctions.length) > 0 && (
         <>
           <div className="flex overflow-x-auto md:grid md:grid-cols-3 gap-6">
             <StatsCards
@@ -170,13 +216,19 @@ export default function LeiloesPanel() {
         ))}
       </div>
 
-      {activeAuctions.length === 0 && (
+      {(activeAuctions.length + demoAuctions.length) === 0 && (
         <div className="text-center py-12 col-span-full">
           <div className="text-gray-400 text-lg mb-2">
             Nenhum leilão ativo no momento
           </div>
           <p className="text-gray-500">Aguarde novos leads</p>
         </div>
+      )}
+      {session?.user?.email === 'yago@assessorialpha.com' && (
+        <DemoAuctionsButton
+          visible={demoAuctions.length === 0}
+          onCreate={(auctions) => setDemoAuctions(auctions as AuctionWithLeadLocal[])}
+        />
       )}
       {selectedAuction && (
         <AuctionModal

@@ -40,6 +40,8 @@ interface AuctionModalProps {
 
 // Supabase client no longer needed locally for masked emails
 
+const EMPTY_BIDS: Bid[] = [];
+
 export const AuctionModal = ({
     auctionId,
     lead,
@@ -54,12 +56,21 @@ export const AuctionModal = ({
     const [bidAmount, setBidAmount] = useState("");
 
     const [currentBid, setCurrentBid] = useState(lead.currentBid ?? 0);
-    const bidsFromStore = useRealtimeStore((s) => (s.bidsByAuction[auctionId] || [])) as Bid[];
+    const bidsFromStore = useRealtimeStore((s) => (s.bidsByAuction[auctionId] ?? EMPTY_BIDS)) as Bid[];
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [hasWon, setHasWon] = useState(false);
-    const userCredits = useRealtimeStore((s) => s.userCredits);
+    const demoModeActive = useRealtimeStore((s) => s.demoModeActive);
+    const demoCredits = useRealtimeStore((s) => s.demoCredits);
+    const demoHolds = useRealtimeStore((s) => s.demoHolds);
+    const realUserCredits = useRealtimeStore((s) => s.userCredits);
+    const isDemoAuction = auctionId.startsWith('demo-');
+    const demoAvailable = Math.max(0, demoCredits - Object.values(demoHolds || {}).reduce((a, b) => a + (Number(b) || 0), 0));
+    const userCredits = demoModeActive && isDemoAuction ? demoAvailable : realUserCredits;
+    const setDemoHold = useRealtimeStore((s) => s.setDemoHold);
     const setHeldCredits = useRealtimeStore((s) => s.setHeldCredits);
     const rawUserCredits = useRealtimeStore((s) => s.rawUserCredits);
+    const addBidForAuction = useRealtimeStore((s) => s.addBidForAuction);
+    const updateAuctionStatsFromBid = useRealtimeStore((s) => s.updateAuctionStatsFromBid);
     const [userMaskedEmails, setUserMaskedEmails] = useState<Record<string, string>>({});
     // Track loading per userId to optionally debug/loading state
     // const [loadingEmails, setLoadingEmails] = useState<Record<string, boolean>>({});
@@ -89,10 +100,15 @@ export const AuctionModal = ({
 
     // Drive currentBid from store
     useEffect(() => {
-        const top = bidsFromStore[0]?.amount ?? lead.currentBid ?? 0;
-        setCurrentBid(top);
+        const top = bidsFromStore && bidsFromStore.length > 0
+            ? bidsFromStore[0]?.amount
+            : (lead.currentBid ?? 0);
+        if (top !== currentBid) {
+            setCurrentBid(top);
+        }
         console.log('[AuctionModal] bidsFromStore update', { auctionId, count: bidsFromStore.length, top });
-    }, [bidsFromStore, auctionId, lead.currentBid]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [bidsFromStore]);
 
     // Preload masked emails for displayed bids (fetch missing only)
     useEffect(() => {
@@ -151,12 +167,29 @@ export const AuctionModal = ({
             ToastBus.bidTooLow(lead.minimumBid as number);
             return;
         }
-        if (amount > userCredits) {
+        const isDemo = isDemoAuction;
+        if (!isDemo && amount > userCredits) {
             ToastBus.bidInsufficientCredits(amount);
             return;
         }
         setIsSubmitting(true);
         try {
+            if (isDemo) {
+                const bid: Bid = {
+                    id: `demo-bid-${Date.now()}`,
+                    leadId: lead.id,
+                    userId: user.id || 'demo-user',
+                    userName: user.name || 'Você',
+                    amount,
+                    timestamp: new Date(),
+                };
+                addBidForAuction(auctionId, bid);
+                updateAuctionStatsFromBid(auctionId, amount);
+                setDemoHold(auctionId, amount);
+                setBidAmount("");
+                ToastBus.bidSuccess(amount);
+                return;
+            }
             const res = await fetch("/api/auction/bid", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },

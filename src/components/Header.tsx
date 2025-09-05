@@ -49,6 +49,9 @@ export default function Header({
     const avatarToShow = session?.user?.image ?? userAvatarUrl;
     const displayInitial = (nameToShow?.[0] || "U").toUpperCase();
     const realtimeCredits = useRealtimeStore(s => s.userCredits);
+    const demoModeActive = useRealtimeStore(s => s.demoModeActive);
+    const demoCredits = useRealtimeStore(s => s.demoCredits);
+    const demoHolds = useRealtimeStore(s => s.demoHolds);
     const subscribeToUserCreditHolds = useRealtimeStore(s => s.subscribeToUserCreditHolds);
     const subscribeToUserCredits = useRealtimeStore(s => s.subscribeToUserCredits);
 
@@ -62,7 +65,8 @@ export default function Header({
         }
     }, [session?.user?.id, subscribeToUserCredits, subscribeToUserCreditHolds]);
 
-    const displayCredits = session?.user?.id ? realtimeCredits : userCredits;
+    const demoAvailable = Math.max(0, demoCredits - Object.values(demoHolds || {}).reduce((a, b) => a + (Number(b) || 0), 0));
+    const displayCredits = session?.user?.id ? (demoModeActive ? demoAvailable : realtimeCredits) : userCredits;
     console.log('[Header] Render credits', { displayCredits, realtimeCredits, fallback: userCredits });
 
     const Logo = ({ width, height }: { width: number, height: number }) => {

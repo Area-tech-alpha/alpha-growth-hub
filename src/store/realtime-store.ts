@@ -14,6 +14,16 @@ export interface RealtimeState {
     // total amount currently held across active credit_holds for the user
     heldCredits: number;
 
+    // Demo mode (fake auctions/credits)
+    demoModeActive: boolean;
+    demoCredits: number;
+    demoHolds: Record<string, number>;
+    setDemoModeActive: (active: boolean) => void;
+    setDemoCredits: (amount: number) => void;
+    setDemoHold: (auctionId: string, amount: number) => void;
+    releaseDemoHold: (auctionId: string) => void;
+    clearDemoMode: () => void;
+
     setInitialAuctions: (auctions: AuctionWithLead[]) => void;
     setInitialPurchasedLeads: (leads: Lead[]) => void;
 
@@ -66,6 +76,21 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
     userCredits: 0,
     rawUserCredits: 0,
     heldCredits: 0,
+
+    demoModeActive: false,
+    demoCredits: 5000,
+    demoHolds: {},
+    setDemoModeActive: (active: boolean) => set({ demoModeActive: active }),
+    setDemoCredits: (amount: number) => set({ demoCredits: Math.max(0, Number(amount) || 0) }),
+    setDemoHold: (auctionId: string, amount: number) => set((state: RealtimeState) => ({
+        demoHolds: { ...state.demoHolds, [auctionId]: Math.max(0, Number(amount) || 0) }
+    })),
+    releaseDemoHold: (auctionId: string) => set((state: RealtimeState) => {
+        const nextHolds = { ...state.demoHolds };
+        delete nextHolds[auctionId];
+        return { demoHolds: nextHolds };
+    }),
+    clearDemoMode: () => set({ demoModeActive: false, demoCredits: 0, demoHolds: {} }),
 
     setInitialAuctions: (auctions: AuctionWithLead[]) => set({ activeAuctions: auctions }),
     setInitialPurchasedLeads: (leads: Lead[]) => set({ purchasedLeads: leads }),
