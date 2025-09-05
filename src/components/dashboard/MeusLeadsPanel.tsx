@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FiShoppingBag } from "react-icons/fi";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import type { Lead } from "./leads/types";
 import { useRealtimeStore } from "@/store/realtime-store";
 import type { RealtimeState } from "@/store/realtime-store";
 import { ToastBus } from "@/lib/toastBus";
+import RevenueFilterSort, { type RevenueFilterValue } from "./leiloes/RevenueFilterSort";
 
 const escapeCsvCell = (
   cellData: string | number | null | undefined
@@ -30,6 +31,8 @@ export default function MeusLeadsPanel() {
   const [isExporting, setIsExporting] = useState(false);
   const [purchasePrices, setPurchasePrices] = useState<Record<string, number>>({});
   const [loadingPrices, setLoadingPrices] = useState(false);
+  const [revFilter, setRevFilter] = useState<RevenueFilterValue>({ sort: "none" });
+  const [paidSort, setPaidSort] = useState<"none" | "asc" | "desc">("none");
 
   useEffect(() => {
     const loadPurchasePrices = async () => {
@@ -53,6 +56,53 @@ export default function MeusLeadsPanel() {
     };
     loadPurchasePrices();
   }, [purchasedLeads]);
+
+  // Compute available states based on current revenue filter (min/max)
+  const availableStateUFs = useMemo(() => {
+    let leads = purchasedLeads.slice();
+    if (revFilter.min != null) {
+      leads = leads.filter(l => (Number(l.revenue) || 0) >= (revFilter.min as number));
+    }
+    if (revFilter.max != null) {
+      leads = leads.filter(l => (Number(l.revenue) || 0) <= (revFilter.max as number));
+    }
+    const setUF = new Set<string>();
+    leads.forEach(l => {
+      const uf = String(l.state || "").toUpperCase();
+      if (uf) setUF.add(uf);
+    });
+    return Array.from(setUF);
+  }, [purchasedLeads, revFilter.min, revFilter.max]);
+
+  // Apply filters and sorting (revenue sort takes precedence if chosen; otherwise sort by paid)
+  const displayLeads = useMemo(() => {
+    let leads = purchasedLeads.slice();
+
+    if (revFilter.min != null) {
+      leads = leads.filter(l => (Number(l.revenue) || 0) >= (revFilter.min as number));
+    }
+    if (revFilter.max != null) {
+      leads = leads.filter(l => (Number(l.revenue) || 0) <= (revFilter.max as number));
+    }
+    if ((revFilter.locationQuery || "").trim() !== "") {
+      const uf = (revFilter.locationQuery as string).toUpperCase();
+      leads = leads.filter(l => String(l.state || "").toUpperCase() === uf);
+    }
+
+    // Sorting
+    if (revFilter.sort === "asc") {
+      leads = [...leads].sort((a, b) => (Number(a.revenue) || 0) - (Number(b.revenue) || 0));
+    } else if (revFilter.sort === "desc") {
+      leads = [...leads].sort((a, b) => (Number(b.revenue) || 0) - (Number(a.revenue) || 0));
+    } else if (paidSort !== "none") {
+      leads = [...leads].sort((a, b) => {
+        const ap = purchasePrices[a.id] ?? -Infinity; // undefined go last in asc
+        const bp = purchasePrices[b.id] ?? -Infinity;
+        return paidSort === "asc" ? ap - bp : bp - ap;
+      });
+    }
+    return leads;
+  }, [purchasedLeads, revFilter.min, revFilter.max, revFilter.locationQuery, revFilter.sort, paidSort, purchasePrices]);
 
   const handleExportAll = () => {
     if (purchasedLeads.length === 0) {
@@ -143,14 +193,16 @@ export default function MeusLeadsPanel() {
         </div>
 
         <div className="flex items-center justify-between gap-4 sm:justify-end sm:gap-6">
-          <Button
-            onClick={handleExportAll}
-            disabled={isExporting || purchasedLeads.length === 0}
-            className="w-full sm:w-auto bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-black shadow-md transition-all duration-200"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            {isExporting ? "Exportando..." : "Exportar Tudo (.csv)"}
-          </Button>
+          {purchasedLeads.length > 0 && (
+            <Button
+              onClick={handleExportAll}
+              disabled={isExporting || purchasedLeads.length === 0}
+              className="w-full sm:w-auto bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-black shadow-md transition-all duration-200"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              {isExporting ? "Exportando..." : "Exportar Tudo (.csv)"}
+            </Button>
+          )}
 
           <div className="flex-shrink-0 text-right">
             <div className="text-2xl font-bold text-yellow-600">
@@ -163,9 +215,23 @@ export default function MeusLeadsPanel() {
         </div>
       </div>
 
+      {/* Filtros */}
+      {purchasedLeads.length > 0 && (
+        <div className="mt-2">
+          <RevenueFilterSort
+            value={revFilter}
+            onChange={setRevFilter}
+            availableStateUFs={availableStateUFs}
+            includePaidSort
+            paidSort={paidSort}
+            onPaidSortChange={setPaidSort}
+          />
+        </div>
+      )}
+
       {purchasedLeads.length > 0 ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-          {purchasedLeads.map((purchasedLead) => {
+          {displayLeads.map((purchasedLead) => {
             const validDateSource =
               purchasedLead.updated_at || purchasedLead.expires_at;
             const purchaseDate =
