@@ -49,16 +49,12 @@ export default function PurchaseCreditsCard({
     }, [onHeightReady]);
 
     useEffect(() => {
-        console.log("realTimeCreditsss", realtimeCredits);
         if (session?.user?.id) {
-            console.log('[PurchaseCreditsCard] Subscribing to user credits by id', { userId: session.user.id });
             subscribeToUserCredits(session.user.id);
             subscribeToUserCreditHolds(session.user.id);
-        } else {
-            console.log('[PurchaseCreditsCard] No session user id for credits subscription');
         }
     }, [session?.user?.id, subscribeToUserCredits, subscribeToUserCreditHolds, realtimeCredits]);
-    
+
     const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
         const onlyNums = /^[0-9]*$/;

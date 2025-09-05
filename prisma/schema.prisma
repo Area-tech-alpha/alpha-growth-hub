@@ -156,7 +156,7 @@ model users {
   created_at          DateTime              @default(now()) @db.Timestamptz(6)
   updated_at          DateTime              @default(now()) @db.Timestamptz(6)
   name                String?
-  email               String?               @unique // 👈 Adicione @unique para o email
+  email               String?               @unique
   email_verified      DateTime?             @db.Timestamptz(6)
   avatar_url          String?
   bids                bids[]

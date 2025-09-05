@@ -58,7 +58,6 @@ export default function DemoAuctionsButton({
 
         const hot = mk("demo-hot", "hot", 1, { company_name: "Global Trade", location: "São Paulo" });
         const cold = mk("demo-cold", "cold", 1, { company_name: "Nexus Health", location: "Rio de Janeiro" });
-        // Hot primeiro
         onCreate([hot, cold]);
         setDemoModeActive(true);
         setDemoCredits(5000);

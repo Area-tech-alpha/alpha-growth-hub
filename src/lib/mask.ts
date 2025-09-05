@@ -32,11 +32,6 @@ export const maskEmail = (email: string | null | undefined): string => {
   const mask = (part: string) => {
     if (!part) return "***";
     const len = part.length;
-    // Regras para ver mais caracteres reais, mantendo a contagem correta de '*'
-    // len<=2: mostra 1, mascara o restante
-    // 3-4: mostra 1 começo, 1 fim
-    // 5-6: mostra 2 começo, 1 fim
-    // >=7: mostra 3 começo, 2 fim
     let keepStart = 1;
     let keepEnd = 0;
     if (len <= 2) { keepStart = 1; keepEnd = 0; }

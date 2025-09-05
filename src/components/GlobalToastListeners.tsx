@@ -16,7 +16,6 @@ export default function GlobalToastListeners() {
 
         const channel = supabase
             .channel("global-toasts")
-            // New auctions
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'auctions' }, async (payload: { new: { id: string; lead_id: string } }) => {
                 try {
                     const leadId = payload?.new?.lead_id;
@@ -28,13 +27,11 @@ export default function GlobalToastListeners() {
                     ToastBus.notifyNewAuction(payload.new.id, name);
                 } catch { }
             })
-            // Auction closed
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'auctions' }, async (payload: { new: { id: string; status: string; winning_bid_id?: string | null } }) => {
                 const updated = payload?.new;
                 if (!updated?.id) return;
                 if (updated.status === 'open') return;
                 try {
-                    // Did the current user participate?
                     const { data: myBidAny } = await supabase.from('bids').select('id').eq('auction_id', updated.id).eq('user_id', userId).limit(1);
                     const participated = Array.isArray(myBidAny) && myBidAny.length > 0;
                     if (!participated) return;
@@ -47,18 +44,14 @@ export default function GlobalToastListeners() {
                             ToastBus.notifyAuctionLost(updated.id);
                         }
                     } else if (updated.status === 'closed_expired') {
-                        // No winner case: inform participants their credits returned
                         ToastBus.notifyAuctionLost(updated.id);
                     }
                 } catch { }
             })
-            // New bids anywhere -> notify if I'm already participating
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bids' }, async (payload: { new: { id: string; auction_id: string; user_id: string; amount: number | string } }) => {
                 const row = payload?.new;
                 if (!row?.auction_id) return;
-                // Ignore my own bid for this toast
                 if (row.user_id === userId) {
-                    // Schedule ending-soon toast (60s before) when I place my first bid
                     try {
                         if (!timeoutsRef.current[row.auction_id]) {
                             const { data: a } = await supabase.from('auctions').select('expired_at').eq('id', row.auction_id).single();

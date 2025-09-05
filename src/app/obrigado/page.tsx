@@ -1,4 +1,3 @@
-// app/obrigado/page.tsx
 "use client";
 
 import Link from "next/link";
@@ -6,12 +5,10 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import useSWR from 'swr';
 
-// Função auxiliar para o SWR fazer as requisições
 const fetcher = (url: string) => fetch(url).then(res => res.json());
 
 function ObrigadoContent() {
     const searchParams = useSearchParams();
-    // Pegamos o checkoutId, que é nosso identificador único da transação
     const checkoutId = searchParams.get('checkoutId');
 
     const [uiState, setUiState] = useState<{ title: string; subtitle: string; loading: boolean }>({
@@ -20,19 +17,17 @@ function ObrigadoContent() {
         loading: true,
     });
 
-    // SWR vai chamar nossa API a cada 3 segundos para verificar o status
     const { data, error } = useSWR(
         checkoutId ? `/api/check-status?checkoutId=${checkoutId}` : null,
         fetcher,
         {
-            refreshInterval: 3000, // 3 segundos
+            refreshInterval: 3000,
             revalidateOnFocus: false,
             revalidateOnReconnect: false,
         }
     );
 
     useEffect(() => {
-        // Estado de erro na API
         if (error) {
             setUiState({
                 title: 'Ocorreu um problema',
@@ -42,7 +37,6 @@ function ObrigadoContent() {
             return;
         }
 
-        // A API retornou que o processamento foi concluído com sucesso
         if (data?.status === 'SUCCESS') {
             setUiState({
                 title: 'Pagamento confirmado! 🎉',
@@ -50,18 +44,16 @@ function ObrigadoContent() {
                 loading: false,
             });
         }
-        // A API retornou que o pagamento ainda está pendente de processamento no nosso sistema
         else if (data?.status === 'PENDING') {
             setUiState({
                 title: 'Pagamento aprovado!',
                 subtitle: 'Estamos processando seus créditos. Esta página será atualizada automaticamente.',
-                loading: true, // Mantém o visual de "carregando"
+                loading: true,
             });
         }
 
     }, [data, error]);
 
-    // O SWR ainda está na primeira requisição (isLoading não está disponível diretamente no SWR v2, então usamos nosso próprio estado)
     if (!data && !error && uiState.loading) {
         return (
             <div className="flex flex-col items-center text-center">
@@ -75,7 +67,6 @@ function ObrigadoContent() {
         );
     }
 
-    // Renderização final (Sucesso ou Erro)
     return (
         <>
             <h1 className="text-2xl md:text-3xl font-semibold text-white mb-2">{uiState.title}</h1>
@@ -87,7 +78,6 @@ function ObrigadoContent() {
     );
 }
 
-// Componente principal da página, com Suspense para carregar os parâmetros da URL
 export default function ObrigadoPage() {
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-black relative overflow-hidden">

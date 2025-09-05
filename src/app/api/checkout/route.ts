@@ -25,20 +25,9 @@ export async function POST(request: Request) {
         }
         const customerName = (session.user.name ?? 'Cliente').substring(0, 30);
 
-        console.log('[Checkout] Start', {
-            amount,
-            userId: session.user.id,
-            requestUrl: request.url,
-            env_NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-            env_SITE_URL: process.env.SITE_URL,
-            asaasUrl: ASAAS_API_URL,
-            hasApiKey: Boolean(ASAAS_API_KEY)
-        });
-
         const credits = Math.floor(amount);
         const internalCheckoutId = uuidv4();
         const externalReference = `ck:${internalCheckoutId}|uid:${session.user.id}`;
-        console.log('[Checkout] Computed refs', { internalCheckoutId, externalReference, SITE_URL });
 
         const checkoutData = {
             billingTypes: ['CREDIT_CARD', 'PIX'],
@@ -62,7 +51,6 @@ export async function POST(request: Request) {
             ]
         };
 
-        console.log('[Checkout] checkoutData (sanitized):', checkoutData);
         const response = await fetch(`${ASAAS_API_URL}/checkouts`, {
             method: 'POST',
             headers: {
@@ -72,24 +60,17 @@ export async function POST(request: Request) {
             },
             body: JSON.stringify(checkoutData),
         });
-        console.log('[Checkout] Asaas response status:', response.status);
 
         if (!response.ok) {
             const errorData = await response.json();
-            console.error('[Checkout] Erro da API Asaas:', errorData);
             return NextResponse.json({ error: 'Falha ao criar checkout no Asaas', details: errorData }, { status: response.status });
         }
 
         const asaasResponse = await response.json();
-        console.log('[Checkout] Asaas response body:', {
-            asaasResponse
-        });
 
-        // Persist linkage between Asaas checkout and our user for webhook correlation
         if (!asaasResponse?.id) {
             return NextResponse.json({ error: 'Resposta inválida do Asaas (sem id do checkout)' }, { status: 502 });
         }
-        // Persist with retry, fallback to Supabase if Prisma cannot reach DB
         try {
             const persist = async () => {
                 await prisma.checkout_sessions.upsert({
@@ -140,7 +121,6 @@ export async function POST(request: Request) {
             amount: amount,
             credits: credits,
         };
-        console.log('[Checkout] Success payload:', payload);
         return NextResponse.json(payload);
 
     } catch (error) {

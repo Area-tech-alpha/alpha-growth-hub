@@ -29,7 +29,6 @@ export async function POST(request: Request) {
             return NextResponse.json({ prices: {} })
         }
 
-        // 1) Fetch closed_won auctions for these leads
         const auctions = await prisma.auctions.findMany({
             where: { lead_id: { in: leadIds }, status: 'closed_won' },
             select: { lead_id: true, winning_bid_id: true }
@@ -43,7 +42,6 @@ export async function POST(request: Request) {
             return NextResponse.json({ prices: {} })
         }
 
-        // 2) Fetch winning bids amounts
         const bids = await prisma.bids.findMany({
             where: { id: { in: winningBidIds } },
             select: { id: true, amount: true }
@@ -51,7 +49,6 @@ export async function POST(request: Request) {
         const amountByBid: Record<string, number> = {}
         bids.forEach(b => { amountByBid[b.id] = toNum(b.amount as unknown) })
 
-        // 3) Build leadId -> amount map
         const prices: Record<string, number> = {}
         auctions.forEach(a => {
             const leadId = a.lead_id

@@ -32,7 +32,6 @@ export async function POST(request: Request) {
                 const n = typeof v === 'string' ? parseFloat(v as string) : Number(v);
                 return Number.isFinite(n) ? n : 0;
             };
-            // Load auction and validate status/expiry
             const auction = await tx.auctions.findUnique({ where: { id: auctionId } })
             if (!auction) {
                 return { status: 404 as const, body: { error: 'Leilão não encontrado' } }
@@ -41,7 +40,6 @@ export async function POST(request: Request) {
                 return { status: 409 as const, body: { error: 'Leilão encerrado' } }
             }
 
-            // Validate amount against current top and minimum
             const topBid = await tx.bids.findFirst({
                 where: { auction_id: auctionId },
                 orderBy: [{ amount: 'desc' }, { created_at: 'desc' }]
@@ -53,10 +51,8 @@ export async function POST(request: Request) {
                 return { status: 400 as const, body: { error: `Lance mínimo é ${requiredMin}` } }
             }
 
-            // Credits: compute available (= balance - active holds excluding this auction's existing hold)
             const user = await tx.users.findUnique({ where: { id: userId } })
             const creditBalance = toNum(user?.credit_balance as unknown)
-            console.log("creditBalance", creditBalance)
 
             const existingHold = await tx.credit_holds.findFirst({
                 where: { user_id: userId, auction_id: auctionId, status: 'active' }
@@ -71,11 +67,9 @@ export async function POST(request: Request) {
             const availableExcludingThis = creditBalance - (totalActiveHolds - existingHoldAmount)
             const deltaNeeded = amount - existingHoldAmount
             if (availableExcludingThis < deltaNeeded) {
-                console.log("availableExcludingThis", availableExcludingThis, deltaNeeded)
                 return { status: 402 as const, body: { error: 'Créditos insuficientes' } }
             }
 
-            // Insert bid
             const bid = await tx.bids.create({
                 data: {
                     auction_id: auctionId,
@@ -84,7 +78,6 @@ export async function POST(request: Request) {
                 }
             })
 
-            // Upsert hold to the new bid amount
             if (existingHold) {
                 await tx.credit_holds.update({
                     where: { id: existingHold.id },
@@ -102,13 +95,11 @@ export async function POST(request: Request) {
                 })
             }
 
-            // Update auction minimum_bid so that next bid must be at least last bid + 1
             await tx.auctions.update({
                 where: { id: auctionId },
                 data: { minimum_bid: new Prisma.Decimal(amount + 1) }
             })
 
-            // Compute new available credits
             const holdsAfter = await tx.credit_holds.findMany({ where: { user_id: userId, status: 'active', auctions: { status: 'open' } }, select: { amount: true } })
             const totalHoldsAfter = holdsAfter.reduce((sum, h) => sum + toNum(h.amount as unknown), 0)
             const availableCredits = Math.max(0, creditBalance - totalHoldsAfter)

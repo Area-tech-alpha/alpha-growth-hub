@@ -85,15 +85,12 @@ export default function Dashboard({
 
   useEffect(() => {
     userIdRef.current = userId;
-    console.log("[Dashboard] userId:", userId);
   }, [userId]);
 
   useEffect(() => {
     if (session?.user?.id) {
-      console.log('[Dashboard] Subscribing to user credits by id', { userId: session.user.id });
       subscribeToUserCredits(session.user.id);
       subscribeToUserCreditHolds(session.user.id);
-      console.log('[Dashboard] Subscribing to user purchases + fetch initial');
       fetchLatestUserPurchases({ userId: session?.user?.id, limit: 5 });
       subscribeToUserPurchases({ userId: session?.user?.id });
     }
@@ -110,15 +107,10 @@ export default function Dashboard({
         expires_at: auction.expired_at,
       } as LeadForAuction,
     }));
-    console.log("[Dashboard] normalizedInitialAuctions count:", mapped.length);
     return mapped;
   }, [initialAuctions]);
 
   useEffect(() => {
-    console.log("[Dashboard] setInitial state", {
-      auctions: normalizedInitialAuctions.length,
-      purchasedLeads: (initialPurchasedLeads as unknown as Lead[])?.length || 0,
-    });
     setInitialAuctions(normalizedInitialAuctions);
     setInitialPurchasedLeads(
       (initialPurchasedLeads as unknown as Lead[]) || []
@@ -131,10 +123,8 @@ export default function Dashboard({
   ]);
 
   useEffect(() => {
-    console.log("[Dashboard] Prefetch bids start");
     const load = async () => {
       const auctionIds = normalizedInitialAuctions.map((a) => a.id);
-      console.log("[Dashboard] Prefetch auctionIds:", auctionIds);
       await Promise.all(
         auctionIds.map(async (auctionId) => {
           const { data, error } = await supabase
@@ -168,12 +158,6 @@ export default function Dashboard({
             })
           );
           setBidsForAuction(auctionId, mapped);
-          console.log(
-            "[Dashboard] Prefetch bids done for",
-            auctionId,
-            "count:",
-            mapped.length
-          );
         })
       );
     };
@@ -182,7 +166,6 @@ export default function Dashboard({
     }
   }, [normalizedInitialAuctions, supabase, setBidsForAuction]);
   useEffect(() => {
-    console.log("[Dashboard] Subscribing auctions/bids realtime");
     const channel = supabase
       .channel("dashboard-realtime")
       .on(
@@ -257,10 +240,6 @@ export default function Dashboard({
                       .eq("id", updated.lead_id)
                       .single();
                     if (data?.id) {
-                      console.log(
-                        "[Dashboard] Ensuring purchased lead via Supabase:",
-                        data.id
-                      );
                       addPurchasedLeadIfMissing(data as unknown as Lead);
                     }
                   } catch { }
@@ -306,12 +285,9 @@ export default function Dashboard({
           }
         }
       )
-      .subscribe((status) => {
-        console.log("[Dashboard] auctions/bids channel status:", status);
-      });
+      .subscribe();
 
     return () => {
-      console.log("[Dashboard] Unsubscribing auctions/bids realtime");
       supabase.removeChannel(channel);
     };
   }, [
@@ -329,7 +305,6 @@ export default function Dashboard({
       console.warn("[Dashboard] Skip leads realtime: no userId");
       return;
     }
-    console.log('[Dashboard] Fetch + Subscribe user leads');
     fetchUserLeads(userId, 200);
     subscribeToUserLeads(userId);
     return () => {

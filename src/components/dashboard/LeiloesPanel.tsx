@@ -46,7 +46,6 @@ export default function LeiloesPanel() {
 
     let leads = source.map((auction) => auction.leads);
 
-    // Apply revenue filter
     if (revFilter.min != null) {
       leads = leads.filter(l => (Number(l.revenue) || 0) >= (revFilter.min as number));
     }
@@ -54,15 +53,12 @@ export default function LeiloesPanel() {
       leads = leads.filter(l => (Number(l.revenue) || 0) <= (revFilter.max as number));
     }
 
-    // Location filter (prefix, case-insensitive)
     if (revFilter.locationQuery && revFilter.locationQuery.trim() !== "") {
       const q = normalizeStr(revFilter.locationQuery);
       leads = leads.filter((l) => normalizeStr(l.location as string).startsWith(q));
     }
 
-    // Sort base (existing criteria)
     let sortedLeads = sortLeads(leads);
-    // Then override with revenue sort if requested
     if (revFilter.sort === 'asc') {
       sortedLeads = [...sortedLeads].sort((a, b) => (Number(a.revenue) || 0) - (Number(b.revenue) || 0));
     } else if (revFilter.sort === 'desc') {
@@ -89,10 +85,8 @@ export default function LeiloesPanel() {
   const noResults = sortedAuctions.length === 0 && (activeAuctions.length + demoAuctions.length) > 0 && (revFilter.locationQuery?.trim() || "").length > 0;
 
   const handleExpire = (auctionId: string) => {
-    // Demo auctions end locally
     if (auctionId.startsWith('demo-')) {
       ToastBus.notifyAuctionExpired(auctionId);
-      // Determine winner from local bids
       const bids = bidsByAuctionStore[auctionId] || [];
       const top = [...bids].sort((a, b) => b.amount - a.amount)[0];
       const currentUserId = session?.user?.id;
@@ -103,20 +97,16 @@ export default function LeiloesPanel() {
         ToastBus.notifyAuctionLost(auctionId);
       }
       setDemoAuctions(prev => prev.filter(a => a.id !== auctionId));
-      // If no more demo auctions, clear demo mode to restore real credits in UI
       setTimeout(() => {
         const clearDemo = useRealtimeStore.getState().clearDemoMode;
         clearDemo();
       }, 0);
       return;
     }
-    // Real auctions follow server close
     removeAuctionById(auctionId);
     ToastBus.notifyAuctionExpired(auctionId);
     fetch(`/api/auctions/${auctionId}/close`, { method: "POST" })
       .then(async (res) => {
-        const json = await res.json().catch(() => ({}));
-        console.log("[LeiloesPanel] close result:", res.status, json);
         if (!res.ok) {
           ToastBus.error(
             "Falha ao fechar leilão",
@@ -154,17 +144,11 @@ export default function LeiloesPanel() {
   );
 
   useEffect(() => {
-    console.log("[LeiloesPanel] sortedAuctions:", sortedAuctions);
-  }, [sortedAuctions])
-
-  // Visual feedback when filters change: brief hide/show
-  useEffect(() => {
     setIsFiltering(true);
     const t = setTimeout(() => setIsFiltering(false), 250);
     return () => clearTimeout(t);
   }, [revFilter]);
 
-  // Sync demo auctions' currentBid and bidders from local bids store
   useEffect(() => {
     if (demoAuctions.length === 0) return;
     let changed = false;

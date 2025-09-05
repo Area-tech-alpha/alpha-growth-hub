@@ -83,7 +83,6 @@ export default function RevenueFilterSort({
         .normalize('NFD')
         .replace(/\p{Diacritic}/gu, '');
 
-    // Map canonical labels and their normalized values
     const locationOptions = useMemo(() => {
         const set = new Set<string>();
         availableLocations.forEach((loc) => {
@@ -94,7 +93,6 @@ export default function RevenueFilterSort({
         return list.map(label => ({ label, value: normalize(label) }));
     }, [availableLocations]);
 
-    // Sync external value to local input
     useEffect(() => {
         setLocStr(value.locationQuery ?? "");
     }, [value.locationQuery]);
@@ -114,7 +112,6 @@ export default function RevenueFilterSort({
         }
     };
 
-    // Filter dropdown options accent-insensitively by current input
     const filteredOptions = useMemo(() => {
         const q = normalize(locStr);
         if (!q) return locationOptions;

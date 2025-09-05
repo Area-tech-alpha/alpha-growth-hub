@@ -1,9 +1,7 @@
-// app/api/check-status/route.ts (VERSÃO CORRIGIDA)
-
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '../../../../auth'; // Ajuste o caminho se necessário
+import { authOptions } from '../../../../auth';
 
 export async function GET(request: Request) {
     const session = await getServerSession(authOptions);
@@ -27,26 +25,18 @@ export async function GET(request: Request) {
         });
 
         if (!checkoutSession) {
-            console.log(`[Check-Status] Sessão de checkout não encontrada para internalId: ${internalCheckoutId}`);
             return NextResponse.json({ status: 'PENDING' });
         }
 
-        // CORREÇÃO: Busca a transação usando o 'asaas_checkout_id' que é o link correto
         const transaction = await prisma.credit_transactions.findFirst({
             where: {
-                // A tabela credit_transactions precisa ter a coluna asaas_checkout_id
-                // ou um link com o asaas_payment_id que possa ser correlacionado.
-                // Assumindo que você possa adicionar 'asaas_checkout_id' à tabela de transações.
-                // Se não, você precisaria buscar o payment_id associado a este checkout.
                 asaas_payment_id: checkoutSession.asaas_checkout_id
             }
         });
 
         if (transaction) {
-            console.log(`[Check-Status] Sucesso para internalId: ${internalCheckoutId}`);
             return NextResponse.json({ status: 'SUCCESS' });
         } else {
-            console.log(`[Check-Status] Pendente para internalId: ${internalCheckoutId}`);
             return NextResponse.json({ status: 'PENDING' });
         }
     } catch (error) {

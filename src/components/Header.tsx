@@ -57,17 +57,13 @@ export default function Header({
 
     useEffect(() => {
         if (session?.user?.id) {
-            console.log('[Header] Subscribing to user credits by id', { userId: session.user.id });
             subscribeToUserCredits(session.user.id);
             subscribeToUserCreditHolds(session.user.id);
-        } else {
-            console.log('[Header] No session user id for credits subscription');
         }
     }, [session?.user?.id, subscribeToUserCredits, subscribeToUserCreditHolds]);
 
     const demoAvailable = Math.max(0, demoCredits - Object.values(demoHolds || {}).reduce((a, b) => a + (Number(b) || 0), 0));
     const displayCredits = session?.user?.id ? (demoModeActive ? demoAvailable : realtimeCredits) : userCredits;
-    console.log('[Header] Render credits', { displayCredits, realtimeCredits, fallback: userCredits });
 
     const Logo = ({ width, height }: { width: number, height: number }) => {
         if (!mounted) {

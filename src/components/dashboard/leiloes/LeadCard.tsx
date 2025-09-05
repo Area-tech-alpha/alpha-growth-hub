@@ -22,7 +22,6 @@ import { Button } from "@/components/ui/button";
 import { CountdownTimer } from "../leads/CountdownTimer";
 import { Lead } from "../leads/types";
 import { maskPhone } from "@/lib/mask";
-import { useEffect } from "react";
 
 interface LeadCardProps {
   lead: Lead;
@@ -40,10 +39,6 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
       maximumFractionDigits: 0,
     }).format(numericValue);
   };
-
-  useEffect(() => {
-    console.log("[LeadCard] lead:", lead);
-  }, [lead])
 
   const formatNumber = (value: number | undefined | null) => {
     return typeof value === "number" && !isNaN(value) ? value.toString() : "0";

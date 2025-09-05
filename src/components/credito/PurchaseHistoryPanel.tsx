@@ -32,7 +32,6 @@ const useRealtimeStore = (
     return selector(mockState);
 };
 
-// Componentes locais para corresponder à sua estrutura original
 const Card = ({ children, className, style }: { children: React.ReactNode, className?: string, style?: React.CSSProperties }) => (
     <div className={`mx-auto w-full max-w-2xl rounded-xl border bg-[#1a1a1a] text-white shadow-lg ${className}`} style={style}>
         {children}
@@ -84,9 +83,9 @@ export default function PurchaseHistoryPanel({ targetHeight }: PurchaseHistoryPa
         });
     };
 
-    const cardStyle: React.CSSProperties = targetHeight 
+    const cardStyle: React.CSSProperties = targetHeight
         ? { height: `${targetHeight}px`, visibility: 'visible' }
-        : { visibility: 'hidden' }; // Esconde o card até a altura ser definida para evitar "pulo"
+        : { visibility: 'hidden' };
 
     return (
         <Card style={cardStyle} className="flex flex-col">
@@ -119,7 +118,7 @@ export default function PurchaseHistoryPanel({ targetHeight }: PurchaseHistoryPa
                         {purchases.map((purchase) => (
                             <li
                                 key={purchase.id}
-                               className="flex items-center justify-between text-sm p-3 rounded-lg bg-yellow-900/30 hover:bg-yellow-900/50 transition-colors"
+                                className="flex items-center justify-between text-sm p-3 rounded-lg bg-yellow-900/30 hover:bg-yellow-900/50 transition-colors"
                             >
                                 <div className="flex items-center gap-3">
                                     <CheckCircle className="h-5 w-5 flex-shrink-0 text-green-500" />

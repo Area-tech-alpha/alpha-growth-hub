@@ -38,8 +38,6 @@ interface AuctionModalProps {
     initialBids?: Bid[];
 }
 
-// Supabase client no longer needed locally for masked emails
-
 const EMPTY_BIDS: Bid[] = [];
 
 export const AuctionModal = ({
@@ -74,8 +72,6 @@ export const AuctionModal = ({
     const addBidForAuction = useRealtimeStore((s) => s.addBidForAuction);
     const updateAuctionStatsFromBid = useRealtimeStore((s) => s.updateAuctionStatsFromBid);
     const [userMaskedEmails, setUserMaskedEmails] = useState<Record<string, string>>({});
-    // Track loading per userId to optionally debug/loading state
-    // const [loadingEmails, setLoadingEmails] = useState<Record<string, boolean>>({});
     const userEmailsRef = useRef<Record<string, string>>({});
     const auctionFromStore = activeAuctions.find((a: AuctionWithLead) => a.id === auctionId);
     const auctionMinimumBid = auctionFromStore?.minimum_bid;
@@ -107,7 +103,6 @@ export const AuctionModal = ({
         }
     };
 
-    // Drive currentBid from store
     useEffect(() => {
         const top = bidsFromStore && bidsFromStore.length > 0
             ? bidsFromStore[0]?.amount
@@ -115,18 +110,15 @@ export const AuctionModal = ({
         if (top !== currentBid) {
             setCurrentBid(top);
         }
-        console.log('[AuctionModal] bidsFromStore update', { auctionId, count: bidsFromStore.length, top });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [bidsFromStore]);
 
-    // Preload masked emails for displayed bids (fetch missing only)
     useEffect(() => {
         const loadMissing = async () => {
             try {
                 const ids = Array.from(new Set(bidsFromStore.map(b => b.userId).filter(Boolean)));
                 const missing = ids.filter((id) => !userEmailsRef.current[id]);
                 if (missing.length === 0) return;
-                // setLoadingEmails((m) => ({ ...m, ...Object.fromEntries(missing.map(id => [id, true])) }));
                 const res = await fetch('/api/users/masked-emails', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -142,15 +134,10 @@ export const AuctionModal = ({
                     userEmailsRef.current = { ...userEmailsRef.current, ...maskedMap };
                     setUserMaskedEmails((m) => ({ ...m, ...maskedMap }));
                 }
-                // setLoadingEmails((m) => ({ ...m, ...Object.fromEntries(missing.map(id => [id, false])) }));
             } catch { }
         };
         loadMissing();
     }, [bidsFromStore]);
-
-    useEffect(() => {
-        console.log('[AuctionModal] userMaskedEmails update', { userMaskedEmails });
-    }, [userMaskedEmails]);
 
     const formatCurrency = (value: number | undefined | null) => {
         const numericValue = typeof value === "number" && !isNaN(value) ? value : 0;

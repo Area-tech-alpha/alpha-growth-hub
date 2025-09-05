@@ -54,20 +54,6 @@ export default function MeusLeadsPanel() {
     loadPurchasePrices();
   }, [purchasedLeads]);
 
-  useEffect(() => {
-    console.log(
-      "[MeusLeadsPanel] purchasedLeads length:",
-      purchasedLeads.length
-    );
-    if (purchasedLeads.length > 0) {
-      const first = purchasedLeads[0] as Lead & { owner_id?: string };
-      console.log("[MeusLeadsPanel] first lead sample:", {
-        id: first?.id,
-        owner: first?.owner_id,
-      });
-    }
-  }, [purchasedLeads]);
-
   const handleExportAll = () => {
     if (purchasedLeads.length === 0) {
       ToastBus.csvNoneToExport();
@@ -180,7 +166,6 @@ export default function MeusLeadsPanel() {
       {purchasedLeads.length > 0 ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
           {purchasedLeads.map((purchasedLead) => {
-            console.log("[MeusLeadsPanel] purchasedLead:", purchasedLead);
             const validDateSource =
               purchasedLead.updated_at || purchasedLead.expires_at;
             const purchaseDate =

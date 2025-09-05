@@ -31,12 +31,10 @@ function error(title: string, description?: string, key?: string, dedupeMs?: num
 }
 
 export const ToastBus = {
-    // Generic helpers
     info,
     success,
     error,
 
-    // Auctions lifecycle
     notifyNewAuction: (auctionId: string, name?: string) =>
         info("Novo leilão", name ? `"${name}" disponível para lances.` : undefined, `auction:new:${auctionId}`, 5000),
 
@@ -55,7 +53,6 @@ export const ToastBus = {
     notifyAuctionEndingSoon: (auctionId: string, secondsLeft: number = 60) =>
         info("Atenção: leilão terminando", `Faltam ${secondsLeft} segundos para encerrar.`, `auction:ending:${auctionId}`, 60000),
 
-    // Bids
     bidSuccess: (amount: number) =>
         success("Lance realizado com sucesso!", `Seu lance de R$ ${Math.floor(amount)} foi registrado.`),
     bidInvalid: (currentBid: number) =>
@@ -69,7 +66,6 @@ export const ToastBus = {
     bidFailed: (message?: string) =>
         error("Falha ao enviar lance", message || "Tente novamente."),
 
-    // Credits / Checkout
     checkoutLoginRequired: () =>
         error("Ação necessária", "Você precisa estar logado para comprar créditos."),
     checkoutRedirecting: () =>
@@ -77,7 +73,6 @@ export const ToastBus = {
     checkoutFailed: (message?: string) =>
         error("Falha ao iniciar pagamento", message),
 
-    // CSV
     csvPreparing: () => info("Preparando seu arquivo CSV..."),
     csvGenerating: () => info("Gerando seu arquivo CSV..."),
     csvDownloadStarted: () => success("Download iniciado!"),
