@@ -4,13 +4,14 @@ import StatsCards from "./leiloes/statsCards";
 import { Clock, TrendingUp, Users } from "lucide-react";
 import { LeadCard } from "./leiloes/LeadCard";
 import { AuctionModal } from "./leiloes/AuctionModal";
-import type { AuctionWithLead, Bid } from "./leiloes/types";
+import type { AuctionWithLead, Bid, LeadForAuction } from "./leiloes/types";
 import { useRealtimeStore } from "@/store/realtime-store";
 import type { RealtimeState } from "@/store/realtime-store";
 import { ToastBus } from "@/lib/toastBus";
 import { sortLeads } from "@/lib/sortLeads";
 import RevenueFilterSort, { RevenueFilterValue } from "./leiloes/RevenueFilterSort";
 import DemoAuctionsButton from "./leiloes/DemoAuctionsButton";
+import { BRAZIL_STATES } from "@/lib/br-states";
 
 type AuctionWithLeadLocal = AuctionWithLead;
 
@@ -38,14 +39,22 @@ export default function LeiloesPanel() {
       .toLowerCase()
       .normalize('NFD')
       .replace(/\p{Diacritic}/gu, '');
-  const sortedAuctions = useMemo(() => {
+  const ufToName = useMemo(() => {
+    const m = new Map<string, string>();
+    BRAZIL_STATES.forEach(s => m.set(s.uf.toUpperCase(), s.name));
+    return m;
+  }, []);
+
+  const { sortedAuctions, availableStateUFs } = useMemo(() => {
     const source = [...activeAuctions, ...demoAuctions];
     if (!source || source.length === 0) {
-      return [];
+      return { sortedAuctions: [] as AuctionWithLead[], availableStateUFs: [] as string[] };
     }
 
-    let leads = source.map((auction) => auction.leads);
+    // Start from all leads
+    let leads: LeadForAuction[] = source.map((auction) => auction.leads as LeadForAuction);
 
+    // Apply revenue filters first
     if (revFilter.min != null) {
       leads = leads.filter(l => (Number(l.revenue) || 0) >= (revFilter.min as number));
     }
@@ -53,11 +62,28 @@ export default function LeiloesPanel() {
       leads = leads.filter(l => (Number(l.revenue) || 0) <= (revFilter.max as number));
     }
 
-    if (revFilter.locationQuery && revFilter.locationQuery.trim() !== "") {
-      const q = normalizeStr(revFilter.locationQuery);
-      leads = leads.filter((l) => normalizeStr(l.location as string).startsWith(q));
+    // Available UFs based on the currently revenue-filtered leads
+    const availableUFSet = new Set<string>();
+    leads.forEach(l => {
+      const uf = String(l.state || "").toUpperCase();
+      if (uf) availableUFSet.add(uf);
+    });
+    const availableUFs = Array.from(availableUFSet);
+
+    // Apply location filter (match against state name and UF, accent-insensitive)
+    if ((revFilter.locationQuery || "").trim() !== "") {
+      const q = normalizeStr(revFilter.locationQuery as string);
+      leads = leads.filter((l) => {
+        const ufRaw = String(l.state || "");
+        const uf = ufRaw.toUpperCase();
+        const name = ufToName.get(uf) || "";
+        const norm = `${normalizeStr(name)} ${uf.toLowerCase()}`;
+        const qUf = uf.toLowerCase();
+        return norm.startsWith(q) || qUf.startsWith(q);
+      });
     }
 
+    // Sort
     let sortedLeads = sortLeads(leads);
     if (revFilter.sort === 'asc') {
       sortedLeads = [...sortedLeads].sort((a, b) => (Number(a.revenue) || 0) - (Number(b.revenue) || 0));
@@ -65,22 +91,17 @@ export default function LeiloesPanel() {
       sortedLeads = [...sortedLeads].sort((a, b) => (Number(b.revenue) || 0) - (Number(a.revenue) || 0));
     }
 
+    // Map back to auctions
     const auctionMap = new Map(
       source.map((auction) => [auction.leads.id, auction])
     );
-    return sortedLeads
+    const auctions = sortedLeads
       .map((lead) => auctionMap.get(lead.id))
       .filter(Boolean) as AuctionWithLead[];
-  }, [activeAuctions, demoAuctions, revFilter]);
 
-  const locations = useMemo(() => {
-    const set = new Set<string>();
-    [...activeAuctions, ...demoAuctions].forEach(a => {
-      const loc = String(a.leads.location || "").trim();
-      if (loc) set.add(loc);
-    });
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [activeAuctions, demoAuctions]);
+    return { sortedAuctions: auctions, availableStateUFs: availableUFs };
+  }, [activeAuctions, demoAuctions, revFilter.min, revFilter.max, revFilter.locationQuery, revFilter.sort, ufToName]);
+
 
   const noResults = sortedAuctions.length === 0 && (activeAuctions.length + demoAuctions.length) > 0 && (revFilter.locationQuery?.trim() || "").length > 0;
 
@@ -149,6 +170,19 @@ export default function LeiloesPanel() {
     return () => clearTimeout(t);
   }, [revFilter]);
 
+  // If the selected UF no longer exists among available leads after updates/expirations,
+  // clear the location filter so the list follows the normal flow.
+  useEffect(() => {
+    const loc = (revFilter.locationQuery || "").trim();
+    if (!loc) return;
+    // Only clear automatically if it's a known UF (from states list) and no longer available
+    const upper = loc.toUpperCase();
+    const isKnownUF = BRAZIL_STATES.some(s => s.uf === upper);
+    if (isKnownUF && !availableStateUFs.includes(upper)) {
+      setRevFilter(prev => ({ ...prev, locationQuery: "" }));
+    }
+  }, [availableStateUFs, revFilter.locationQuery]);
+
   useEffect(() => {
     if (!selectedAuction) return;
     const stillActive = [...activeAuctions, ...demoAuctions].some(a => a.id === selectedAuction.id);
@@ -201,7 +235,7 @@ export default function LeiloesPanel() {
             ]}
           />
           <div className="mt-4">
-            <RevenueFilterSort value={revFilter} onChange={setRevFilter} availableLocations={locations} />
+            <RevenueFilterSort value={revFilter} onChange={setRevFilter} availableStateUFs={availableStateUFs} />
           </div>
         </>
       )}

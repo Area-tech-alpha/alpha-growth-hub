@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
+import { BRAZIL_STATES } from "@/lib/br-states";
 
 export type RevenueSort = "none" | "asc" | "desc";
 
@@ -30,15 +31,14 @@ function parseDigitsToNumber(value: string): number | undefined {
 export default function RevenueFilterSort({
     value,
     onChange,
-    availableLocations = [],
+    availableStateUFs,
 }: {
     value: RevenueFilterValue;
     onChange: (next: RevenueFilterValue) => void;
-    availableLocations?: string[];
+    availableStateUFs: string[];
 }) {
     const [minStr, setMinStr] = useState("");
     const [maxStr, setMaxStr] = useState("");
-    const [locStr, setLocStr] = useState(value.locationQuery ?? "");
 
     useEffect(() => {
         setMinStr(value.min != null ? formatBRLCompact(value.min) : "");
@@ -78,45 +78,27 @@ export default function RevenueFilterSort({
         []
     );
 
-    const normalize = (s: string) => s
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/\p{Diacritic}/gu, '');
+    // Keeping UI simple: dropdown only, no need to normalize here
 
-    const locationOptions = useMemo(() => {
-        const set = new Set<string>();
-        availableLocations.forEach((loc) => {
-            const trimmed = String(loc || '').trim();
-            if (trimmed) set.add(trimmed);
-        });
-        const list = Array.from(set.values());
-        return list.map(label => ({ label, value: normalize(label) }));
-    }, [availableLocations]);
+    // Build options from static states list, filtered to only available states
+    const stateOptions = useMemo(() => {
+        const allowed = new Set((availableStateUFs || []).map(s => s.toUpperCase()));
+        return BRAZIL_STATES
+            .filter(s => allowed.has(s.uf))
+            .map(s => ({
+                uf: s.uf,
+                label: `${s.name} - ${s.uf}`,
+            }));
+    }, [availableStateUFs]);
 
-    useEffect(() => {
-        setLocStr(value.locationQuery ?? "");
-    }, [value.locationQuery]);
-
-    const onLocChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const raw = e.target.value;
-        setLocStr(raw);
-        onChange({ ...value, locationQuery: raw });
+    const selectedUF = (value.locationQuery || "").toString().toUpperCase();
+    const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const nextUF = e.target.value;
+        onChange({ ...value, locationQuery: nextUF });
     };
-
-    const onLocBlur = () => {
-        const norm = normalize(locStr);
-        const match = locationOptions.find(opt => opt.value === norm);
-        if (match) {
-            setLocStr(match.label);
-            onChange({ ...value, locationQuery: match.label });
-        }
+    const clearSelection = () => {
+        onChange({ ...value, locationQuery: "" });
     };
-
-    const filteredOptions = useMemo(() => {
-        const q = normalize(locStr);
-        if (!q) return locationOptions;
-        return locationOptions.filter(opt => opt.value.startsWith(q));
-    }, [locStr, locationOptions]);
 
     return (
         <div className={containerCls}>
@@ -168,27 +150,36 @@ export default function RevenueFilterSort({
                     <option value="desc">Faturamento ↓</option>
                 </select>
             </div>
-            {/* Localidade */}
+            {/* Localidade - dropdown only with clear (X inside field) */}
             <div className="flex items-center gap-2 sm:col-span-2 lg:col-span-2">
-                <label htmlFor="rev-loc" className="text-sm text-muted-foreground whitespace-nowrap">
+                <label htmlFor="rev-loc-select" className="text-sm text-muted-foreground whitespace-nowrap">
                     Localidade
                 </label>
-                <Input
-                    id="rev-loc"
-                    type="text"
-                    placeholder="Pesquisar localização"
-                    value={locStr}
-                    onChange={onLocChange}
-                    onBlur={onLocBlur}
-                    list="locations-datalist"
-                    aria-label="Pesquisar localidade"
-                    className="bg-background text-foreground"
-                />
-                <datalist id="locations-datalist">
-                    {filteredOptions.map((opt) => (
-                        <option value={opt.label} key={opt.label} />
-                    ))}
-                </datalist>
+                <div className="relative w-full">
+                    <select
+                        id="rev-loc-select"
+                        className="flex h-9 w-full rounded-md border border-input bg-card text-card-foreground pl-2 pr-14 py-1 text-sm"
+                        value={selectedUF}
+                        onChange={handleSelectChange}
+                        aria-label="Selecionar localidade"
+                    >
+                        <option value="">Todos os estados</option>
+                        {stateOptions.map((opt) => (
+                            <option value={opt.uf} key={opt.uf}>{opt.label}</option>
+                        ))}
+                    </select>
+                    {selectedUF !== "" && (
+                        <button
+                            type="button"
+                            onClick={clearSelection}
+                            aria-label="Limpar localidade"
+                            className="absolute right-8 top-1/2 -translate-y-1/2 h-5 w-5 inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+                            title="Limpar"
+                        >
+                            ×
+                        </button>
+                    )}
+                </div>
             </div>
         </div>
     );
