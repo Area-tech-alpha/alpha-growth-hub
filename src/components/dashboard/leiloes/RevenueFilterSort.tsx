@@ -38,6 +38,7 @@ export default function RevenueFilterSort({
 }) {
     const [minStr, setMinStr] = useState("");
     const [maxStr, setMaxStr] = useState("");
+    const [locStr, setLocStr] = useState(value.locationQuery ?? "");
 
     useEffect(() => {
         setMinStr(value.min != null ? formatBRLCompact(value.min) : "");
@@ -82,21 +83,43 @@ export default function RevenueFilterSort({
         .normalize('NFD')
         .replace(/\p{Diacritic}/gu, '');
 
+    // Map canonical labels and their normalized values
     const locationOptions = useMemo(() => {
-        const set = new Map<string, string>();
-        for (const loc of availableLocations) {
+        const set = new Set<string>();
+        availableLocations.forEach((loc) => {
             const trimmed = String(loc || '').trim();
-            if (!trimmed) continue;
-            const keyOriginal = trimmed.toLowerCase();
-            if (!set.has(keyOriginal)) set.set(keyOriginal, trimmed);
-            const normalized = trimmed
-                .normalize('NFD')
-                .replace(/\p{Diacritic}/gu, '');
-            const keyNorm = normalized.toLowerCase();
-            if (!set.has(keyNorm)) set.set(keyNorm, normalized);
-        }
-        return Array.from(set.values());
+            if (trimmed) set.add(trimmed);
+        });
+        const list = Array.from(set.values());
+        return list.map(label => ({ label, value: normalize(label) }));
     }, [availableLocations]);
+
+    // Sync external value to local input
+    useEffect(() => {
+        setLocStr(value.locationQuery ?? "");
+    }, [value.locationQuery]);
+
+    const onLocChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const raw = e.target.value;
+        setLocStr(raw);
+        onChange({ ...value, locationQuery: raw });
+    };
+
+    const onLocBlur = () => {
+        const norm = normalize(locStr);
+        const match = locationOptions.find(opt => opt.value === norm);
+        if (match) {
+            setLocStr(match.label);
+            onChange({ ...value, locationQuery: match.label });
+        }
+    };
+
+    // Filter dropdown options accent-insensitively by current input
+    const filteredOptions = useMemo(() => {
+        const q = normalize(locStr);
+        if (!q) return locationOptions;
+        return locationOptions.filter(opt => opt.value.startsWith(q));
+    }, [locStr, locationOptions]);
 
     return (
         <div className={containerCls}>
@@ -157,15 +180,16 @@ export default function RevenueFilterSort({
                     id="rev-loc"
                     type="text"
                     placeholder="Pesquisar localização"
-                    value={value.locationQuery ?? ""}
-                    onChange={(e) => onChange({ ...value, locationQuery: e.target.value })}
+                    value={locStr}
+                    onChange={onLocChange}
+                    onBlur={onLocBlur}
                     list="locations-datalist"
                     aria-label="Pesquisar localidade"
                     className="bg-background text-foreground"
                 />
                 <datalist id="locations-datalist">
-                    {locationOptions.map((loc) => (
-                        <option value={loc} key={loc} />
+                    {filteredOptions.map((opt) => (
+                        <option value={opt.label} key={opt.label} />
                     ))}
                 </datalist>
             </div>

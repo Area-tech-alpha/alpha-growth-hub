@@ -29,6 +29,7 @@ export default function LeiloesPanel() {
     useState<AuctionWithLeadLocal | null>(null);
   const [revFilter, setRevFilter] = useState<RevenueFilterValue>({ sort: "none" });
   const [demoAuctions, setDemoAuctions] = useState<AuctionWithLeadLocal[]>([]);
+  const [isFiltering, setIsFiltering] = useState(false);
   const bidsByAuctionStore = useRealtimeStore(
     (s: RealtimeState) => s.bidsByAuction
   ) as Record<string, Bid[]>;
@@ -142,6 +143,7 @@ export default function LeiloesPanel() {
     [sortedAuctions]
   );
   const activeAuctionsCount = sortedAuctions.length;
+  const isFiltered = (revFilter.min != null) || (revFilter.max != null) || ((revFilter.locationQuery || "").trim() !== "");
   const totalBidders = useMemo(
     () =>
       sortedAuctions.reduce(
@@ -154,6 +156,13 @@ export default function LeiloesPanel() {
   useEffect(() => {
     console.log("[LeiloesPanel] sortedAuctions:", sortedAuctions);
   }, [sortedAuctions])
+
+  // Visual feedback when filters change: brief hide/show
+  useEffect(() => {
+    setIsFiltering(true);
+    const t = setTimeout(() => setIsFiltering(false), 250);
+    return () => clearTimeout(t);
+  }, [revFilter]);
 
   // Sync demo auctions' currentBid and bidders from local bids store
   useEffect(() => {
@@ -182,7 +191,7 @@ export default function LeiloesPanel() {
               title="Leilões Ativos"
               icon={<Clock />}
               contentTitle={activeAuctionsCount.toString()}
-              contentDescription="leads disponíveis"
+              contentDescription={isFiltered ? "leads disponíveis (filtrados)" : "leads disponíveis"}
             />
             <StatsCards
               title="Valor Total"
@@ -205,7 +214,7 @@ export default function LeiloesPanel() {
       {noResults && (
         <div className="mt-6 text-center text-sm text-muted-foreground">Não existem leilões para a localidade informada no momento.</div>
       )}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mt-6">
+      <div className={`grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mt-6 transition-opacity duration-200 ${isFiltering ? 'opacity-0' : 'opacity-100'}`}>
         {sortedAuctions.map((auction) => (
           <LeadCard
             key={auction.id}
