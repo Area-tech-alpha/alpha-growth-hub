@@ -102,6 +102,12 @@ export async function POST(request: Request) {
                 })
             }
 
+            // Update auction minimum_bid so that next bid must be at least last bid + 1
+            await tx.auctions.update({
+                where: { id: auctionId },
+                data: { minimum_bid: new Prisma.Decimal(amount + 1) }
+            })
+
             // Compute new available credits
             const holdsAfter = await tx.credit_holds.findMany({ where: { user_id: userId, status: 'active', auctions: { status: 'open' } }, select: { amount: true } })
             const totalHoldsAfter = holdsAfter.reduce((sum, h) => sum + toNum(h.amount as unknown), 0)

@@ -24,6 +24,7 @@ export interface AuctionRecord {
     status: string;
     expired_at: string;
     lead_id: string;
+    minimum_bid?: number | string;
     leads: Lead; // nested lead from select('*, leads(*)')
 }
 
@@ -35,6 +36,7 @@ export interface AuctionWithLead {
     id: string;
     status: string;
     expired_at: string;
+    minimum_bid?: number;
     leads: LeadForAuction;
     [key: string]: unknown;
 }

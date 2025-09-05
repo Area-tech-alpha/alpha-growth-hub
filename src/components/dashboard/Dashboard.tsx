@@ -104,6 +104,7 @@ export default function Dashboard({
       id: auction.id,
       status: auction.status,
       expired_at: auction.expired_at,
+      minimum_bid: typeof auction.minimum_bid === 'string' ? parseFloat(auction.minimum_bid) : (auction.minimum_bid ?? undefined),
       leads: {
         ...(auction.leads as Lead),
         expires_at: auction.expired_at,
@@ -193,6 +194,7 @@ export default function Dashboard({
             status: string;
             expired_at: string;
             lead_id: string;
+            minimum_bid?: number | string | null;
           };
         }) => {
           const newRow = payload.new;
@@ -206,6 +208,7 @@ export default function Dashboard({
             id: newRow.id,
             status: newRow.status,
             expired_at: newRow.expired_at,
+            minimum_bid: typeof newRow.minimum_bid === 'string' ? parseFloat(newRow.minimum_bid) : (newRow.minimum_bid ?? undefined),
             leads: {
               ...(leadData as Lead),
               expires_at: newRow.expired_at,
@@ -223,6 +226,7 @@ export default function Dashboard({
             expired_at: string;
             lead_id: string;
             winning_bid_id?: string | null;
+            minimum_bid?: number | string | null;
           };
         }) => {
           const updated = payload.new;
@@ -232,6 +236,7 @@ export default function Dashboard({
             updateAuctionFields(updated.id, {
               status: updated.status,
               expired_at: updated.expired_at,
+              minimum_bid: typeof updated.minimum_bid === 'string' ? parseFloat(updated.minimum_bid) : (updated.minimum_bid ?? undefined),
             });
           }
 

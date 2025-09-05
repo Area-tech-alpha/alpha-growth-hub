@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { CountdownTimer } from "../leads/CountdownTimer";
 import { Lead } from "../leads/types";
-import { Bid } from "./types";
+import { Bid, AuctionWithLead } from "./types";
 import { ToastBus } from "@/lib/toastBus";
 import { useRealtimeStore } from "@/store/realtime-store";
 
@@ -63,6 +63,8 @@ export const AuctionModal = ({
     const demoCredits = useRealtimeStore((s) => s.demoCredits);
     const demoHolds = useRealtimeStore((s) => s.demoHolds);
     const realUserCredits = useRealtimeStore((s) => s.userCredits);
+    const activeAuctions = useRealtimeStore((s) => s.activeAuctions) as AuctionWithLead[];
+    const updateAuctionFields = useRealtimeStore((s) => s.updateAuctionFields);
     const isDemoAuction = auctionId.startsWith('demo-');
     const demoAvailable = Math.max(0, demoCredits - Object.values(demoHolds || {}).reduce((a, b) => a + (Number(b) || 0), 0));
     const userCredits = demoModeActive && isDemoAuction ? demoAvailable : realUserCredits;
@@ -75,6 +77,13 @@ export const AuctionModal = ({
     // Track loading per userId to optionally debug/loading state
     // const [loadingEmails, setLoadingEmails] = useState<Record<string, boolean>>({});
     const userEmailsRef = useRef<Record<string, string>>({});
+    const auctionFromStore = activeAuctions.find((a: AuctionWithLead) => a.id === auctionId);
+    const auctionMinimumBid = auctionFromStore?.minimum_bid;
+    const requiredMin = Math.max(
+        Number.isFinite(auctionMinimumBid as number) ? (auctionMinimumBid as number) : 0,
+        (currentBid ?? 0) + 1,
+        lead.minimum_value || 0
+    );
     const handleBidAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
         const onlyNums = /^[0-9]*$/;
@@ -159,12 +168,8 @@ export const AuctionModal = ({
             return;
         }
         const amount = parseFloat(bidAmount);
-        if (!amount || amount <= currentBid) {
-            ToastBus.bidInvalid(currentBid);
-            return;
-        }
-        if (amount < (lead.minimumBid as number)) {
-            ToastBus.bidTooLow(lead.minimumBid as number);
+        if (!amount || amount < requiredMin) {
+            ToastBus.bidTooLow(requiredMin);
             return;
         }
         const isDemo = isDemoAuction;
@@ -185,6 +190,7 @@ export const AuctionModal = ({
                 };
                 addBidForAuction(auctionId, bid);
                 updateAuctionStatsFromBid(auctionId, amount);
+                updateAuctionFields(auctionId, { minimum_bid: amount + 1 });
                 setDemoHold(auctionId, amount);
                 setBidAmount("");
                 ToastBus.bidSuccess(amount);
@@ -296,11 +302,7 @@ export const AuctionModal = ({
                                 <div className="text-sm flex items-center gap-2">
                                     <AlertCircle className="h-4 w-4" />
                                     Lance mínimo:{" "}
-                                    <strong>
-                                        {formatCurrency(
-                                            Math.max((currentBid ?? 0) + 1, lead.minimumBid as number)
-                                        )}
-                                    </strong>
+                                    <strong>{formatCurrency(requiredMin)}</strong>
                                 </div>
                                 <div className="flex gap-2">
                                     <Input

@@ -21,6 +21,7 @@ export interface Lead {
     currentBid: number;
     owner_id?: string;
     bidders: number;
+    minimum_value: number;
     category: string;
     tags: string[];
     [key: string]: unknown;
