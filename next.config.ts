@@ -4,15 +4,19 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "nfwfolrcpaxqwgkzzfok.supabase.co", 
+        hostname: "nfwfolrcpaxqwgkzzfok.supabase.co",
       },
       {
         protocol: "https",
-        hostname: "assessorialpha.com", 
+        hostname: "assessorialpha.com",
       },
       {
         protocol: "https",
-        hostname: "lh3.googleusercontent.com", 
+        hostname: "lh3.googleusercontent.com",
+      },
+      {
+        protocol: "https",
+        hostname: "izmzxqzcsnaykofpcjjh.supabase.co",
       },
     ],
   },
