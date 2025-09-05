@@ -9,6 +9,7 @@ import {
   DollarSign,
   Flame,
   Hash,
+  MapPin,
 } from "lucide-react";
 import {
   Card,
@@ -96,6 +97,14 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
                 isHot={isHot}
               />
             </div>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
+            <MapPin className="h-3 w-3" />
+            <span>
+              {lead.city && lead.state
+                ? `${lead.city} - ${lead.state}`
+                : (lead.city || lead.state || "N/A")}
+            </span>
           </div>
         </CardHeader>
 

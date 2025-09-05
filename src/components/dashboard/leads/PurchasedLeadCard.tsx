@@ -10,6 +10,7 @@ import {
   Clock,
   Download,
   User,
+  MapPin,
 } from "lucide-react";
 import {
   Card,
@@ -131,6 +132,14 @@ export const PurchasedLeadCard = ({
               <Building className="h-5 w-5" />
               {lead.company_name || "Nome da Empresa"}
             </CardTitle>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
+              <MapPin className="h-3.5 w-3.5" />
+              <span>
+                {lead.city && lead.state
+                  ? `${lead.city} - ${lead.state}`
+                  : (lead.city || lead.state || "N/A")}
+              </span>
+            </div>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
               <Clock className="h-3 w-3" />
               <span>{formatDate(purchaseDate)}</span>
