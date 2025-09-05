@@ -4,13 +4,14 @@ export interface Lead {
     description: string;
     status: 'hot' | "high_frozen" | "low_frozen" | 'cold' | 'sold';
     expires_at: string;
-    location: string;
     channel: string;
     revenue: number;
     marketing_investment: number;
     company_name: string;
     contact_name: string;
     cnpj: string;
+    state: string;
+    city: string;
     phone: string;
     email: string;
     maskedCompanyName: string;

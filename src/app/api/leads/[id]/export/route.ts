@@ -47,10 +47,13 @@ export async function GET(
       "Nome do Contato",
       "Telefone",
       "Email",
-      "Localizacao",
+      "Estado",
+      "Cidade",
       "Nicho",
       "Faturamento Anual (R$)",
       "Investimento em Marketing (R$)",
+      "CNPJ",
+
     ];
 
     const rowData = [
@@ -58,9 +61,11 @@ export async function GET(
       escapeCsvCell(lead.contact_name),
       escapeCsvCell(lead.phone),
       escapeCsvCell(lead.email),
-      escapeCsvCell(lead.location),
+      escapeCsvCell(lead.state),
+      escapeCsvCell(lead.city),
       escapeCsvCell(lead.revenue.toNumber()),
       escapeCsvCell(lead.marketing_investment.toNumber()),
+      escapeCsvCell(lead.cnpj),
     ];
 
     const csvContent = [headers.join(","), rowData.join(",")].join("\n");

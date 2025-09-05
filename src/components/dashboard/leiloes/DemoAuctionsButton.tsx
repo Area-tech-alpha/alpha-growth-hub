@@ -33,7 +33,8 @@ export default function DemoAuctionsButton({
                 description: lead.description || "Lead demonstrativo",
                 status,
                 expires_at: new Date(now + minutes * 60 * 1000).toISOString(),
-                location: lead.location || "São Paulo",
+                location: lead.state || "São Paulo",
+                city: lead.city || "São Paulo",
                 channel: "Demo",
                 revenue: (lead as Lead)?.revenue ?? (status === "hot" ? 5_000_000 : 1_200_000),
                 marketing_investment:
