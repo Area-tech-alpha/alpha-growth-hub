@@ -150,6 +150,14 @@ export default function LeiloesPanel() {
   }, [revFilter]);
 
   useEffect(() => {
+    if (!selectedAuction) return;
+    const stillActive = [...activeAuctions, ...demoAuctions].some(a => a.id === selectedAuction.id);
+    if (!stillActive) {
+      setSelectedAuction(null);
+    }
+  }, [activeAuctions, demoAuctions, selectedAuction]);
+
+  useEffect(() => {
     if (demoAuctions.length === 0) return;
     let changed = false;
     const next = demoAuctions.map(a => {

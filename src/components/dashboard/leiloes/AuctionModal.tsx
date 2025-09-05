@@ -101,6 +101,7 @@ export const AuctionModal = ({
         if (currentUserId && lastBid && lastBid.userId === currentUserId) {
             setHasWon(true);
         }
+        onClose();
     };
 
     useEffect(() => {
