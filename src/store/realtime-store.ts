@@ -100,7 +100,19 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
 
     updateAuctionFields: (auctionId: string, fields: Partial<AuctionWithLead>) => set((state: RealtimeState) => {
         return {
-            activeAuctions: state.activeAuctions.map(a => a.id === auctionId ? { ...a, ...fields } : a)
+            activeAuctions: state.activeAuctions.map(a => {
+                if (a.id !== auctionId) return a;
+                const next = { ...a, ...fields } as AuctionWithLead;
+                // Se o expired_at mudar, refletimos no leads.expires_at para o CountdownTimer
+                if (typeof fields.expired_at === 'string' && (a as { leads?: { expires_at?: string } }).leads) {
+                    next.leads = { ...(a.leads as Record<string, unknown>), expires_at: fields.expired_at } as unknown as typeof a.leads;
+                }
+                // Se vier um merge parcial de leads, aplicamos profundo
+                if (fields.leads && typeof fields.leads === 'object') {
+                    next.leads = { ...(a.leads as Record<string, unknown>), ...(fields.leads as Record<string, unknown>) } as unknown as typeof a.leads;
+                }
+                return next;
+            })
         };
     }),
 

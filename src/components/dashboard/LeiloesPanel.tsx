@@ -191,6 +191,22 @@ export default function LeiloesPanel() {
     }
   }, [activeAuctions, demoAuctions, selectedAuction]);
 
+  // Keep selectedAuction in sync with latest store updates (e.g., expired_at changes)
+  useEffect(() => {
+    if (!selectedAuction) return;
+    const latest = activeAuctions.find(a => a.id === selectedAuction.id);
+    if (!latest) return;
+    const changed = (
+      latest.expired_at !== selectedAuction.expired_at ||
+      (latest.leads?.expires_at !== selectedAuction.leads?.expires_at) ||
+      latest.minimum_bid !== selectedAuction.minimum_bid ||
+      latest.status !== selectedAuction.status
+    );
+    if (changed) {
+      setSelectedAuction(latest as AuctionWithLeadLocal);
+    }
+  }, [activeAuctions, selectedAuction]);
+
   useEffect(() => {
     if (demoAuctions.length === 0) return;
     let changed = false;

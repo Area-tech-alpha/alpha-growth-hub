@@ -103,6 +103,21 @@ export async function POST(request: Request) {
                 data: { minimum_bid: new Prisma.Decimal(nextMinimum) }
             })
 
+            // Regra de "anti-sniping": se o lance ocorrer no último minuto,
+            // ajusta o tempo restante para 30 segundos a partir de agora
+            const nowMs = Date.now()
+            const expMs = new Date(auction.expired_at as unknown as string).getTime()
+            const remainingMs = expMs - nowMs
+            if (Number.isFinite(remainingMs) && remainingMs <= 60_000) {
+                // Se faltam 31–60s, leva para 60s; se faltam 0–30s, leva para 30s
+                const extendToMs = remainingMs > 30_000 ? 60_000 : 30_000
+                const newExpiry = new Date(nowMs + extendToMs) as unknown as Date
+                await tx.auctions.update({
+                    where: { id: auctionId },
+                    data: { expired_at: newExpiry }
+                })
+            }
+
             const holdsAfter = await tx.credit_holds.findMany({ where: { user_id: userId, status: 'active', auctions: { status: 'open' } }, select: { amount: true } })
             const totalHoldsAfter = holdsAfter.reduce((sum, h) => sum + toNum(h.amount as unknown), 0)
             const availableCredits = Math.max(0, creditBalance - totalHoldsAfter)
