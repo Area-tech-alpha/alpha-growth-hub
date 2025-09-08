@@ -41,29 +41,40 @@ export async function POST(
             console.log('[close-auction] topBid', { hasTopBid: !!topBid, topBidId: topBid?.id, user: topBid?.user_id, amount: String(topBid?.amount || '') })
 
             if (!topBid) {
-
                 const currentLeadStatus = auction.leads?.status || 'cold'
                 const nextLeadStatus = currentLeadStatus === 'hot' ? 'high_frozen' : 'low_frozen'
 
-                const [updatedAuction, updatedLead] = await Promise.all([
-                    tx.auctions.update({
-                        where: { id: auctionId },
-                        data: { status: 'closed_expired', winning_bid_id: null }
-                    }),
-                    tx.leads.update({
-                        where: { id: auction.lead_id },
-                        data: { status: nextLeadStatus }
-                    })
-                ])
+                // Idempotency guard: only transition from open -> closed_expired once
+                const lock = await tx.auctions.updateMany({
+                    where: { id: auctionId, status: 'open' },
+                    data: { status: 'closed_expired', winning_bid_id: null }
+                })
+                if (lock.count === 0) {
+                    console.warn('[close-auction] already closed, skipping duplicate expiration', { auctionId })
+                    return { status: 409 as const, body: { error: 'Auction already closed', outcome: 'already_closed' as const } }
+                }
+
+                const updatedLead = await tx.leads.update({
+                    where: { id: auction.lead_id },
+                    data: { status: nextLeadStatus }
+                })
+                const updatedAuction = await tx.auctions.findUnique({ where: { id: auctionId } })
                 console.log('[close-auction] no bids, marked expired', { auctionId })
                 return { status: 200 as const, body: { auction: updatedAuction, lead: updatedLead, outcome: 'expired_no_bids' as const } }
             }
 
+            // Idempotency guard: only transition from open -> closed_won once
+            const lock = await tx.auctions.updateMany({
+                where: { id: auctionId, status: 'open' },
+                data: { status: 'closed_won', winning_bid_id: topBid.id }
+            })
+            if (lock.count === 0) {
+                console.warn('[close-auction] already closed, skipping duplicate win processing', { auctionId })
+                return { status: 409 as const, body: { error: 'Auction already closed', outcome: 'already_closed' as const } }
+            }
+
             const [updatedAuction, updatedLead] = await Promise.all([
-                tx.auctions.update({
-                    where: { id: auctionId },
-                    data: { status: 'closed_won', winning_bid_id: topBid.id }
-                }),
+                tx.auctions.findUnique({ where: { id: auctionId } }),
                 tx.leads.update({
                     where: { id: auction.lead_id },
                     data: { status: 'sold', owner_id: topBid.user_id }
