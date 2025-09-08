@@ -109,11 +109,11 @@ export default function PurchaseCreditsCard({
 
     return (
         <div ref={cardRef}>
-            <Card>
+            <Card className="lg:min-h-[430px] flex flex-col">
                 <CardHeader>
                     <div className="flex items-center gap-3">
-                        <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700">
-                            <LuCoins className="h-6 w-6 text-yellow-400 dark:text-yellow-300" />
+                        <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-muted border">
+                            <LuCoins className="h-6 w-6 text-yellow-500" />
                         </div>
                         <div>
                             <CardTitle className="text-xl">Comprar Créditos</CardTitle>
@@ -123,8 +123,8 @@ export default function PurchaseCreditsCard({
                         </div>
                     </div>
                 </CardHeader>
-                <CardContent>
-                    <div className="grid gap-3">
+                <CardContent className="flex-1 flex flex-col justify-between">
+                    <div className="grid gap-6 lg:mt-4">
                         <label htmlFor="valor" className="text-sm font-medium text-foreground">
                             Valor (R$)
                         </label>
@@ -150,7 +150,7 @@ export default function PurchaseCreditsCard({
                     {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
                     {!session && <p className="text-xs text-center mt-2 text-muted-foreground">Faça login para poder comprar.</p>}
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="mt-auto">
                     <Button
                         onClick={handleBuy}
                         className="w-full bg-yellow-500 hover:bg-yellow-500/90 text-yellow-950"
