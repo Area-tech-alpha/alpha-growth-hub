@@ -24,6 +24,8 @@ export interface Lead {
     bidders: number;
     minimum_value: number;
     category: string;
+    document_url: string;
+    contract_url: string;
     tags: string[];
     [key: string]: unknown;
 }

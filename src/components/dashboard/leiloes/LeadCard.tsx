@@ -45,6 +45,8 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
   };
 
   const isHot = lead.status === "hot";
+  const documentUrl = (lead as unknown as { document_url?: string })?.document_url;
+  const contractUrl = (lead as unknown as { contract_url?: string })?.contract_url;
 
   return (
     <>
@@ -74,14 +76,14 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
       >
         <CardHeader className="pb-3">
           <div className="flex justify-between items-start gap-4">
-            <div className="flex-1 flex items-center gap-3">
+            <div className="flex-1 flex items-center gap-3 min-w-0">
               {isHot && (
                 <div className="flex items-center gap-1.5 bg-red-600 text-white pl-2 pr-3 py-1 rounded-full text-sm font-bold shadow-lg z-10 flex-shrink-0">
                   <Flame size={16} />
                   <span>HOT</span>
                 </div>
               )}
-              <CardTitle className="text-lg font-bold text-yellow-600">
+              <CardTitle className="text-lg font-bold text-yellow-600 truncate flex-1" title={lead.company_name}>
                 {lead.company_name}
               </CardTitle>
             </div>
@@ -165,6 +167,24 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
               </div>
 
             </div>
+            {isHot && (documentUrl || contractUrl) && (
+              <div className="mt-2 flex items-center gap-2">
+                {documentUrl && (
+                  <Button asChild variant="outline" size="sm" className="h-7 px-2.5">
+                    <a href={documentUrl} target="_blank" rel="noopener noreferrer">
+                      Abrir documento
+                    </a>
+                  </Button>
+                )}
+                {contractUrl && (
+                  <Button asChild variant="outline" size="sm" className="h-7 px-2.5">
+                    <a href={contractUrl} target="_blank" rel="noopener noreferrer">
+                      Abrir contrato
+                    </a>
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4 pt-2">
