@@ -10,6 +10,7 @@ import { useRealtimeStore } from "@/store/realtime-store";
 import type { RealtimeState } from "@/store/realtime-store";
 import { ToastBus } from "@/lib/toastBus";
 import RevenueFilterSort, { type RevenueFilterValue } from "./leiloes/RevenueFilterSort";
+import { useSession } from "next-auth/react";
 
 const escapeCsvCell = (
   cellData: string | number | null | undefined
@@ -28,11 +29,26 @@ export default function MeusLeadsPanel() {
   const purchasedLeads = useRealtimeStore(
     (s: RealtimeState) => s.purchasedLeads
   ) as Lead[];
+  const fetchUserLeads = useRealtimeStore((s) => s.fetchUserLeads);
+  const subscribeToUserLeads = useRealtimeStore((s) => s.subscribeToUserLeads);
+  const unsubscribeFromUserLeads = useRealtimeStore((s) => s.unsubscribeFromUserLeads);
+  const { data: session } = useSession();
+  const userId = session?.user?.id;
   const [isExporting, setIsExporting] = useState(false);
   const [purchasePrices, setPurchasePrices] = useState<Record<string, number>>({});
   const [loadingPrices, setLoadingPrices] = useState(false);
   const [revFilter, setRevFilter] = useState<RevenueFilterValue>({ sort: "none" });
   const [paidSort, setPaidSort] = useState<"none" | "asc" | "desc">("none");
+
+  useEffect(() => {
+    if (!userId) return;
+    // Initial load + realtime subscription
+    fetchUserLeads(userId).catch(() => { });
+    subscribeToUserLeads(userId);
+    return () => {
+      unsubscribeFromUserLeads();
+    };
+  }, [userId, fetchUserLeads, subscribeToUserLeads, unsubscribeFromUserLeads]);
 
   useEffect(() => {
     const loadPurchasePrices = async () => {
