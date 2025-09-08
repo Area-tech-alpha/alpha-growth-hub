@@ -28,17 +28,18 @@ export async function GET(request: Request) {
             return NextResponse.json({ status: 'PENDING' });
         }
 
-        const transaction = await prisma.credit_transactions.findFirst({
-            where: {
-                asaas_payment_id: checkoutSession.asaas_checkout_id
-            }
-        });
+        // Check webhook-processed status keyed by internal checkout id
+        const eventKey = `checkout_status:${internalCheckoutId}`;
+        const processed = await prisma.processed_webhooks.findUnique({ where: { event_key: eventKey } });
 
-        if (transaction) {
+        if (processed?.status === 'processed') {
             return NextResponse.json({ status: 'SUCCESS' });
-        } else {
-            return NextResponse.json({ status: 'PENDING' });
         }
+        if (processed?.status === 'failed') {
+            return NextResponse.json({ status: 'FAILED' });
+        }
+
+        return NextResponse.json({ status: 'PENDING' });
     } catch (error) {
         console.error("Erro ao verificar status do checkout:", error);
         return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });

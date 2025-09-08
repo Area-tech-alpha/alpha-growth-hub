@@ -46,9 +46,16 @@ function ObrigadoContent() {
         }
         else if (data?.status === 'PENDING') {
             setUiState({
-                title: 'Pagamento aprovado!',
-                subtitle: 'Estamos processando seus créditos. Esta página será atualizada automaticamente.',
+                title: 'Aguardando confirmação...',
+                subtitle: 'Estamos verificando seu pagamento. Esta página será atualizada automaticamente.',
                 loading: true,
+            });
+        }
+        else if (data?.status === 'FAILED') {
+            setUiState({
+                title: 'Pagamento não aprovado',
+                subtitle: 'Seu pagamento não foi confirmado. Você pode tentar novamente.',
+                loading: false,
             });
         }
 

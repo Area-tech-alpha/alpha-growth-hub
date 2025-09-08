@@ -18,14 +18,9 @@ export async function POST(request: Request) {
         const asaasPaymentId: string = payment.id;
         const checkoutSessionId: string = payment.checkoutSession;
 
-        const isPaidEvent = event === 'PAYMENT_RECEIVED' || event === 'PAYMENT_CONFIRMED';
-        if (!isPaidEvent) {
-            return NextResponse.json({ status: 'ignored', event }, { status: 200 });
-        }
-
         const sessionMapping = await prisma.checkout_sessions.findFirst({
             where: { asaas_checkout_id: checkoutSessionId },
-            select: { user_id: true },
+            select: { user_id: true, internal_checkout_id: true },
         });
 
         if (!sessionMapping?.user_id) {
@@ -34,12 +29,37 @@ export async function POST(request: Request) {
         }
 
         const userId = sessionMapping.user_id;
+        const internalCheckoutId = sessionMapping.internal_checkout_id;
+        const eventKey = `checkout_status:${internalCheckoutId}`;
+
+        const isPaidEvent = event === 'PAYMENT_RECEIVED' || event === 'PAYMENT_CONFIRMED';
+        if (!isPaidEvent) {
+            try {
+                await prisma.processed_webhooks.upsert({
+                    where: { event_key: eventKey },
+                    update: { status: 'failed' },
+                    create: { event_key: eventKey, status: 'failed' },
+                });
+            } catch (e) {
+                console.error('[Webhook] Falha ao registrar status failed em processed_webhooks:', e);
+            }
+            return NextResponse.json({ status: 'ignored', event }, { status: 200 });
+        }
 
         const alreadyProcessed = await prisma.credit_transactions.findUnique({
             where: { asaas_payment_id: asaasPaymentId }
         });
 
         if (alreadyProcessed) {
+            try {
+                await prisma.processed_webhooks.upsert({
+                    where: { event_key: eventKey },
+                    update: { status: 'processed' },
+                    create: { event_key: eventKey, status: 'processed' },
+                });
+            } catch (e) {
+                console.error('[Webhook] Falha ao registrar status processed (idempotente) em processed_webhooks:', e);
+            }
             return NextResponse.json({ status: 'already_processed' }, { status: 200 });
         }
 
@@ -63,6 +83,16 @@ export async function POST(request: Request) {
             await prisma.$queryRaw`SELECT public.process_credit_jobs_worker()`;
         } catch (e) {
             console.error('[Webhook] Erro ao executar worker imediato. O job ainda está na fila.', e);
+        }
+
+        try {
+            await prisma.processed_webhooks.upsert({
+                where: { event_key: eventKey },
+                update: { status: 'processed' },
+                create: { event_key: eventKey, status: 'processed' },
+            });
+        } catch (e) {
+            console.error('[Webhook] Falha ao registrar status processed em processed_webhooks:', e);
         }
 
         return NextResponse.json({ status: 'success', queued: true, msgId: String(msgId) }, { status: 200 });
