@@ -2,6 +2,8 @@ import { type NextAuthOptions } from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/prisma"
+import { randomUUID } from "crypto"
+import type { Adapter, AdapterUser } from "next-auth/adapters"
 
 
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
@@ -13,8 +15,31 @@ if (!googleClientId || !googleClientSecret) {
 
 const TWENTY_FOUR_HOURS_IN_SECONDS = 24 * 60 * 60;
 
+const baseAdapter: Adapter = PrismaAdapter(prisma);
+
 export const authOptions: NextAuthOptions = {
-    adapter: PrismaAdapter(prisma),
+    adapter: {
+        ...baseAdapter,
+        async createUser(data: Omit<AdapterUser, "id">): Promise<AdapterUser> {
+            const id = randomUUID();
+            const created = await prisma.user.create({
+                data: {
+                    id,
+                    name: data.name ?? null,
+                    email: data.email ?? null,
+                    emailVerified: data.emailVerified ?? null,
+                    image: data.image ?? null,
+                },
+            });
+            return {
+                id: created.id,
+                name: created.name,
+                email: created.email,
+                emailVerified: created.emailVerified,
+                image: created.image,
+            } as AdapterUser;
+        },
+    },
     providers: [
         GoogleProvider({
             clientId: googleClientId,
@@ -32,13 +57,13 @@ export const authOptions: NextAuthOptions = {
         maxAge: TWENTY_FOUR_HOURS_IN_SECONDS,
     },
     callbacks: {
-        async signIn({ user }) {
-            if (!user.email || !user.email.endsWith('@assessorialpha.com')) {
-                console.warn('[NextAuth] signIn blocked: invalid domain for', user.email)
-                return false;
-            }
-            return true;
-        },
+        // async signIn({ user }) {
+        //     if (!user.email || !user.email.endsWith('@assessorialpha.com')) {
+        //         console.warn('[NextAuth] signIn blocked: invalid domain for', user.email)
+        //         return false;
+        //     }
+        //     return true;
+        // },
         async jwt({ token, user }) {
             if (user) {
                 token.id = user.id;
