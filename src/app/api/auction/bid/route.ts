@@ -46,7 +46,8 @@ export async function POST(request: Request) {
             })
             const currentTop = topBid ? toNum(topBid.amount as unknown) : 0
             const minimumBid = toNum(auction.minimum_bid as unknown)
-            const requiredMin = Math.max(minimumBid, currentTop + 1)
+            const nextMinFromTop = currentTop > 0 ? Math.ceil(currentTop * 1.10) : 0
+            const requiredMin = Math.max(minimumBid, nextMinFromTop)
             if (!Number.isFinite(amount) || amount < requiredMin) {
                 return { status: 400 as const, body: { error: `Lance mínimo é ${requiredMin}` } }
             }
@@ -95,9 +96,11 @@ export async function POST(request: Request) {
                 })
             }
 
+            // Atualiza o lance mínimo para 10% acima do lance atual
+            const nextMinimum = Math.ceil(amount * 1.10)
             await tx.auctions.update({
                 where: { id: auctionId },
-                data: { minimum_bid: new Prisma.Decimal(amount + 1) }
+                data: { minimum_bid: new Prisma.Decimal(nextMinimum) }
             })
 
             const holdsAfter = await tx.credit_holds.findMany({ where: { user_id: userId, status: 'active', auctions: { status: 'open' } }, select: { amount: true } })
