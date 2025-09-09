@@ -263,6 +263,13 @@ export const AuctionModal = ({
             if (typeof json?.availableCredits === "number") {
                 const nextHeld = Math.max(0, Number(rawUserCredits || 0) - Number(json.availableCredits));
                 setHeldCredits(nextHeld);
+                try {
+                    await fetch('/api/me/credits').then(r => r.json()).then(({ creditBalance }) => {
+                        if (typeof creditBalance === 'number') {
+                            useRealtimeStore.getState().setUserCredits(creditBalance);
+                        }
+                    });
+                } catch { }
             }
             setHasWon(true);
             ToastBus.buyNowSuccess(buyNowAmount, lead.name);
@@ -388,7 +395,7 @@ export const AuctionModal = ({
                                     <Button
                                         onClick={handleBuyNow}
                                         disabled={isSubmitting}
-                                        className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold shadow w-full"
+                                        className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold shadow w-full mb-6"
                                         title={`Comprar já! (${formatCurrency(buyNowPrice)} = 1,5× do lance mínimo)`}
                                     >
                                         Comprar já!

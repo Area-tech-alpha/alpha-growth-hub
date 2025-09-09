@@ -21,6 +21,7 @@ export async function POST(request: Request) {
         if (!auctionId || !Number.isFinite(amount)) {
             return NextResponse.json({ error: 'Parâmetros inválidos' }, { status: 400 })
         }
+        console.log('[bid] received', { auctionId, userId, amount, buyNow })
 
         const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             const toNum = (v: unknown): number => {
@@ -65,6 +66,10 @@ export async function POST(request: Request) {
 
             const user = await tx.users.findUnique({ where: { id: userId } })
             const creditBalance = toNum(user?.credit_balance as unknown)
+            let effectiveBalance = creditBalance
+            if (buyNow) {
+                console.log('[bid] buy-now start', { auctionId, userId, creditBalanceBefore: creditBalance })
+            }
 
             const existingHold = await tx.credit_holds.findFirst({
                 where: { user_id: userId, auction_id: auctionId, status: 'active' }
@@ -117,10 +122,12 @@ export async function POST(request: Request) {
                 const winnerHold = holdsForAuction.find(h => h.user_id === userId)
                 if (winnerHold) {
                     await tx.credit_holds.update({ where: { id: winnerHold.id }, data: { status: 'consumed', updated_at: new Date() as unknown as Date } })
+                    console.log('[bid] buy-now consumed winner hold', { auctionId, holdId: winnerHold.id, amount: String(winnerHold.amount) })
                 }
                 const loserIds = holdsForAuction.filter(h => h.user_id !== userId).map(h => h.id)
                 if (loserIds.length > 0) {
                     await tx.credit_holds.updateMany({ where: { id: { in: loserIds } }, data: { status: 'released', updated_at: new Date() as unknown as Date } })
+                    console.log('[bid] buy-now released loser holds', { auctionId, releasedCount: loserIds.length })
                 }
 
                 // Debita saldo do vencedor
@@ -128,6 +135,8 @@ export async function POST(request: Request) {
                 const winnerBalance = toNum(winner?.credit_balance as unknown)
                 const nextBalance = new Prisma.Decimal(winnerBalance).minus(new Prisma.Decimal(amount))
                 await tx.users.update({ where: { id: userId }, data: { credit_balance: nextBalance } })
+                effectiveBalance = toNum(nextBalance as unknown)
+                console.log('[bid] buy-now debited balance', { userId, before: winnerBalance, amount, after: effectiveBalance })
             } else {
                 // Atualiza o lance mínimo para 10% acima do lance atual
                 const nextMinimum = Math.ceil(amount * 1.10)
@@ -154,7 +163,10 @@ export async function POST(request: Request) {
 
             const holdsAfter = await tx.credit_holds.findMany({ where: { user_id: userId, status: 'active', auctions: { status: 'open' } }, select: { amount: true } })
             const totalHoldsAfter = holdsAfter.reduce((sum, h) => sum + toNum(h.amount as unknown), 0)
-            const availableCredits = Math.max(0, creditBalance - totalHoldsAfter)
+            const availableCredits = Math.max(0, effectiveBalance - totalHoldsAfter)
+            if (buyNow) {
+                console.log('[bid] buy-now computed availableCredits', { userId, effectiveBalance, totalHoldsAfter, availableCredits })
+            }
 
             return { status: 201 as const, body: { bid: { id: bid.id, auction_id: auctionId, user_id: userId, amount: toNum(bid.amount as unknown) }, availableCredits } }
         })
