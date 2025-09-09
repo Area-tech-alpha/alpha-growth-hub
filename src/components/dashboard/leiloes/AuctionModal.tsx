@@ -353,10 +353,12 @@ export const AuctionModal = ({
                                 <div className="text-xs text-muted-foreground -mt-2 flex items-center gap-1">
                                     <span>Comprar já:</span>
                                     <strong className="text-yellow-600">{formatCurrency(buyNowPrice)}</strong>
-                                    <Info className="h-3.5 w-3.5 text-muted-foreground" aria-label="Encerrar o leilão agora pagando 1,5× do lance mínimo. O lead é transferido imediatamente e os créditos são debitados." />
+                                    <span className="inline-flex items-center" title="Encerrar o leilão agora pagando 1,5× do lance mínimo. O lead é transferido imediatamente e os créditos são debitados.">
+                                        <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                                    </span>
                                     <span>(1,5× do lance mínimo)</span>
                                 </div>
-                                <div className="flex gap-2">
+                                <div className="flex flex-col sm:flex-row gap-2">
                                     <Input
                                         type="text"
                                         inputMode="numeric"
@@ -369,7 +371,7 @@ export const AuctionModal = ({
                                     <Button
                                         onClick={handleBid}
                                         disabled={isSubmitting}
-                                        className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold"
+                                        className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold w-full sm:w-auto"
                                     >
                                         <Zap className="h-4 w-4 mr-2" />
                                         {isSubmitting ? "Enviando..." : "Dar Lance"}
@@ -377,7 +379,7 @@ export const AuctionModal = ({
                                     <Button
                                         onClick={handleBuyNow}
                                         disabled={isSubmitting}
-                                        className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold shadow"
+                                        className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold shadow w-full sm:w-auto"
                                         title={`Comprar já! (${formatCurrency(buyNowPrice)} = 1,5× do lance mínimo)`}
                                     >
                                         Comprar já!

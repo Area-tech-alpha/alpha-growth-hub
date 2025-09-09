@@ -108,8 +108,8 @@ export async function POST(request: Request) {
             }
 
             if (buyNow) {
-                // Fecha imediatamente: marca como ganho e transfere lead
-                await tx.auctions.update({ where: { id: auctionId }, data: { status: 'closed_won', winning_bid_id: bid.id } })
+                // Fecha imediatamente: marca como ganho, expira agora e transfere lead
+                await tx.auctions.update({ where: { id: auctionId }, data: { status: 'closed_won', winning_bid_id: bid.id, expired_at: new Date() as unknown as Date } })
                 await tx.leads.update({ where: { id: auction.lead_id }, data: { status: 'sold', owner_id: userId } })
 
                 // Consome hold do vencedor e libera os demais
