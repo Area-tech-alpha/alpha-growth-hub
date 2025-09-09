@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
     Phone,
     Mail,
@@ -83,6 +84,7 @@ export const AuctionModal = ({
     );
     // Comprar já! deve ser 1.5x do lance mínimo efetivo mostrado (requiredMin)
     const buyNowPrice = Math.ceil(requiredMin * 1.5);
+    const [confirmBuyNowOpen, setConfirmBuyNowOpen] = useState(false);
     const handleBidAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const rawDigits = e.target.value.replace(/\D/g, "");
         setBidAmount(rawDigits);
@@ -212,14 +214,21 @@ export const AuctionModal = ({
     };
 
     const handleBuyNow = async () => {
+        // Abre confirmação em vez de executar direto
+        setConfirmBuyNowOpen(true);
+    };
+
+    const executeBuyNow = async () => {
         if (!isAuctionActive) {
             ToastBus.bidAuctionClosed();
+            setConfirmBuyNowOpen(false);
             return;
         }
         const buyNowAmount = buyNowPrice;
         const isDemo = isDemoAuction;
         if (!isDemo && buyNowAmount > userCredits) {
             ToastBus.bidInsufficientCredits(buyNowAmount);
+            setConfirmBuyNowOpen(false);
             return;
         }
         setIsSubmitting(true);
@@ -239,6 +248,7 @@ export const AuctionModal = ({
                 setHasWon(true);
                 ToastBus.bidSuccess(buyNowAmount);
                 onClose();
+                setConfirmBuyNowOpen(false);
                 return;
             }
             const res = await fetch("/api/auction/bid", {
@@ -257,6 +267,9 @@ export const AuctionModal = ({
             setHasWon(true);
             ToastBus.bidSuccess(buyNowAmount);
             onClose();
+            // Remoção otimista do leilão da lista
+            try { useRealtimeStore.getState().removeAuctionById(auctionId); } catch { }
+            setConfirmBuyNowOpen(false);
         } catch (e) {
             const message = (e as { message?: string })?.message || String(e);
             console.error("[AuctionModal] BuyNow error:", message);
@@ -266,7 +279,7 @@ export const AuctionModal = ({
         }
     };
 
-    return (
+    const mainDialog = (
         <Dialog open={true} onOpenChange={onClose}>
             <DialogContent className="w-full max-w-[calc(100%-2rem)] sm:max-w-3xl md:max-w-4xl max-h-[90vh] overflow-y-auto bg-card text-card-foreground">
                 <DialogHeader>
@@ -350,15 +363,36 @@ export const AuctionModal = ({
                                     Lance mínimo:{" "}
                                     <strong>{formatCurrency(requiredMin)}</strong>
                                 </div>
-                                <div className="text-xs text-muted-foreground -mt-2 flex items-center gap-1">
-                                    <span>Comprar já:</span>
-                                    <strong className="text-yellow-600">{formatCurrency(buyNowPrice)}</strong>
-                                    <span className="inline-flex items-center" title="Encerrar o leilão agora pagando 1,5× do lance mínimo. O lead é transferido imediatamente e os créditos são debitados.">
-                                        <Info className="h-3.5 w-3.5 text-muted-foreground" />
-                                    </span>
-                                    <span>(1,5× do lance mínimo)</span>
-                                </div>
-                                <div className="flex flex-col sm:flex-row gap-2">
+                                <TooltipProvider delayDuration={200} disableHoverableContent>
+                                    <div className="text-xs text-muted-foreground -mt-2 flex items-start gap-1">
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <span className="inline-flex items-center sm:cursor-help">
+                                                    <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                                                </span>
+                                            </TooltipTrigger>
+                                            {/* Esconde tooltip em mobile (sm:hidden) */}
+                                            <TooltipContent className="hidden sm:block max-w-xs">
+                                                Encerrar o leilão agora pagando 1,5× do lance mínimo. O lead é transferido imediatamente e os créditos são debitados.
+                                            </TooltipContent>
+                                        </Tooltip>
+                                        <div>
+                                            <span className="mr-1">Comprar já:</span>
+                                            <strong className="text-yellow-600">{formatCurrency(buyNowPrice)}</strong>
+                                            <span className="hidden sm:inline"> (1,5× do lance mínimo)</span>
+                                            <span className="block sm:hidden text-muted-foreground/90">(1,5× do lance mínimo)</span>
+                                        </div>
+                                    </div>
+                                </TooltipProvider>
+                                <div className="flex flex-col gap-2">
+                                    <Button
+                                        onClick={handleBuyNow}
+                                        disabled={isSubmitting}
+                                        className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold shadow w-full"
+                                        title={`Comprar já! (${formatCurrency(buyNowPrice)} = 1,5× do lance mínimo)`}
+                                    >
+                                        Comprar já!
+                                    </Button>
                                     <Input
                                         type="text"
                                         inputMode="numeric"
@@ -371,18 +405,10 @@ export const AuctionModal = ({
                                     <Button
                                         onClick={handleBid}
                                         disabled={isSubmitting}
-                                        className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold w-full sm:w-auto"
+                                        className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold w-full"
                                     >
                                         <Zap className="h-4 w-4 mr-2" />
                                         {isSubmitting ? "Enviando..." : "Dar Lance"}
-                                    </Button>
-                                    <Button
-                                        onClick={handleBuyNow}
-                                        disabled={isSubmitting}
-                                        className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold shadow w-full sm:w-auto"
-                                        title={`Comprar já! (${formatCurrency(buyNowPrice)} = 1,5× do lance mínimo)`}
-                                    >
-                                        Comprar já!
                                     </Button>
                                 </div>
                             </div>
@@ -457,4 +483,27 @@ export const AuctionModal = ({
             </DialogContent>
         </Dialog>
     );
+
+    const confirmDialog = (
+        confirmBuyNowOpen && (
+            <Dialog open={confirmBuyNowOpen} onOpenChange={setConfirmBuyNowOpen} key="confirm-buynow">
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Confirmar Comprar já</DialogTitle>
+                        <DialogDescription>
+                            Esta ação encerra o leilão imediatamente e debita {formatCurrency(buyNowPrice)} dos seus créditos. Deseja continuar?
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex gap-2 justify-end pt-2">
+                        <Button variant="outline" onClick={() => setConfirmBuyNowOpen(false)} disabled={isSubmitting}>Cancelar</Button>
+                        <Button className="bg-gradient-to-r from-yellow-400 to-yellow-600 text-black" onClick={executeBuyNow} disabled={isSubmitting}>
+                            Confirmar
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+        )
+    );
+
+    return <>{mainDialog}{confirmDialog}</>;
 }
