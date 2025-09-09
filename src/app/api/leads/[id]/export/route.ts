@@ -43,29 +43,40 @@ export async function GET(
     }
 
     const headers = [
+      "Nome",
+      "Descrição",
+      "Canal",
+      "Faturamento",
+      "Investimento em Marketing",
       "Nome da Empresa",
       "Nome do Contato",
-      "Telefone",
-      "Email",
+      "CNPJ",
       "Estado",
       "Cidade",
-      "Nicho",
-      "Faturamento Anual (R$)",
-      "Investimento em Marketing (R$)",
-      "CNPJ",
-
+      "Telefone",
+      "Email",
+      "Documento (URL)",
+      "Contrato (URL)",
     ];
 
+    const rec = lead as unknown as Record<string, unknown>;
+    const revenueVal = typeof rec["revenue"] === 'string' ? (rec["revenue"] as string) : String(rec["revenue"] ?? "");
+    const mktVal = typeof rec["marketing_investment"] === 'string' ? (rec["marketing_investment"] as string) : String(rec["marketing_investment"] ?? "");
     const rowData = [
-      escapeCsvCell(lead.company_name),
-      escapeCsvCell(lead.contact_name),
-      escapeCsvCell(lead.phone),
-      escapeCsvCell(lead.email),
-      escapeCsvCell(lead.state),
-      escapeCsvCell(lead.city),
-      escapeCsvCell(typeof lead.revenue === 'string' ? lead.revenue : String(lead.revenue)),
-      escapeCsvCell(typeof lead.marketing_investment === 'string' ? lead.marketing_investment : String(lead.marketing_investment)),
-      escapeCsvCell(lead.cnpj),
+      escapeCsvCell((rec["name"] as string) ?? null),
+      escapeCsvCell((rec["description"] as string) ?? null),
+      escapeCsvCell((rec["channel"] as string) ?? null),
+      escapeCsvCell(revenueVal),
+      escapeCsvCell(mktVal),
+      escapeCsvCell((rec["company_name"] as string) ?? null),
+      escapeCsvCell((rec["contact_name"] as string) ?? null),
+      escapeCsvCell((rec["cnpj"] as string) ?? null),
+      escapeCsvCell((rec["state"] as string) ?? null),
+      escapeCsvCell((rec["city"] as string) ?? null),
+      escapeCsvCell((rec["phone"] as string) ?? null),
+      escapeCsvCell((rec["email"] as string) ?? null),
+      escapeCsvCell((rec["document_url"] as string) ?? null),
+      escapeCsvCell((rec["contract_url"] as string) ?? null),
     ];
 
     const csvContent = [headers.join(","), rowData.join(",")].join("\n");

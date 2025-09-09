@@ -14,18 +14,7 @@ import { ToastBus } from "@/lib/toastBus";
 import RevenueFilterSort, { type RevenueFilterValue } from "./leiloes/RevenueFilterSort";
 import { useSession } from "next-auth/react";
 
-const escapeCsvCell = (
-  cellData: string | number | null | undefined
-): string => {
-  if (cellData === null || cellData === undefined) {
-    return '""';
-  }
-  const stringData = String(cellData);
-  if (/[",\n\r]/.test(stringData)) {
-    return `"${stringData.replace(/"/g, '""')}"`;
-  }
-  return `"${stringData}"`;
-};
+// CSV é exportado via endpoint /api/leads/export para manter padrão único.
 
 export default function MeusLeadsPanel() {
   const purchasedLeads = useRealtimeStore(
@@ -122,76 +111,31 @@ export default function MeusLeadsPanel() {
     return leads;
   }, [purchasedLeads, revFilter.min, revFilter.max, revFilter.locationQuery, revFilter.sort, paidSort, purchasePrices]);
 
-  const handleExportAll = () => {
+  const handleExportAll = async () => {
     if (purchasedLeads.length === 0) {
       ToastBus.csvNoneToExport();
       return;
     }
-
     setIsExporting(true);
     ToastBus.csvGenerating();
-
     try {
-      const headers = [
-        "ID do Lead",
-        "Nome da Empresa",
-        "Nome do Contato",
-        "Telefone",
-        "Email",
-        "Estado",
-        "Cidade",
-        "Nicho",
-        "Faturamento Anual (R$)",
-        "Investimento em Marketing (R$)",
-        "Canal",
-        "Data da Compra",
-        "CNPJ",
-      ];
-
-      const rows = purchasedLeads.map((lead) => {
-        const purchaseDateSource = lead.updated_at || lead.expires_at;
-        const purchaseDate =
-          purchaseDateSource && typeof purchaseDateSource === "string"
-            ? new Date(purchaseDateSource).toLocaleString("pt-BR")
-            : "N/A";
-
-        return [
-          escapeCsvCell(lead.id),
-          escapeCsvCell(lead.company_name),
-          escapeCsvCell(lead.contact_name),
-          escapeCsvCell(lead.phone),
-          escapeCsvCell(lead.email),
-          escapeCsvCell(lead.state),
-          escapeCsvCell(lead.city),
-          escapeCsvCell(lead.niche),
-          escapeCsvCell(lead.revenue),
-          escapeCsvCell(lead.marketing_investment),
-          escapeCsvCell(lead.channel),
-          escapeCsvCell(purchaseDate),
-          escapeCsvCell(lead.cnpj),
-        ].join(",");
-      });
-
-      const csvContent = [headers.join(","), ...rows].join("\n");
-      const blob = new Blob([`\uFEFF${csvContent}`], {
-        type: "text/csv;charset=utf-8;",
-      });
+      const res = await fetch('/api/leads/export');
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error || 'Falha ao exportar');
+      }
+      const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-
+      const a = document.createElement('a');
       a.href = url;
-      a.download = `meus_leads_comprados_${new Date()
-        .toLocaleDateString("pt-BR")
-        .replace(/\//g, "-")}.csv`;
-
+      a.download = `meus_leads_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.csv`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-
       ToastBus.csvSuccess();
     } catch (error) {
-      ToastBus.csvError("Ocorreu um erro ao gerar o arquivo CSV.");
+      ToastBus.csvError('Ocorreu um erro ao gerar o arquivo CSV.');
       console.error(error);
     } finally {
       setIsExporting(false);
