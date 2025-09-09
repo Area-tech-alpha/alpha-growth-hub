@@ -201,7 +201,7 @@ export default function MeusLeadsPanel() {
   return (
     <>
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
-        <div>
+        <div className="flex-1 min-w-0">
           <h2 className="text-2xl font-bold text-foreground">
             Meus Leads Comprados
           </h2>
@@ -209,9 +209,16 @@ export default function MeusLeadsPanel() {
             Leads que você adquiriu nos leilões
           </p>
         </div>
-
         {purchasedLeads.length > 0 && (
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-stretch sm:justify-end gap-3 sm:gap-6 w-full">
+          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 sm:gap-4 flex-shrink-0">
+            <div className="text-right">
+              <div className="text-2xl font-bold text-yellow-600">
+                {purchasedLeads.length}
+              </div>
+              <div className="text-sm text-muted-foreground whitespace-nowrap">
+                leads comprados
+              </div>
+            </div>
             <Button
               onClick={handleExportAll}
               disabled={isExporting || purchasedLeads.length === 0}
@@ -220,15 +227,6 @@ export default function MeusLeadsPanel() {
               <Download className="h-4 w-4 mr-2" />
               {isExporting ? "Exportando..." : "Exportar Tudo (.csv)"}
             </Button>
-
-            <div className="flex-shrink-0 text-right self-end sm:self-auto">
-              <div className="text-2xl font-bold text-yellow-600">
-                {purchasedLeads.length}
-              </div>
-              <div className="text-sm text-muted-foreground whitespace-nowrap">
-                leads comprados
-              </div>
-            </div>
           </div>
         )}
       </div>
