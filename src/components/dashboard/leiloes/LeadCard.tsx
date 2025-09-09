@@ -190,13 +190,13 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
           <div className="grid grid-cols-2 gap-4 pt-2">
             <div className="text-center">
               <div className="text-lg font-bold text-yellow-600">
-                {formatCurrency(lead.currentBid)}
+                {formatCurrency(lead.currentBid ?? 0)}
               </div>
               <div className="text-xs text-muted-foreground">Lance Atual</div>
             </div>
             <div className="text-center">
               <div className="text-lg font-bold text-foreground">
-                {formatNumber(lead.bidders)}
+                {formatNumber(lead.bidders ?? 0)}
               </div>
               <div className="text-xs text-muted-foreground">Lances</div>
             </div>

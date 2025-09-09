@@ -158,13 +158,18 @@ export default function Dashboard({
             })
           );
           setBidsForAuction(auctionId, mapped);
+          try {
+            const top = mapped.length > 0 ? mapped[0].amount : 0;
+            const count = mapped.length;
+            updateAuctionFields(auctionId, { leads: { currentBid: top, bidders: count } });
+          } catch { }
         })
       );
     };
     if (normalizedInitialAuctions.length > 0) {
       load();
     }
-  }, [normalizedInitialAuctions, supabase, setBidsForAuction]);
+  }, [normalizedInitialAuctions, supabase, setBidsForAuction, updateAuctionFields]);
   useEffect(() => {
     const channel = supabase
       .channel("dashboard-realtime")

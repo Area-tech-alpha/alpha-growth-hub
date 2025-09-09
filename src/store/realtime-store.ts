@@ -24,7 +24,7 @@ export interface RealtimeState {
     setInitialPurchasedLeads: (leads: Lead[]) => void;
 
     upsertAuctionWithLead: (auction: AuctionWithLead) => void;
-    updateAuctionFields: (auctionId: string, fields: Partial<AuctionWithLead>) => void;
+    updateAuctionFields: (auctionId: string, fields: Partial<Omit<AuctionWithLead, 'leads'>> & { leads?: Partial<LeadForAuction> }) => void;
     removeAuctionById: (auctionId: string) => void;
 
     addBidForAuction: (auctionId: string, bid: Bid) => void;
@@ -98,11 +98,11 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
         };
     }),
 
-    updateAuctionFields: (auctionId: string, fields: Partial<AuctionWithLead>) => set((state: RealtimeState) => {
+    updateAuctionFields: (auctionId: string, fields: Partial<Omit<AuctionWithLead, 'leads'>> & { leads?: Partial<LeadForAuction> }) => set((state: RealtimeState) => {
         return {
             activeAuctions: state.activeAuctions.map(a => {
                 if (a.id !== auctionId) return a;
-                const next = { ...a, ...fields } as AuctionWithLead;
+                const next: AuctionWithLead = { ...a, ...fields } as AuctionWithLead;
                 // Se o expired_at mudar, refletimos no leads.expires_at para o CountdownTimer
                 if (typeof fields.expired_at === 'string' && (a as { leads?: { expires_at?: string } }).leads) {
                     next.leads = { ...(a.leads as Record<string, unknown>), expires_at: fields.expired_at } as unknown as typeof a.leads;
