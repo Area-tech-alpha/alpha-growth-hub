@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../../auth'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
 export async function GET() {
     try {
@@ -15,7 +16,10 @@ export async function GET() {
             where: { user_id: userId, status: 'active', auctions: { status: 'open' } },
             select: { amount: true },
         })
-        const sum = (rows || []).reduce((acc, r) => acc + (typeof (r as any).amount === 'string' ? parseFloat((r as any).amount) : Number((r as any).amount || 0)), 0)
+        const sum = (rows || []).reduce((acc, r) => {
+            const dec = (r as { amount: unknown }).amount as unknown as Prisma.Decimal
+            return acc + (typeof dec?.toNumber === 'function' ? dec.toNumber() : Number(dec ?? 0))
+        }, 0)
         return NextResponse.json({ activeHolds: sum })
     } catch (e) {
         console.error('[API] /api/me/holds error:', e)
