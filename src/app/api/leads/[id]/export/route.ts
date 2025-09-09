@@ -63,8 +63,8 @@ export async function GET(
       escapeCsvCell(lead.email),
       escapeCsvCell(lead.state),
       escapeCsvCell(lead.city),
-      escapeCsvCell(lead.revenue.toNumber()),
-      escapeCsvCell(lead.marketing_investment.toNumber()),
+      escapeCsvCell(typeof lead.revenue === 'string' ? lead.revenue : String(lead.revenue)),
+      escapeCsvCell(typeof lead.marketing_investment === 'string' ? lead.marketing_investment : String(lead.marketing_investment)),
       escapeCsvCell(lead.cnpj),
     ];
 

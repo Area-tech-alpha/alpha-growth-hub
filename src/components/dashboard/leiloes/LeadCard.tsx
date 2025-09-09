@@ -116,7 +116,7 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
                 <div>
                   <div className="text-muted-foreground">Faturamento</div>
                   <div className="font-semibold">
-                    {formatCurrency(lead.revenue)}
+                    {formatCurrency(typeof lead.revenue === 'string' ? parseFloat(lead.revenue) : (lead.revenue as number))}
                   </div>
                 </div>
               </div>
@@ -125,7 +125,7 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
                 <div>
                   <div className="text-muted-foreground">Invest. Marketing</div>
                   <div className="font-semibold">
-                    {formatCurrency(lead.marketing_investment)}
+                    {formatCurrency(typeof lead.marketing_investment === 'string' ? parseFloat(lead.marketing_investment) : (lead.marketing_investment as number))}
                   </div>
                 </div>
               </div>

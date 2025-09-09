@@ -56,10 +56,10 @@ export default function LeiloesPanel() {
 
     // Apply revenue filters first
     if (revFilter.min != null) {
-      leads = leads.filter(l => (Number(l.revenue) || 0) >= (revFilter.min as number));
+      leads = leads.filter(l => (Number(typeof l.revenue === 'string' ? parseFloat(l.revenue) : l.revenue) || 0) >= (revFilter.min as number));
     }
     if (revFilter.max != null) {
-      leads = leads.filter(l => (Number(l.revenue) || 0) <= (revFilter.max as number));
+      leads = leads.filter(l => (Number(typeof l.revenue === 'string' ? parseFloat(l.revenue) : l.revenue) || 0) <= (revFilter.max as number));
     }
 
     // Available UFs based on the currently revenue-filtered leads
@@ -86,9 +86,9 @@ export default function LeiloesPanel() {
     // Sort
     let sortedLeads = sortLeads(leads);
     if (revFilter.sort === 'asc') {
-      sortedLeads = [...sortedLeads].sort((a, b) => (Number(a.revenue) || 0) - (Number(b.revenue) || 0));
+      sortedLeads = [...sortedLeads].sort((a, b) => (Number(typeof a.revenue === 'string' ? parseFloat(a.revenue) : a.revenue) || 0) - (Number(typeof b.revenue === 'string' ? parseFloat(b.revenue) : b.revenue) || 0));
     } else if (revFilter.sort === 'desc') {
-      sortedLeads = [...sortedLeads].sort((a, b) => (Number(b.revenue) || 0) - (Number(a.revenue) || 0));
+      sortedLeads = [...sortedLeads].sort((a, b) => (Number(typeof b.revenue === 'string' ? parseFloat(b.revenue) : b.revenue) || 0) - (Number(typeof a.revenue === 'string' ? parseFloat(a.revenue) : a.revenue) || 0));
     }
 
     // Map back to auctions

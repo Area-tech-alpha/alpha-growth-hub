@@ -100,8 +100,8 @@ model leads {
   phone                String     @db.VarChar(50)
   email                String     @db.VarChar(255)
   cnpj                 String?    @db.VarChar(32)
-  revenue              Decimal    @db.Decimal(15, 2)
-  marketing_investment Decimal    @db.Decimal(12, 2)
+  revenue              String     @db.Text
+  marketing_investment String     @db.Text
   city                 String?    @db.VarChar(255)
   state                String?    @db.VarChar(100)
   segment              String?    @db.VarChar(100)

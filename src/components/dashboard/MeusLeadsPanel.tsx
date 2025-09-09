@@ -77,10 +77,10 @@ export default function MeusLeadsPanel() {
   const availableStateUFs = useMemo(() => {
     let leads = purchasedLeads.slice();
     if (revFilter.min != null) {
-      leads = leads.filter(l => (Number(l.revenue) || 0) >= (revFilter.min as number));
+      leads = leads.filter(l => (Number(typeof l.revenue === 'string' ? parseFloat(l.revenue) : l.revenue) || 0) >= (revFilter.min as number));
     }
     if (revFilter.max != null) {
-      leads = leads.filter(l => (Number(l.revenue) || 0) <= (revFilter.max as number));
+      leads = leads.filter(l => (Number(typeof l.revenue === 'string' ? parseFloat(l.revenue) : l.revenue) || 0) <= (revFilter.max as number));
     }
     const setUF = new Set<string>();
     leads.forEach(l => {
@@ -95,10 +95,10 @@ export default function MeusLeadsPanel() {
     let leads = purchasedLeads.slice();
 
     if (revFilter.min != null) {
-      leads = leads.filter(l => (Number(l.revenue) || 0) >= (revFilter.min as number));
+      leads = leads.filter(l => (Number(typeof l.revenue === 'string' ? parseFloat(l.revenue) : l.revenue) || 0) >= (revFilter.min as number));
     }
     if (revFilter.max != null) {
-      leads = leads.filter(l => (Number(l.revenue) || 0) <= (revFilter.max as number));
+      leads = leads.filter(l => (Number(typeof l.revenue === 'string' ? parseFloat(l.revenue) : l.revenue) || 0) <= (revFilter.max as number));
     }
     if ((revFilter.locationQuery || "").trim() !== "") {
       const uf = (revFilter.locationQuery as string).toUpperCase();
@@ -107,9 +107,9 @@ export default function MeusLeadsPanel() {
 
     // Sorting
     if (revFilter.sort === "asc") {
-      leads = [...leads].sort((a, b) => (Number(a.revenue) || 0) - (Number(b.revenue) || 0));
+      leads = [...leads].sort((a, b) => (Number(typeof a.revenue === 'string' ? parseFloat(a.revenue) : a.revenue) || 0) - (Number(typeof b.revenue === 'string' ? parseFloat(b.revenue) : b.revenue) || 0));
     } else if (revFilter.sort === "desc") {
-      leads = [...leads].sort((a, b) => (Number(b.revenue) || 0) - (Number(a.revenue) || 0));
+      leads = [...leads].sort((a, b) => (Number(typeof b.revenue === 'string' ? parseFloat(b.revenue) : b.revenue) || 0) - (Number(typeof a.revenue === 'string' ? parseFloat(a.revenue) : a.revenue) || 0));
     } else if (paidSort !== "none") {
       leads = [...leads].sort((a, b) => {
         const ap = purchasePrices[a.id] ?? -Infinity; // undefined go last in asc
