@@ -263,13 +263,6 @@ export const AuctionModal = ({
             if (typeof json?.availableCredits === "number") {
                 const nextHeld = Math.max(0, Number(rawUserCredits || 0) - Number(json.availableCredits));
                 setHeldCredits(nextHeld);
-                try {
-                    await fetch('/api/me/credits').then(r => r.json()).then(({ creditBalance }) => {
-                        if (typeof creditBalance === 'number') {
-                            useRealtimeStore.getState().setUserCredits(creditBalance);
-                        }
-                    });
-                } catch { }
             }
             setHasWon(true);
             ToastBus.buyNowSuccess(buyNowAmount, lead.name);
