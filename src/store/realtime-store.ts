@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AuctionWithLead, Bid } from '@/components/dashboard/leiloes/types';
+import type { AuctionWithLead, Bid, LeadForAuction } from '@/components/dashboard/leiloes/types';
 import type { Lead } from '@/components/dashboard/leads/types';
 import { createClient } from '@/utils/supabase/client';
 
