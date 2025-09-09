@@ -9,12 +9,13 @@ import CreditosPanel from "@/components/dashboard/CreditosPanel";
 import MeusLeadsPanel from "@/components/dashboard/MeusLeadsPanel";
 import { CiCreditCard1 } from "react-icons/ci";
 import { IoMdTrendingUp } from "react-icons/io";
-import { FiShoppingBag } from "react-icons/fi";
+import { FiShoppingBag, FiInfo } from "react-icons/fi";
 import type { Lead } from "./leads/types";
 import { useRealtimeStore } from "@/store/realtime-store";
 import type { RealtimeState } from "@/store/realtime-store";
 import type { Bid, AuctionWithLead, AuctionRecord, LeadForAuction } from "./leiloes/types";
 import LeiloesPanel from "./LeiloesPanel";
+import InfoPanel from "./InfoPanel";
 
 export default function Dashboard({
   initialAuctions,
@@ -338,6 +339,10 @@ export default function Dashboard({
                 </span>
               )}
             </TabsTrigger>
+            <TabsTrigger value="info" className="flex items-center gap-2">
+              <FiInfo className="size-4" />
+              Como funciona
+            </TabsTrigger>
           </div>
         </TabsList>
         <TabsContent value="creditos">
@@ -348,6 +353,9 @@ export default function Dashboard({
         </TabsContent>
         <TabsContent value="leiloes">
           <LeiloesPanel />
+        </TabsContent>
+        <TabsContent value="info">
+          <InfoPanel />
         </TabsContent>
       </Tabs>
     </div>
