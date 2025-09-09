@@ -110,7 +110,7 @@ export async function POST(request: Request) {
             const remainingMs = expMs - nowMs
             if (Number.isFinite(remainingMs) && remainingMs <= 60_000) {
                 // Se faltam 31–60s, leva para 60s; se faltam 0–30s, leva para 30s
-                const extendToMs = remainingMs > 30_000 ? 60_000 : 30_000
+                const extendToMs = remainingMs > 30_000 ? 67_000 : 37_000
                 const newExpiry = new Date(nowMs + extendToMs) as unknown as Date
                 await tx.auctions.update({
                     where: { id: auctionId },
