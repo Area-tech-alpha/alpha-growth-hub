@@ -66,6 +66,9 @@ export const ToastBus = {
     bidFailed: (message?: string) =>
         error("Falha ao enviar lance", message || "Tente novamente."),
 
+    buyNowSuccess: (amount?: number, leadName?: string) =>
+        success("Lead adquirido!", `${leadName ? `"${leadName}" - ` : ''}Compra confirmada por R$ ${Math.floor(Number(amount || 0))}.`),
+
     checkoutLoginRequired: () =>
         error("Ação necessária", "Você precisa estar logado para comprar créditos."),
     checkoutRedirecting: () =>

@@ -246,7 +246,7 @@ export const AuctionModal = ({
                 updateAuctionStatsFromBid(auctionId, buyNowAmount);
                 setDemoHold(auctionId, buyNowAmount);
                 setHasWon(true);
-                ToastBus.bidSuccess(buyNowAmount);
+                ToastBus.buyNowSuccess(buyNowAmount, lead.name);
                 onClose();
                 setConfirmBuyNowOpen(false);
                 return;
@@ -265,7 +265,7 @@ export const AuctionModal = ({
                 setHeldCredits(nextHeld);
             }
             setHasWon(true);
-            ToastBus.bidSuccess(buyNowAmount);
+            ToastBus.buyNowSuccess(buyNowAmount, lead.name);
             onClose();
             // Remoção otimista do leilão da lista
             try { useRealtimeStore.getState().removeAuctionById(auctionId); } catch { }
@@ -491,7 +491,7 @@ export const AuctionModal = ({
                     <DialogHeader>
                         <DialogTitle>Confirmar Comprar já</DialogTitle>
                         <DialogDescription>
-                            Esta ação encerra o leilão imediatamente e debita {formatCurrency(buyNowPrice)} dos seus créditos. Deseja continuar?
+                            Ao confirmar, o leilão será encerrado imediatamente e o lead será adquirido na hora. Serão debitados {formatCurrency(buyNowPrice)} dos seus créditos.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex gap-2 justify-end pt-2">
