@@ -1,3 +1,4 @@
+import { compareBands, bandOverlapsRange } from "@/lib/revenueBands";
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import StatsCards from "./leiloes/statsCards";
@@ -56,10 +57,10 @@ export default function LeiloesPanel() {
 
     // Apply revenue filters first
     if (revFilter.min != null) {
-      leads = leads.filter(l => (Number(typeof l.revenue === 'string' ? parseFloat(l.revenue) : l.revenue) || 0) >= (revFilter.min as number));
+      leads = leads.filter(l => bandOverlapsRange(String(l.revenue), revFilter.min as number, null));
     }
     if (revFilter.max != null) {
-      leads = leads.filter(l => (Number(typeof l.revenue === 'string' ? parseFloat(l.revenue) : l.revenue) || 0) <= (revFilter.max as number));
+      leads = leads.filter(l => bandOverlapsRange(String(l.revenue), null, revFilter.max as number));
     }
 
     // Available UFs based on the currently revenue-filtered leads
@@ -86,9 +87,9 @@ export default function LeiloesPanel() {
     // Sort
     let sortedLeads = sortLeads(leads);
     if (revFilter.sort === 'asc') {
-      sortedLeads = [...sortedLeads].sort((a, b) => (Number(typeof a.revenue === 'string' ? parseFloat(a.revenue) : a.revenue) || 0) - (Number(typeof b.revenue === 'string' ? parseFloat(b.revenue) : b.revenue) || 0));
+      sortedLeads = [...sortedLeads].sort((a, b) => compareBands(String(a.revenue), String(b.revenue)));
     } else if (revFilter.sort === 'desc') {
-      sortedLeads = [...sortedLeads].sort((a, b) => (Number(typeof b.revenue === 'string' ? parseFloat(b.revenue) : b.revenue) || 0) - (Number(typeof a.revenue === 'string' ? parseFloat(a.revenue) : a.revenue) || 0));
+      sortedLeads = [...sortedLeads].sort((a, b) => compareBands(String(b.revenue), String(a.revenue)));
     }
 
     // Map back to auctions

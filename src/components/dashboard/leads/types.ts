@@ -5,8 +5,8 @@ export interface Lead {
     status: 'hot' | "high_frozen" | "low_frozen" | 'cold' | 'sold';
     expires_at: string;
     channel: string;
-    revenue: string | number;
-    marketing_investment: string | number;
+    revenue: string;
+    marketing_investment: string;
     company_name: string;
     contact_name: string;
     cnpj: string;

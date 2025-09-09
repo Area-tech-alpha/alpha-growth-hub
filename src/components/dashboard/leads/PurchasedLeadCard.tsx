@@ -167,12 +167,12 @@ export const PurchasedLeadCard = ({
             <InfoRow
               icon={DollarSign}
               label="Faturamento"
-              value={formatCurrency(typeof lead.revenue === 'string' ? parseFloat(lead.revenue) : (lead.revenue as number))}
+              value={String(lead.revenue)}
             />
             <InfoRow
               icon={Megaphone}
               label="Invest. Marketing"
-              value={formatCurrency(typeof lead.marketing_investment === 'string' ? parseFloat(lead.marketing_investment) : (lead.marketing_investment as number))}
+              value={String(lead.marketing_investment)}
             />
           </div>
         </div>

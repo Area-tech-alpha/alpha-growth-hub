@@ -311,7 +311,7 @@ export const AuctionModal = ({
                                     <span className="text-sm">Faturamento</span>
                                 </div>
                                 <div className="font-bold text-xl">
-                                    {formatCurrency(typeof lead.revenue === 'string' ? parseFloat(lead.revenue) : (lead.revenue as number))}
+                                    {String(lead.revenue)}
                                 </div>
                             </div>
                             <div className="p-4 bg-muted rounded-lg">
@@ -320,7 +320,7 @@ export const AuctionModal = ({
                                     <span className="text-sm">Invest. Marketing</span>
                                 </div>
                                 <div className="font-bold text-xl">
-                                    {formatCurrency(typeof lead.marketing_investment === 'string' ? parseFloat(lead.marketing_investment) : (lead.marketing_investment as number))}
+                                    {String(lead.marketing_investment)}
                                 </div>
                             </div>
                         </div>
@@ -507,3 +507,5 @@ export const AuctionModal = ({
 
     return <>{mainDialog}{confirmDialog}</>;
 }
+
+

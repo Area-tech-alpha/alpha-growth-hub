@@ -1,5 +1,7 @@
 "use client";
 
+import { compareBands, bandOverlapsRange } from "@/lib/revenueBands";
+
 import { useEffect, useMemo, useState } from "react";
 import { FiShoppingBag } from "react-icons/fi";
 import { Download } from "lucide-react";
@@ -77,10 +79,10 @@ export default function MeusLeadsPanel() {
   const availableStateUFs = useMemo(() => {
     let leads = purchasedLeads.slice();
     if (revFilter.min != null) {
-      leads = leads.filter(l => (Number(typeof l.revenue === 'string' ? parseFloat(l.revenue) : l.revenue) || 0) >= (revFilter.min as number));
+      leads = leads.filter(l => bandOverlapsRange(String(l.revenue), revFilter.min as number, null));
     }
     if (revFilter.max != null) {
-      leads = leads.filter(l => (Number(typeof l.revenue === 'string' ? parseFloat(l.revenue) : l.revenue) || 0) <= (revFilter.max as number));
+      leads = leads.filter(l => bandOverlapsRange(String(l.revenue), null, revFilter.max as number));
     }
     const setUF = new Set<string>();
     leads.forEach(l => {
@@ -95,10 +97,10 @@ export default function MeusLeadsPanel() {
     let leads = purchasedLeads.slice();
 
     if (revFilter.min != null) {
-      leads = leads.filter(l => (Number(typeof l.revenue === 'string' ? parseFloat(l.revenue) : l.revenue) || 0) >= (revFilter.min as number));
+      leads = leads.filter(l => bandOverlapsRange(String(l.revenue), revFilter.min as number, null));
     }
     if (revFilter.max != null) {
-      leads = leads.filter(l => (Number(typeof l.revenue === 'string' ? parseFloat(l.revenue) : l.revenue) || 0) <= (revFilter.max as number));
+      leads = leads.filter(l => bandOverlapsRange(String(l.revenue), null, revFilter.max as number));
     }
     if ((revFilter.locationQuery || "").trim() !== "") {
       const uf = (revFilter.locationQuery as string).toUpperCase();
@@ -107,9 +109,9 @@ export default function MeusLeadsPanel() {
 
     // Sorting
     if (revFilter.sort === "asc") {
-      leads = [...leads].sort((a, b) => (Number(typeof a.revenue === 'string' ? parseFloat(a.revenue) : a.revenue) || 0) - (Number(typeof b.revenue === 'string' ? parseFloat(b.revenue) : b.revenue) || 0));
+      leads = [...leads].sort((a, b) => compareBands(String(a.revenue), String(b.revenue)));
     } else if (revFilter.sort === "desc") {
-      leads = [...leads].sort((a, b) => (Number(typeof b.revenue === 'string' ? parseFloat(b.revenue) : b.revenue) || 0) - (Number(typeof a.revenue === 'string' ? parseFloat(a.revenue) : a.revenue) || 0));
+      leads = [...leads].sort((a, b) => compareBands(String(b.revenue), String(a.revenue)));
     } else if (paidSort !== "none") {
       leads = [...leads].sort((a, b) => {
         const ap = purchasePrices[a.id] ?? -Infinity; // undefined go last in asc
