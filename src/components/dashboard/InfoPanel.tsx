@@ -2,7 +2,6 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 
 export default function InfoPanel() {
     return (
@@ -81,7 +80,7 @@ export default function InfoPanel() {
                     </section>
 
                     <section className="space-y-2">
-                        <h3 className="text-lg font-semibold flex items-center gap-2">Dicas rápidas <Badge variant="secondary">Recomendado</Badge></h3>
+                        <h3 className="text-lg font-semibold flex items-center gap-2">Dicas rápidas</h3>
                         <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
                             <li>Use filtros para encontrar leads por região e faixa de faturamento.</li>
                             <li>Acompanhe seu saldo de créditos e histórico de compras.</li>
