@@ -14,9 +14,10 @@ export async function POST(request: Request) {
         }
         const userId = session.user.id
 
-        const body = await request.json().catch(() => ({})) as { auction_id?: string; amount?: number }
+        const body = await request.json().catch(() => ({})) as { auction_id?: string; amount?: number; buy_now?: boolean }
         const auctionId = String(body.auction_id || '')
         const amount = Number(body.amount)
+        const buyNow = Boolean(body.buy_now)
         if (!auctionId || !Number.isFinite(amount)) {
             return NextResponse.json({ error: 'Parâmetros inválidos' }, { status: 400 })
         }
@@ -48,8 +49,18 @@ export async function POST(request: Request) {
             const minimumBid = toNum(auction.minimum_bid as unknown)
             const nextMinFromTop = currentTop > 0 ? Math.ceil(currentTop * 1.10) : 0
             const requiredMin = Math.max(minimumBid, nextMinFromTop)
-            if (!Number.isFinite(amount) || amount < requiredMin) {
-                return { status: 400 as const, body: { error: `Lance mínimo é ${requiredMin}` } }
+            if (!Number.isFinite(amount)) {
+                return { status: 400 as const, body: { error: 'Valor inválido' } }
+            }
+            if (buyNow) {
+                const buyNowMin = Math.ceil(requiredMin * 1.5)
+                if (amount < buyNowMin) {
+                    return { status: 400 as const, body: { error: `Comprar já! requer no mínimo ${buyNowMin}` } }
+                }
+            } else {
+                if (amount < requiredMin) {
+                    return { status: 400 as const, body: { error: `Lance mínimo é ${requiredMin}` } }
+                }
             }
 
             const user = await tx.users.findUnique({ where: { id: userId } })
@@ -96,26 +107,49 @@ export async function POST(request: Request) {
                 })
             }
 
-            // Atualiza o lance mínimo para 10% acima do lance atual
-            const nextMinimum = Math.ceil(amount * 1.10)
-            await tx.auctions.update({
-                where: { id: auctionId },
-                data: { minimum_bid: new Prisma.Decimal(nextMinimum) }
-            })
+            if (buyNow) {
+                // Fecha imediatamente: marca como ganho e transfere lead
+                await tx.auctions.update({ where: { id: auctionId }, data: { status: 'closed_won', winning_bid_id: bid.id } })
+                await tx.leads.update({ where: { id: auction.lead_id }, data: { status: 'sold', owner_id: userId } })
 
-            // Regra de "anti-sniping": se o lance ocorrer no último minuto,
-            // ajusta o tempo restante para 30 segundos a partir de agora
-            const nowMs = Date.now()
-            const expMs = new Date(auction.expired_at as unknown as string).getTime()
-            const remainingMs = expMs - nowMs
-            if (Number.isFinite(remainingMs) && remainingMs <= 60_000) {
-                // Se faltam 31–60s, leva para 60s; se faltam 0–30s, leva para 30s
-                const extendToMs = remainingMs > 30_000 ? 67_000 : 37_000
-                const newExpiry = new Date(nowMs + extendToMs) as unknown as Date
+                // Consome hold do vencedor e libera os demais
+                const holdsForAuction = await tx.credit_holds.findMany({ where: { auction_id: auctionId, status: 'active' } })
+                const winnerHold = holdsForAuction.find(h => h.user_id === userId)
+                if (winnerHold) {
+                    await tx.credit_holds.update({ where: { id: winnerHold.id }, data: { status: 'consumed', updated_at: new Date() as unknown as Date } })
+                }
+                const loserIds = holdsForAuction.filter(h => h.user_id !== userId).map(h => h.id)
+                if (loserIds.length > 0) {
+                    await tx.credit_holds.updateMany({ where: { id: { in: loserIds } }, data: { status: 'released', updated_at: new Date() as unknown as Date } })
+                }
+
+                // Debita saldo do vencedor
+                const winner = await tx.users.findUnique({ where: { id: userId }, select: { credit_balance: true } })
+                const winnerBalance = toNum(winner?.credit_balance as unknown)
+                const nextBalance = new Prisma.Decimal(winnerBalance).minus(new Prisma.Decimal(amount))
+                await tx.users.update({ where: { id: userId }, data: { credit_balance: nextBalance } })
+            } else {
+                // Atualiza o lance mínimo para 10% acima do lance atual
+                const nextMinimum = Math.ceil(amount * 1.10)
                 await tx.auctions.update({
                     where: { id: auctionId },
-                    data: { expired_at: newExpiry }
+                    data: { minimum_bid: new Prisma.Decimal(nextMinimum) }
                 })
+            }
+
+            if (!buyNow) {
+                // Regra de anti-sniping: apenas para lances normais
+                const nowMs = Date.now()
+                const expMs = new Date(auction.expired_at as unknown as string).getTime()
+                const remainingMs = expMs - nowMs
+                if (Number.isFinite(remainingMs) && remainingMs <= 60_000) {
+                    const extendToMs = remainingMs > 30_000 ? 67_000 : 37_000
+                    const newExpiry = new Date(nowMs + extendToMs) as unknown as Date
+                    await tx.auctions.update({
+                        where: { id: auctionId },
+                        data: { expired_at: newExpiry }
+                    })
+                }
             }
 
             const holdsAfter = await tx.credit_holds.findMany({ where: { user_id: userId, status: 'active', auctions: { status: 'open' } }, select: { amount: true } })
