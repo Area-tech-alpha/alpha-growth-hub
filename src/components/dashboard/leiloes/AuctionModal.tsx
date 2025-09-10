@@ -74,13 +74,21 @@ export const AuctionModal = ({
     const userEmailsRef = useRef<Record<string, string>>({});
     const auctionFromStore = activeAuctions.find((a: AuctionWithLead) => a.id === auctionId);
     const auctionMinimumBid = auctionFromStore?.minimum_bid;
-    const requiredMin = Math.max(
+    let requiredMin = Math.max(
         Number.isFinite(auctionMinimumBid as number) ? (auctionMinimumBid as number) : 0,
         (currentBid ?? 0) + 1,
         lead.minimum_value || 0
     );
-    // Comprar já! deve ser 1.5x do lance mínimo efetivo mostrado (requiredMin)
-    const buyNowPrice = Math.ceil(requiredMin * 1.5);
+    let buyNowPrice = Math.ceil(requiredMin * 1.5);
+    // Regras específicas para DEMO: mínimos fixos iniciais e progressão 1.1x/1.5x do último lance fake
+    if (isDemoAuction) {
+        const baseline = lead.status === 'hot' ? 800 : 400;
+        const last = Number(currentBid || 0);
+        const nextMinFromLast = last > 0 ? Math.ceil(last * 1.10) : baseline;
+        requiredMin = Math.max(baseline, nextMinFromLast);
+        const baseForBuy = last > 0 ? last : baseline;
+        buyNowPrice = Math.ceil(baseForBuy * 1.5);
+    }
     const [confirmBuyNowOpen, setConfirmBuyNowOpen] = useState(false);
     const handleBidAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const rawDigits = e.target.value.replace(/\D/g, "");
@@ -177,7 +185,22 @@ export const AuctionModal = ({
                 };
                 addBidForAuction(auctionId, bid);
                 updateAuctionStatsFromBid(auctionId, amount);
-                updateAuctionFields(auctionId, { minimum_bid: amount + 1 });
+                // Segue a mesma regra do real: próximo lance mínimo = ceil(lance * 1.10)
+                const nextMinimum = Math.ceil(amount * 1.10);
+                updateAuctionFields(auctionId, { minimum_bid: nextMinimum });
+                // Anti-sniping demo: se faltar 31–60s, volta para 60s; se 0–30s, volta para 30s
+                try {
+                    const nowMs = Date.now();
+                    const expSrc = auctionFromStore?.expired_at || lead.expires_at;
+                    const expMs = new Date(expSrc).getTime();
+                    const remainingMs = expMs - nowMs;
+                    if (Number.isFinite(remainingMs) && remainingMs <= 60_000) {
+                        const extendToMs = remainingMs > 30_000 ? 60_000 : 30_000;
+                        const newExpiryIso = new Date(nowMs + extendToMs).toISOString();
+                        // Atualiza auction e também leads.expires_at (store já reflete, mas forçamos aqui também para o modal)
+                        updateAuctionFields(auctionId, { expired_at: newExpiryIso, leads: { expires_at: newExpiryIso } });
+                    }
+                } catch { }
                 setDemoHold(auctionId, amount);
                 setBidAmount("");
                 ToastBus.bidSuccess(amount);
@@ -254,6 +277,9 @@ export const AuctionModal = ({
                 setDemoHold(auctionId, buyNowAmount);
                 setHasWon(true);
                 ToastBus.buyNowSuccess(buyNowAmount, lead.name);
+                try {
+                    window.dispatchEvent(new CustomEvent('demo-auction-closed', { detail: { id: auctionId } }));
+                } catch { }
                 onClose();
                 setConfirmBuyNowOpen(false);
                 return;

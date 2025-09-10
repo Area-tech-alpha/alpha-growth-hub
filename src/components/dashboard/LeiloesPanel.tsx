@@ -189,6 +189,18 @@ export default function LeiloesPanel() {
     }
   }, [activeAuctions, demoAuctions, selectedAuction]);
 
+  // Remove demo auction when modal signals close (buy-now demo)
+  useEffect(() => {
+    const onDemoClosed = (e: Event) => {
+      const anyE = e as unknown as { detail?: { id?: string } };
+      const id = anyE?.detail?.id;
+      if (!id) return;
+      setDemoAuctions(prev => prev.filter(a => a.id === id ? false : true));
+    };
+    window.addEventListener('demo-auction-closed', onDemoClosed as unknown as EventListener);
+    return () => window.removeEventListener('demo-auction-closed', onDemoClosed as unknown as EventListener);
+  }, []);
+
   // Keep selectedAuction in sync with latest store updates (e.g., expired_at changes)
   useEffect(() => {
     if (!selectedAuction) return;
@@ -215,7 +227,19 @@ export default function LeiloesPanel() {
       const count = bids.length;
       if (topAmount !== a.leads.currentBid || count !== a.leads.bidders) {
         changed = true;
-        return { ...a, leads: { ...a.leads, currentBid: topAmount, bidders: count } } as AuctionWithLeadLocal;
+        // Anti-sniping demo: se houve novo bid e estamos no último minuto, estende
+        let nextExpiresAt = a.leads.expires_at;
+        try {
+          const nowMs = Date.now();
+          const expMs = new Date(a.leads.expires_at).getTime();
+          const remainingMs = expMs - nowMs;
+          if (Number.isFinite(remainingMs) && remainingMs <= 60_000) {
+            const extendToMs = remainingMs > 30_000 ? 60_000 : 30_000;
+            nextExpiresAt = new Date(nowMs + extendToMs).toISOString();
+          }
+        } catch { }
+        const nextMin = topAmount > 0 ? Math.ceil(topAmount * 1.10) : (a.minimum_bid || undefined);
+        return { ...a, minimum_bid: nextMin, leads: { ...a.leads, currentBid: topAmount, bidders: count, expires_at: nextExpiresAt } } as AuctionWithLeadLocal;
       }
       return a;
     });
@@ -275,7 +299,7 @@ export default function LeiloesPanel() {
           <p className="text-gray-500">Aguarde novos leads</p>
         </div>
       )}
-      {session?.user?.email === 'yago@assessorialpha.com' && (
+      {(session?.user?.email === 'yago@assessorialpha.com' || session?.user?.email === 'maxwell.tech@assessorialpha.com') && (
         <DemoAuctionsButton
           visible={demoAuctions.length === 0}
           onCreate={(auctions) => setDemoAuctions(auctions as AuctionWithLeadLocal[])}
