@@ -359,7 +359,7 @@ export const AuctionModal = ({
                                     <DollarSign className="h-4 w-4" />
                                     <span className="text-sm">Faturamento</span>
                                 </div>
-                                <div className="font-bold text-xl truncate" title={String(lead.revenue)}>
+                                <div className="font-bold text-base sm:text-xl truncate" title={String(lead.revenue)}>
                                     {String(lead.revenue)}
                                 </div>
                             </div>
@@ -368,7 +368,7 @@ export const AuctionModal = ({
                                     <Megaphone className="h-4 w-4" />
                                     <span className="text-sm">Invest. Marketing</span>
                                 </div>
-                                <div className="font-bold text-xl truncate" title={String(lead.marketing_investment)}>
+                                <div className="font-bold text-base sm:text-xl truncate" title={String(lead.marketing_investment)}>
                                     {String(lead.marketing_investment)}
                                 </div>
                             </div>
