@@ -42,7 +42,8 @@ export async function POST(request: Request) {
                 await tx.$executeRawUnsafe("set local lock_timeout = '3s'");
             } catch { }
             // Keep blocking lock as-is; optionally we could switch to try-lock here
-            await tx.$queryRawUnsafe(`select pg_advisory_xact_lock(hashtext('${auctionId.replace(/'/g, "''")}'))`);
+            // Use executeRaw for functions that return void to avoid Prisma deserialization errors
+            await tx.$executeRawUnsafe(`select pg_advisory_xact_lock(hashtext('${auctionId.replace(/'/g, "''")}'))`);
 
             // Minimal idempotency if table exists
             if (idemKey) {
