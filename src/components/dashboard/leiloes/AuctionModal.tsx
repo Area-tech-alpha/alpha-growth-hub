@@ -37,7 +37,6 @@ interface AuctionModalProps {
     lead: Lead;
     onClose: () => void;
     user: { id?: string; name: string };
-    initialBids?: Bid[];
 }
 
 const EMPTY_BIDS: Bid[] = [];
@@ -47,8 +46,6 @@ export const AuctionModal = ({
     lead,
     onClose,
     user,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    initialBids,
 }: AuctionModalProps) => {
     const [isAuctionActive, setIsAuctionActive] = useState(
         new Date(lead.expires_at).getTime() > Date.now()
@@ -113,11 +110,8 @@ export const AuctionModal = ({
         const top = bidsFromStore && bidsFromStore.length > 0
             ? bidsFromStore[0]?.amount
             : (lead.currentBid ?? 0);
-        if (top !== currentBid) {
-            setCurrentBid(top);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [bidsFromStore]);
+        setCurrentBid((prev) => (prev !== top ? top : prev));
+    }, [bidsFromStore, lead.currentBid]);
 
     useEffect(() => {
         const loadMissing = async () => {
@@ -189,13 +183,26 @@ export const AuctionModal = ({
                 ToastBus.bidSuccess(amount);
                 return;
             }
+            const idemKey = `${user.id || 'anon'}:${auctionId}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
             const res = await fetch("/api/auction/bid", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ auction_id: auctionId, amount }),
+                headers: { "Content-Type": "application/json", "idempotency-key": idemKey },
+                body: JSON.stringify({ auction_id: auctionId, amount, idempotency_key: idemKey }),
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok) {
+                if (res.status === 402) {
+                    ToastBus.bidInsufficientCredits(amount);
+                    return;
+                }
+                if (res.status === 409) {
+                    ToastBus.bidFailed(String(json?.error || 'Outra ação está em processamento. Tente novamente.'));
+                    return;
+                }
+                if (res.status === 400) {
+                    ToastBus.bidFailed(String(json?.error || 'Parâmetros inválidos'));
+                    return;
+                }
                 throw new Error(json?.error || "Falha ao registrar o lance");
             }
             if (typeof json?.availableCredits === "number") {
@@ -251,13 +258,29 @@ export const AuctionModal = ({
                 setConfirmBuyNowOpen(false);
                 return;
             }
+            const idemKey = `${user.id || 'anon'}:${auctionId}:buy:${Date.now()}:${Math.random().toString(36).slice(2)}`;
             const res = await fetch("/api/auction/bid", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ auction_id: auctionId, amount: buyNowAmount, buy_now: true }),
+                headers: { "Content-Type": "application/json", "idempotency-key": idemKey },
+                body: JSON.stringify({ auction_id: auctionId, amount: buyNowAmount, buy_now: true, idempotency_key: idemKey }),
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok) {
+                if (res.status === 402) {
+                    ToastBus.bidInsufficientCredits(buyNowAmount);
+                    setConfirmBuyNowOpen(false);
+                    return;
+                }
+                if (res.status === 409) {
+                    ToastBus.bidFailed(String(json?.error || 'Outra ação está em processamento. Tente novamente.'));
+                    setConfirmBuyNowOpen(false);
+                    return;
+                }
+                if (res.status === 400) {
+                    ToastBus.bidFailed(String(json?.error || 'Parâmetros inválidos'));
+                    setConfirmBuyNowOpen(false);
+                    return;
+                }
                 throw new Error(json?.error || "Falha ao comprar já");
             }
             if (typeof json?.availableCredits === "number") {

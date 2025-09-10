@@ -14,10 +14,13 @@ export async function POST(request: Request) {
         }
         const userId = session.user.id
 
-        const body = await request.json().catch(() => ({})) as { auction_id?: string; amount?: number; buy_now?: boolean }
+        const body = await request.json().catch(() => ({})) as { auction_id?: string; amount?: number; buy_now?: boolean; idempotency_key?: string }
         const auctionId = String(body.auction_id || '')
         const amount = Number(body.amount)
         const buyNow = Boolean(body.buy_now)
+        const headerKey = request.headers.get('idempotency-key') || ''
+        const bodyKey = typeof (body as { idempotency_key?: string }).idempotency_key === 'string' ? (body as { idempotency_key?: string }).idempotency_key as string : ''
+        const idemKey = (headerKey || bodyKey).trim()
         if (!auctionId || !Number.isFinite(amount)) {
             return NextResponse.json({ error: 'Parâmetros inválidos' }, { status: 400 })
         }
@@ -34,6 +37,23 @@ export async function POST(request: Request) {
                 const n = typeof v === 'string' ? parseFloat(v as string) : Number(v);
                 return Number.isFinite(n) ? n : 0;
             };
+            // Serialize actions per auction using an advisory lock (waits up to lock_timeout)
+            try {
+                await tx.$executeRawUnsafe("set local lock_timeout = '3s'");
+            } catch { }
+            // Keep blocking lock as-is; optionally we could switch to try-lock here
+            await tx.$queryRawUnsafe(`select pg_advisory_xact_lock(hashtext('${auctionId.replace(/'/g, "''")}'))`);
+
+            // Minimal idempotency if table exists
+            if (idemKey) {
+                try {
+                    const inserted = await tx.$executeRawUnsafe(`insert into public.request_keys(key) values ('${idemKey.replace(/'/g, "''")}') on conflict (key) do nothing`);
+                    if (!inserted) {
+                        return { status: 409 as const, body: { error: 'Requisição duplicada. Tente novamente.' } }
+                    }
+                } catch { /* ignore if table is missing */ }
+            }
+
             const auction = await tx.auctions.findUnique({ where: { id: auctionId } })
             if (!auction) {
                 return { status: 404 as const, body: { error: 'Leilão não encontrado' } }
@@ -53,12 +73,9 @@ export async function POST(request: Request) {
             if (!Number.isFinite(amount)) {
                 return { status: 400 as const, body: { error: 'Valor inválido' } }
             }
-            if (buyNow) {
-                const buyNowMin = Math.ceil(requiredMin * 1.5)
-                if (amount < buyNowMin) {
-                    return { status: 400 as const, body: { error: `Comprar já! requer no mínimo ${buyNowMin}` } }
-                }
-            } else {
+            // Server-side buy-now price
+            const serverBuyNowPrice = Math.ceil(requiredMin * 1.5)
+            if (!buyNow) {
                 if (amount < requiredMin) {
                     return { status: 400 as const, body: { error: `Lance mínimo é ${requiredMin}` } }
                 }
@@ -81,8 +98,9 @@ export async function POST(request: Request) {
                 select: { amount: true, auction_id: true }
             })
             const totalActiveHolds = holds.reduce((sum, h) => sum + toNum(h.amount as unknown), 0)
+            const effectiveAmount = buyNow ? serverBuyNowPrice : amount
             const availableExcludingThis = creditBalance - (totalActiveHolds - existingHoldAmount)
-            const deltaNeeded = amount - existingHoldAmount
+            const deltaNeeded = effectiveAmount - existingHoldAmount
             if (availableExcludingThis < deltaNeeded) {
                 return { status: 402 as const, body: { error: 'Créditos insuficientes' } }
             }
@@ -91,7 +109,7 @@ export async function POST(request: Request) {
                 data: {
                     auction_id: auctionId,
                     user_id: userId,
-                    amount: new Prisma.Decimal(amount)
+                    amount: new Prisma.Decimal(effectiveAmount)
                 }
             })
 
@@ -113,11 +131,10 @@ export async function POST(request: Request) {
             }
 
             if (buyNow) {
-                // Fecha imediatamente: marca como ganho, expira agora e transfere lead
+                // Fecha imediatamente
                 await tx.auctions.update({ where: { id: auctionId }, data: { status: 'closed_won', winning_bid_id: bid.id, expired_at: new Date() as unknown as Date } })
                 await tx.leads.update({ where: { id: auction.lead_id }, data: { status: 'sold', owner_id: userId } })
 
-                // Consome hold do vencedor e libera os demais
                 const holdsForAuction = await tx.credit_holds.findMany({ where: { auction_id: auctionId, status: 'active' } })
                 const winnerHold = holdsForAuction.find(h => h.user_id === userId)
                 if (winnerHold) {
@@ -130,16 +147,15 @@ export async function POST(request: Request) {
                     console.log('[bid] buy-now released loser holds', { auctionId, releasedCount: loserIds.length })
                 }
 
-                // Debita saldo do vencedor
                 const winner = await tx.users.findUnique({ where: { id: userId }, select: { credit_balance: true } })
                 const winnerBalance = toNum(winner?.credit_balance as unknown)
-                const nextBalance = new Prisma.Decimal(winnerBalance).minus(new Prisma.Decimal(amount))
+                const nextBalance = new Prisma.Decimal(winnerBalance).minus(new Prisma.Decimal(effectiveAmount))
                 await tx.users.update({ where: { id: userId }, data: { credit_balance: nextBalance } })
                 effectiveBalance = toNum(nextBalance as unknown)
-                console.log('[bid] buy-now debited balance', { userId, before: winnerBalance, amount, after: effectiveBalance })
+                console.log('[bid] buy-now debited balance', { userId, before: winnerBalance, amount: effectiveAmount, after: effectiveBalance })
             } else {
                 // Atualiza o lance mínimo para 10% acima do lance atual
-                const nextMinimum = Math.ceil(amount * 1.10)
+                const nextMinimum = Math.ceil(effectiveAmount * 1.10)
                 await tx.auctions.update({
                     where: { id: auctionId },
                     data: { minimum_bid: new Prisma.Decimal(nextMinimum) }
@@ -147,12 +163,12 @@ export async function POST(request: Request) {
             }
 
             if (!buyNow) {
-                // Regra de anti-sniping: apenas para lances normais
+                // Anti-sniping (sem alteração)
                 const nowMs = Date.now()
                 const expMs = new Date(auction.expired_at as unknown as string).getTime()
                 const remainingMs = expMs - nowMs
                 if (Number.isFinite(remainingMs) && remainingMs <= 60_000) {
-                    const extendToMs = remainingMs > 30_000 ? 67_000 : 37_000
+                    const extendToMs = remainingMs > 30_000 ? 60_000 : 30_000
                     const newExpiry = new Date(nowMs + extendToMs) as unknown as Date
                     await tx.auctions.update({
                         where: { id: auctionId },

@@ -21,9 +21,6 @@ export default function LeiloesPanel() {
   const activeAuctions = useRealtimeStore(
     (s: RealtimeState) => s.activeAuctions
   ) as AuctionWithLeadLocal[];
-  const bidsByAuction = useRealtimeStore(
-    (s: RealtimeState) => s.bidsByAuction
-  ) as Record<string, Bid[]>;
   const removeAuctionById = useRealtimeStore(
     (s: RealtimeState) => s.removeAuctionById
   );
@@ -289,7 +286,6 @@ export default function LeiloesPanel() {
           auctionId={selectedAuction.id}
           lead={selectedAuction.leads}
           user={user}
-          initialBids={bidsByAuction[selectedAuction.id]}
           onClose={() => setSelectedAuction(null)}
         />
       )}

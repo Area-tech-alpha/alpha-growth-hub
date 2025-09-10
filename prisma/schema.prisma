@@ -198,6 +198,13 @@ model credit_holds {
   @@index([status], map: "idx_credit_holds_status")
 }
 
+model request_keys {
+  key        String    @id
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@map("request_keys")
+}
+
 enum account_type_enum {
   USER_CREDITS
   PLATFORM_REVENUE
