@@ -482,18 +482,20 @@ export const AuctionModal = ({
                                     bidsFromStore.map((bid, index) => (
                                         <div
                                             key={bid.id}
-                                            className={`p-3 rounded-lg border flex justify-between items-center ${index === 0
+                                            className={`p-3 rounded-lg border flex justify-between items-center min-w-0 ${index === 0
                                                 ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200"
                                                 : "bg-muted"
                                                 }`}
                                         >
-                                            <div>
+                                            <div className="min-w-0 pr-2">
                                                 <div className="font-bold text-yellow-600">
                                                     {formatCurrency(bid.amount)}
                                                 </div>
-                                                <div className="text-xs text-muted-foreground min-h-[1rem] flex items-center">
+                                                <div className="text-xs text-muted-foreground min-h-[1rem] flex items-center overflow-hidden">
                                                     {userMaskedEmails[bid.userId] ? (
-                                                        <>{userMaskedEmails[bid.userId]}</>
+                                                        <span className="truncate" title={userMaskedEmails[bid.userId]}>
+                                                            {userMaskedEmails[bid.userId]}
+                                                        </span>
                                                     ) : (
                                                         <span className="inline-block h-3 w-24 rounded bg-muted animate-pulse" />
                                                     )}
