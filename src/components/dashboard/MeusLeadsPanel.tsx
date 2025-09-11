@@ -13,10 +13,9 @@ import type { RealtimeState } from "@/store/realtime-store";
 import { ToastBus } from "@/lib/toastBus";
 import RevenueFilterSort, { type RevenueFilterValue } from "./leiloes/RevenueFilterSort";
 import { useSession } from "next-auth/react";
+import { LeadForAuction } from "./leiloes/types";
 
-// CSV é exportado via endpoint /api/leads/export para manter padrão único.
-
-export default function MeusLeadsPanel() {
+export default function MeusLeadsPanel({ demoLead }: { demoLead: LeadForAuction | null }) {
   const purchasedLeads = useRealtimeStore(
     (s: RealtimeState) => s.purchasedLeads
   ) as Lead[];
@@ -26,10 +25,18 @@ export default function MeusLeadsPanel() {
   const { data: session } = useSession();
   const userId = session?.user?.id;
   const [isExporting, setIsExporting] = useState(false);
+  const demoWonLeads = useRealtimeStore((s) => (s as unknown as { demoWonLeads: Array<LeadForAuction & { demo_price?: number }> }).demoWonLeads) as Array<LeadForAuction & { demo_price?: number }>;
   const [purchasePrices, setPurchasePrices] = useState<Record<string, number>>({});
   const [loadingPrices, setLoadingPrices] = useState(false);
   const [revFilter, setRevFilter] = useState<RevenueFilterValue>({ sort: "none" });
   const [paidSort, setPaidSort] = useState<"none" | "asc" | "desc">("none");
+
+  const allLeads = useMemo(() => {
+    const base = purchasedLeads.slice();
+    const demoList = (demoWonLeads || []).map(l => ({ ...(l as unknown as Lead) } as Lead));
+    const merged = [...demoList, ...base.filter(bl => !demoList.some(dl => dl.id === bl.id))];
+    return merged;
+  }, [purchasedLeads, demoWonLeads]);
 
   useEffect(() => {
     if (!userId) return;
@@ -45,12 +52,12 @@ export default function MeusLeadsPanel() {
     const loadPurchasePrices = async () => {
       try {
         setLoadingPrices(true);
-        const leadIds = Array.from(new Set(purchasedLeads.map(l => l.id)));
-        if (leadIds.length === 0) { setPurchasePrices({}); return; }
+        const realLeadIds = Array.from(new Set(purchasedLeads.map(l => l.id).filter(id => !(demoWonLeads || []).some(d => d.id === id))));
+        if (realLeadIds.length === 0) { setPurchasePrices({}); return; }
         const res = await fetch('/api/leads/purchase-prices', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ leadIds })
+          body: JSON.stringify({ leadIds: realLeadIds })
         });
         const json = await res.json();
         if (!res.ok) throw new Error(json?.error || 'Falha ao buscar preços de compra');
@@ -62,11 +69,11 @@ export default function MeusLeadsPanel() {
       }
     };
     loadPurchasePrices();
-  }, [purchasedLeads]);
+  }, [purchasedLeads, demoWonLeads]);
 
   // Compute available states based on current revenue filter (min/max)
   const availableStateUFs = useMemo(() => {
-    let leads = purchasedLeads.slice();
+    let leads = allLeads.slice();
     if (revFilter.min != null) {
       leads = leads.filter(l => bandOverlapsRange(String(l.revenue), revFilter.min as number, null));
     }
@@ -79,11 +86,11 @@ export default function MeusLeadsPanel() {
       if (uf) setUF.add(uf);
     });
     return Array.from(setUF);
-  }, [purchasedLeads, revFilter.min, revFilter.max]);
+  }, [allLeads, revFilter.min, revFilter.max]);
 
   // Apply filters and sorting (revenue sort takes precedence if chosen; otherwise sort by paid)
   const displayLeads = useMemo(() => {
-    let leads = purchasedLeads.slice();
+    let leads = allLeads.slice();
 
     if (revFilter.min != null) {
       leads = leads.filter(l => bandOverlapsRange(String(l.revenue), revFilter.min as number, null));
@@ -109,7 +116,7 @@ export default function MeusLeadsPanel() {
       });
     }
     return leads;
-  }, [purchasedLeads, revFilter.min, revFilter.max, revFilter.locationQuery, revFilter.sort, paidSort, purchasePrices]);
+  }, [allLeads, revFilter.min, revFilter.max, revFilter.locationQuery, revFilter.sort, paidSort, purchasePrices]);
 
   const handleExportAll = async () => {
     if (purchasedLeads.length === 0) {
@@ -142,6 +149,44 @@ export default function MeusLeadsPanel() {
     }
   };
 
+  const handleExportDemoLead = async () => {
+    const chosen = (demoWonLeads && demoWonLeads.length > 0) ? demoWonLeads[0] : (demoLead || null);
+    if (!chosen) return;
+    try {
+      const l = chosen as unknown as Lead;
+      const headers = [
+        'id', 'name', 'contact_name', 'email', 'phone', 'state', 'city', 'revenue', 'marketing_investment', 'status', 'expires_at', 'demo_price'
+      ];
+      const row = [
+        l.id,
+        l.name || '',
+        l.contact_name || '',
+        l.email || '',
+        l.phone || '',
+        l.state || '',
+        l.city || '',
+        String(l.revenue ?? ''),
+        String(l.marketing_investment ?? ''),
+        l.status || '',
+        l.expires_at || '',
+        String((chosen as unknown as { demo_price?: number }).demo_price ?? '')
+      ].map((v) => String(v).replace(/"/g, '""'));
+      const csv = `\uFEFF${headers.join(',')}\n"${row.join('","')}"`;
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `demo_lead_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      ToastBus.csvSuccess();
+    } catch {
+      ToastBus.csvError('Falha ao exportar demo lead.');
+    }
+  };
+
   return (
     <>
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
@@ -153,24 +198,36 @@ export default function MeusLeadsPanel() {
             Leads que você adquiriu nos leilões
           </p>
         </div>
-        {purchasedLeads.length > 0 && (
+        {(allLeads.length > 0) && (
           <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 sm:gap-4 flex-shrink-0">
             <div className="text-right">
               <div className="text-2xl font-bold text-yellow-600">
-                {purchasedLeads.length}
+                {allLeads.length}
               </div>
               <div className="text-sm text-muted-foreground whitespace-nowrap">
                 leads comprados
               </div>
             </div>
-            <Button
-              onClick={handleExportAll}
-              disabled={isExporting || purchasedLeads.length === 0}
-              className="w-full sm:w-auto bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-black shadow-md transition-all duration-200"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              {isExporting ? "Exportando..." : "Exportar Tudo (.csv)"}
-            </Button>
+            {purchasedLeads.length > 0 && (
+              <Button
+                onClick={handleExportAll}
+                disabled={isExporting}
+                className="w-full sm:w-auto bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-black shadow-md transition-all duration-200"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {isExporting ? "Exportando..." : "Exportar Tudo (.csv)"}
+              </Button>
+            )}
+            {(demoWonLeads && demoWonLeads.length > 0) && (
+              <Button
+                onClick={handleExportDemoLead}
+                variant="outline"
+                className="w-full sm:w-auto"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Exportar Demo (.csv)
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -189,7 +246,7 @@ export default function MeusLeadsPanel() {
         </div>
       )}
 
-      {purchasedLeads.length > 0 ? (
+      {allLeads.length > 0 ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
           {displayLeads.map((purchasedLead) => {
             const validDateSource =
@@ -198,12 +255,14 @@ export default function MeusLeadsPanel() {
               validDateSource && typeof validDateSource === "string"
                 ? new Date(validDateSource)
                 : new Date();
+            const isDemo = (demoWonLeads || []).some(d => d.id === purchasedLead.id);
+            const price = isDemo ? (demoWonLeads.find(d => d.id === purchasedLead.id)?.demo_price ?? undefined) : (loadingPrices ? undefined : purchasePrices[purchasedLead.id]);
             return (
               <PurchasedLeadCard
                 key={purchasedLead.id}
                 lead={purchasedLead}
                 purchaseDate={purchaseDate}
-                purchasePrice={loadingPrices ? undefined : purchasePrices[purchasedLead.id]}
+                purchasePrice={price}
               />
             );
           })}

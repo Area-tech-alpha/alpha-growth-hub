@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/client';
 
 export interface RealtimeState {
     activeAuctions: AuctionWithLead[];
+    demoAuctions: AuctionWithLead[];
     bidsByAuction: Record<string, Bid[]>;
     purchasedLeads: Lead[];
     userCredits: number;
@@ -20,12 +21,19 @@ export interface RealtimeState {
     releaseDemoHold: (auctionId: string) => void;
     clearDemoMode: () => void;
 
+    demoWonLeads: Array<LeadForAuction & { demo_price?: number }>;
+    addDemoWonLead: (lead: LeadForAuction & { demo_price?: number }) => void;
+    clearDemoWonLeads: () => void;
+
     setInitialAuctions: (auctions: AuctionWithLead[]) => void;
     setInitialPurchasedLeads: (leads: Lead[]) => void;
 
     upsertAuctionWithLead: (auction: AuctionWithLead) => void;
     updateAuctionFields: (auctionId: string, fields: Partial<Omit<AuctionWithLead, 'leads'>> & { leads?: Partial<LeadForAuction> }) => void;
     removeAuctionById: (auctionId: string) => void;
+    setDemoAuctions: (auctions: AuctionWithLead[]) => void;
+    updateDemoAuctionFields: (auctionId: string, fields: Partial<Omit<AuctionWithLead, 'leads'>> & { leads?: Partial<LeadForAuction> }) => void;
+    removeDemoAuctionById: (auctionId: string) => void;
 
     addBidForAuction: (auctionId: string, bid: Bid) => void;
     setBidsForAuction: (auctionId: string, bids: Bid[]) => void;
@@ -65,6 +73,7 @@ let leadsSubscribedKey: string | null = null;
 
 export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
     activeAuctions: [],
+    demoAuctions: [],
     bidsByAuction: {},
     purchasedLeads: [],
     userCredits: 0,
@@ -85,6 +94,13 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
         return { demoHolds: nextHolds };
     }),
     clearDemoMode: () => set({ demoModeActive: false, demoCredits: 0, demoHolds: {} }),
+
+    demoWonLeads: [],
+    addDemoWonLead: (lead: LeadForAuction & { demo_price?: number }) => set((state: RealtimeState) => {
+        const exists = (state.demoWonLeads || []).some(l => l.id === lead.id);
+        return exists ? {} : { demoWonLeads: [lead, ...(state.demoWonLeads || [])] };
+    }),
+    clearDemoWonLeads: () => set({ demoWonLeads: [] }),
 
     setInitialAuctions: (auctions: AuctionWithLead[]) => set({ activeAuctions: auctions }),
     setInitialPurchasedLeads: (leads: Lead[]) => set({ purchasedLeads: leads }),
@@ -115,6 +131,26 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
             })
         };
     }),
+
+    setDemoAuctions: (auctions: AuctionWithLead[]) => set({ demoAuctions: auctions }),
+    updateDemoAuctionFields: (auctionId: string, fields: Partial<Omit<AuctionWithLead, 'leads'>> & { leads?: Partial<LeadForAuction> }) => set((state: RealtimeState) => {
+        return {
+            demoAuctions: state.demoAuctions.map(a => {
+                if (a.id !== auctionId) return a;
+                const next: AuctionWithLead = { ...a, ...fields } as AuctionWithLead;
+                if (typeof fields.expired_at === 'string' && (a as { leads?: { expires_at?: string } }).leads) {
+                    next.leads = { ...(a.leads as Record<string, unknown>), expires_at: fields.expired_at } as unknown as typeof a.leads;
+                }
+                if (fields.leads && typeof fields.leads === 'object') {
+                    next.leads = { ...(a.leads as Record<string, unknown>), ...(fields.leads as Record<string, unknown>) } as unknown as typeof a.leads;
+                }
+                return next;
+            })
+        };
+    }),
+    removeDemoAuctionById: (auctionId: string) => set((state: RealtimeState) => ({
+        demoAuctions: state.demoAuctions.filter(a => a.id !== auctionId)
+    })),
 
     removeAuctionById: (auctionId: string) => set((state: RealtimeState) => {
         return {

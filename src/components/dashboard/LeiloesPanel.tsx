@@ -16,7 +16,7 @@ import { BRAZIL_STATES } from "@/lib/br-states";
 
 type AuctionWithLeadLocal = AuctionWithLead;
 
-export default function LeiloesPanel() {
+export default function LeiloesPanel({ setDemoLead }: { setDemoLead: (lead: LeadForAuction) => void }) {
   const { data: session } = useSession();
   const activeAuctions = useRealtimeStore(
     (s: RealtimeState) => s.activeAuctions
@@ -24,10 +24,13 @@ export default function LeiloesPanel() {
   const removeAuctionById = useRealtimeStore(
     (s: RealtimeState) => s.removeAuctionById
   );
+  const addDemoWonLead = useRealtimeStore((s) => (s as unknown as { addDemoWonLead: (l: LeadForAuction) => void }).addDemoWonLead);
+  const removeDemoAuctionById = useRealtimeStore((s) => (s as unknown as { removeDemoAuctionById: (id: string) => void }).removeDemoAuctionById);
   const [selectedAuction, setSelectedAuction] =
     useState<AuctionWithLeadLocal | null>(null);
   const [revFilter, setRevFilter] = useState<RevenueFilterValue>({ sort: "none" });
   const [demoAuctions, setDemoAuctions] = useState<AuctionWithLeadLocal[]>([]);
+  const setDemoAuctionsGlobal = useRealtimeStore((s) => (s as unknown as { setDemoAuctions: (a: AuctionWithLeadLocal[]) => void }).setDemoAuctions);
   const [isFiltering, setIsFiltering] = useState(false);
   const bidsByAuctionStore = useRealtimeStore(
     (s: RealtimeState) => s.bidsByAuction
@@ -43,8 +46,16 @@ export default function LeiloesPanel() {
     return m;
   }, []);
 
+  const globalDemoAuctions = useRealtimeStore((s) => (s as unknown as { demoAuctions: AuctionWithLeadLocal[] }).demoAuctions) as AuctionWithLeadLocal[];
+
+  useEffect(() => {
+    if (globalDemoAuctions && globalDemoAuctions.length > 0 && demoAuctions.length === 0) {
+      setDemoAuctions(globalDemoAuctions);
+    }
+  }, [globalDemoAuctions, demoAuctions.length]);
+
   const { sortedAuctions, availableStateUFs } = useMemo(() => {
-    const source = [...activeAuctions, ...demoAuctions];
+    const source = [...activeAuctions, ...(globalDemoAuctions.length ? globalDemoAuctions : demoAuctions)];
     if (!source || source.length === 0) {
       return { sortedAuctions: [] as AuctionWithLead[], availableStateUFs: [] as string[] };
     }
@@ -98,7 +109,7 @@ export default function LeiloesPanel() {
       .filter(Boolean) as AuctionWithLead[];
 
     return { sortedAuctions: auctions, availableStateUFs: availableUFs };
-  }, [activeAuctions, demoAuctions, revFilter.min, revFilter.max, revFilter.locationQuery, revFilter.sort, ufToName]);
+  }, [activeAuctions, demoAuctions, globalDemoAuctions, revFilter.min, revFilter.max, revFilter.locationQuery, revFilter.sort, ufToName]);
 
 
   const noResults = sortedAuctions.length === 0 && (activeAuctions.length + demoAuctions.length) > 0 && (revFilter.locationQuery?.trim() || "").length > 0;
@@ -107,19 +118,18 @@ export default function LeiloesPanel() {
     if (auctionId.startsWith('demo-')) {
       ToastBus.notifyAuctionExpired(auctionId);
       const bids = bidsByAuctionStore[auctionId] || [];
-      const top = [...bids].sort((a, b) => b.amount - a.amount)[0];
       const currentUserId = session?.user?.id;
       const userParticipated = bids.some(b => b.userId === currentUserId);
-      if (top && currentUserId && top.userId === currentUserId) {
+      const demoAuction = demoAuctions.find(a => a.id === auctionId);
+      if (userParticipated && demoAuction) {
         ToastBus.notifyAuctionWon(auctionId);
-      } else if (userParticipated) {
+        try { setDemoLead(demoAuction.leads as LeadForAuction); } catch { }
+        try { addDemoWonLead(demoAuction.leads as LeadForAuction); } catch { }
+      } else if (!userParticipated) {
         ToastBus.notifyAuctionLost(auctionId);
       }
       setDemoAuctions(prev => prev.filter(a => a.id !== auctionId));
-      setTimeout(() => {
-        const clearDemo = useRealtimeStore.getState().clearDemoMode;
-        clearDemo();
-      }, 0);
+      try { removeDemoAuctionById(auctionId); } catch { }
       return;
     }
     removeAuctionById(auctionId);
@@ -196,6 +206,7 @@ export default function LeiloesPanel() {
       const id = anyE?.detail?.id;
       if (!id) return;
       setDemoAuctions(prev => prev.filter(a => a.id === id ? false : true));
+      try { removeDemoAuctionById(id); } catch { }
     };
     window.addEventListener('demo-auction-closed', onDemoClosed as unknown as EventListener);
     return () => window.removeEventListener('demo-auction-closed', onDemoClosed as unknown as EventListener);
@@ -243,8 +254,11 @@ export default function LeiloesPanel() {
       }
       return a;
     });
-    if (changed) setDemoAuctions(next);
-  }, [bidsByAuctionStore, demoAuctions]);
+    if (changed) {
+      setDemoAuctions(next);
+      try { setDemoAuctionsGlobal(next); } catch { }
+    }
+  }, [bidsByAuctionStore, demoAuctions, setDemoAuctionsGlobal]);
 
   return (
     <>
@@ -302,7 +316,11 @@ export default function LeiloesPanel() {
       {(session?.user?.email === 'yago@assessorialpha.com' || session?.user?.email === 'maxwell.tech@assessorialpha.com') && (
         <DemoAuctionsButton
           visible={demoAuctions.length === 0}
-          onCreate={(auctions) => setDemoAuctions(auctions as AuctionWithLeadLocal[])}
+          onCreate={(auctions) => {
+            const arr = auctions as AuctionWithLeadLocal[];
+            setDemoAuctions(arr);
+            try { setDemoAuctionsGlobal(arr); } catch { }
+          }}
         />
       )}
       {selectedAuction && (
@@ -311,6 +329,9 @@ export default function LeiloesPanel() {
           lead={selectedAuction.leads}
           user={user}
           onClose={() => setSelectedAuction(null)}
+          onDemoWin={(wonLead) => {
+            try { setDemoLead(wonLead as LeadForAuction); } catch { }
+          }}
         />
       )}
     </>

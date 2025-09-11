@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useSession } from "next-auth/react";
 import { ToastBus } from "@/lib/toastBus";
@@ -28,6 +28,8 @@ export default function Dashboard({
   const { data: session } = useSession();
   const userId = session?.user?.id;
   const userIdRef = useRef<string | undefined>(undefined);
+  const [demoLead, setDemoLead] = useState<LeadForAuction | null>(null);
+  // demoLead is passed to MeusLeadsPanel
   const bidsByAuctionRef = useRef<
     Record<string, { userId: string; id: string }[]>
   >({});
@@ -349,10 +351,10 @@ export default function Dashboard({
           <CreditosPanel currentCredits={userCredits} />
         </TabsContent>
         <TabsContent value="meus-leads">
-          <MeusLeadsPanel />
+          <MeusLeadsPanel demoLead={demoLead} />
         </TabsContent>
         <TabsContent value="leiloes">
-          <LeiloesPanel />
+          <LeiloesPanel setDemoLead={setDemoLead} />
         </TabsContent>
         <TabsContent value="info">
           <InfoPanel />

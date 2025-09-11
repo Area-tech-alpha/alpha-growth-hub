@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { CountdownTimer } from "../leads/CountdownTimer";
 import { Lead } from "../leads/types";
-import { Bid, AuctionWithLead } from "./types";
+import { Bid, AuctionWithLead, LeadForAuction } from "./types";
 import { ToastBus } from "@/lib/toastBus";
 import { useRealtimeStore } from "@/store/realtime-store";
 
@@ -37,6 +37,7 @@ interface AuctionModalProps {
     lead: Lead;
     onClose: () => void;
     user: { id?: string; name: string };
+    onDemoWin?: (lead: Lead) => void;
 }
 
 const EMPTY_BIDS: Bid[] = [];
@@ -46,6 +47,7 @@ export const AuctionModal = ({
     lead,
     onClose,
     user,
+    onDemoWin,
 }: AuctionModalProps) => {
     const [isAuctionActive, setIsAuctionActive] = useState(
         new Date(lead.expires_at).getTime() > Date.now()
@@ -61,8 +63,10 @@ export const AuctionModal = ({
     const demoHolds = useRealtimeStore((s) => s.demoHolds);
     const realUserCredits = useRealtimeStore((s) => s.userCredits);
     const activeAuctions = useRealtimeStore((s) => s.activeAuctions) as AuctionWithLead[];
-    const updateAuctionFields = useRealtimeStore((s) => s.updateAuctionFields);
+    type UpdateFields = Partial<Omit<AuctionWithLead, 'leads'>> & { leads?: Partial<LeadForAuction> };
+    const updateDemoAuctionFields = useRealtimeStore((s) => (s as unknown as { updateDemoAuctionFields: (id: string, f: UpdateFields) => void }).updateDemoAuctionFields) as (id: string, f: UpdateFields) => void;
     const isDemoAuction = auctionId.startsWith('demo-');
+    const addDemoWonLead = useRealtimeStore((s) => (s as unknown as { addDemoWonLead: (l: LeadForAuction & { demo_price?: number }) => void }).addDemoWonLead) as (lead: LeadForAuction & { demo_price?: number }) => void;
     const demoAvailable = Math.max(0, demoCredits - Object.values(demoHolds || {}).reduce((a, b) => a + (Number(b) || 0), 0));
     const userCredits = demoModeActive && isDemoAuction ? demoAvailable : realUserCredits;
     const setDemoHold = useRealtimeStore((s) => s.setDemoHold);
@@ -105,11 +109,18 @@ export const AuctionModal = ({
     const handleExpire = () => {
         setIsAuctionActive(false);
 
-        const sortedBids = [...bidsFromStore].sort((a, b) => b.amount - a.amount);
-        const lastBid = sortedBids[0];
         const currentUserId = user.id;
-        if (currentUserId && lastBid && lastBid.userId === currentUserId) {
+        const userParticipated = bidsFromStore.some(b => b.userId === currentUserId);
+        if (isDemoAuction && userParticipated) {
             setHasWon(true);
+            try { onDemoWin?.(lead); } catch { }
+            try { addDemoWonLead({ ...(lead as LeadForAuction), demo_price: currentBid || 0 }); } catch { }
+        } else if (!isDemoAuction) {
+            const sortedBids = [...bidsFromStore].sort((a, b) => b.amount - a.amount);
+            const lastBid = sortedBids[0];
+            if (currentUserId && lastBid && lastBid.userId === currentUserId) {
+                setHasWon(true);
+            }
         }
         onClose();
     };
@@ -187,7 +198,7 @@ export const AuctionModal = ({
                 updateAuctionStatsFromBid(auctionId, amount);
                 // Segue a mesma regra do real: próximo lance mínimo = ceil(lance * 1.10)
                 const nextMinimum = Math.ceil(amount * 1.10);
-                updateAuctionFields(auctionId, { minimum_bid: nextMinimum });
+                updateDemoAuctionFields(auctionId, { minimum_bid: nextMinimum });
                 // Anti-sniping demo: se faltar 31–60s, volta para 60s; se 0–30s, volta para 30s
                 try {
                     const nowMs = Date.now();
@@ -198,7 +209,7 @@ export const AuctionModal = ({
                         const extendToMs = remainingMs > 30_000 ? 60_000 : 30_000;
                         const newExpiryIso = new Date(nowMs + extendToMs).toISOString();
                         // Atualiza auction e também leads.expires_at (store já reflete, mas forçamos aqui também para o modal)
-                        updateAuctionFields(auctionId, { expired_at: newExpiryIso, leads: { expires_at: newExpiryIso } });
+                        updateDemoAuctionFields(auctionId, { expired_at: newExpiryIso, leads: { expires_at: newExpiryIso } });
                     }
                 } catch { }
                 setDemoHold(auctionId, amount);
@@ -280,6 +291,8 @@ export const AuctionModal = ({
                 try {
                     window.dispatchEvent(new CustomEvent('demo-auction-closed', { detail: { id: auctionId } }));
                 } catch { }
+                try { onDemoWin?.(lead); } catch { }
+                try { addDemoWonLead({ ...(lead as LeadForAuction), demo_price: buyNowAmount }); } catch { }
                 onClose();
                 setConfirmBuyNowOpen(false);
                 return;
