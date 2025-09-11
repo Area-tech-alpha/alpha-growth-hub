@@ -10,6 +10,7 @@ import { useSession } from "next-auth/react";
 import LogoutButton from "./LogoutButton";
 import { useTheme } from "next-themes";
 import { useRealtimeStore } from "@/store/realtime-store";
+import Link from "next/link";
 
 
 type HeaderProps = {
@@ -87,9 +88,9 @@ export default function Header({
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between items-center h-16">
                     <div className="flex items-center space-x-3">
-                        <a href="#home" className="relative group flex items-center">
+                        <Link href="/" className="relative group flex items-center">
                             <Logo width={120} height={40} />
-                        </a>
+                        </Link>
                     </div>
 
                     <div className="flex items-center space-x-3 sm:space-x-4">
@@ -142,9 +143,9 @@ export default function Header({
                                     <DialogTitle className="sr-only">Menu</DialogTitle>
                                     <DialogDescription className="sr-only">Ações do usuário</DialogDescription>
                                     <div className="flex items-center justify-between pb-3 border-b pr-10">
-                                        <a href="#home" className="relative group flex items-center">
+                                        <Link href="/" className="relative group flex items-center">
                                             <Logo width={110} height={36} />
-                                        </a>
+                                        </Link>
                                         <div className="flex items-center gap-2 bg-yellow-50 dark:bg-yellow-900/20 px-3 py-1 rounded-lg border border-yellow-200 dark:border-yellow-700">
                                             <LuCoins className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                                             <span className="font-semibold text-yellow-900 dark:text-yellow-200">
