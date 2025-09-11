@@ -14,6 +14,9 @@ export default function InfoPanel() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                    <div className="flex justify-end">
+                        <a href="/termos" className="text-xs underline text-yellow-600 hover:text-yellow-700">Termos de Uso e Privacidade</a>
+                    </div>
                     <section className="space-y-2">
                         <h3 className="text-lg font-semibold">O que é</h3>
                         <p className="text-muted-foreground">

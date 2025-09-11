@@ -210,7 +210,7 @@ export default function LeiloesPanel({ setDemoLead }: { setDemoLead: (lead: Lead
     };
     window.addEventListener('demo-auction-closed', onDemoClosed as unknown as EventListener);
     return () => window.removeEventListener('demo-auction-closed', onDemoClosed as unknown as EventListener);
-  }, []);
+  }, [removeDemoAuctionById]);
 
   // Keep selectedAuction in sync with latest store updates (e.g., expired_at changes)
   useEffect(() => {

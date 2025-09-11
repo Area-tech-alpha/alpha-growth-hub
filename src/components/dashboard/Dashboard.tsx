@@ -16,6 +16,7 @@ import type { RealtimeState } from "@/store/realtime-store";
 import type { Bid, AuctionWithLead, AuctionRecord, LeadForAuction } from "./leiloes/types";
 import LeiloesPanel from "./LeiloesPanel";
 import InfoPanel from "./InfoPanel";
+import { TermsGate } from "@/components/TermsGate";
 
 export default function Dashboard({
   initialAuctions,
@@ -320,46 +321,48 @@ export default function Dashboard({
     };
   }, [userId, fetchUserLeads, subscribeToUserLeads, unsubscribeFromUserLeads]);
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      <Tabs defaultValue={activeAuctions.length > 0 ? "leiloes" : "creditos"} className="w-full">
-        <TabsList className="pb-3 px-4 mt-2 w-full justify-center sm:justify-start">
-          <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-start [--tab-row-gap:0.5rem]">
-            <TabsTrigger value="creditos" className="flex items-center gap-2">
-              <CiCreditCard1 className="size-4" />
-              Créditos
-            </TabsTrigger>
-            <TabsTrigger value="meus-leads" className="flex items-center gap-2">
-              <FiShoppingBag className="size-4" />
-              Meus Leads
-            </TabsTrigger>
-            <TabsTrigger value="leiloes" className="flex items-center">
-              <IoMdTrendingUp className="mr-2" />
-              <span>Leilões</span>
-              {activeAuctions.length > 0 && (
-                <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-yellow-400 text-xs font-semibold text-black">
-                  {activeAuctions.length}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="info" className="flex items-center gap-2">
-              <FiInfo className="size-4" />
-              Como funciona
-            </TabsTrigger>
-          </div>
-        </TabsList>
-        <TabsContent value="creditos">
-          <CreditosPanel currentCredits={userCredits} />
-        </TabsContent>
-        <TabsContent value="meus-leads">
-          <MeusLeadsPanel demoLead={demoLead} />
-        </TabsContent>
-        <TabsContent value="leiloes">
-          <LeiloesPanel setDemoLead={setDemoLead} />
-        </TabsContent>
-        <TabsContent value="info">
-          <InfoPanel />
-        </TabsContent>
-      </Tabs>
-    </div>
+    <TermsGate>
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <Tabs defaultValue={activeAuctions.length > 0 ? "leiloes" : "creditos"} className="w-full">
+          <TabsList className="pb-3 px-4 mt-2 w-full justify-center sm:justify-start">
+            <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-start [--tab-row-gap:0.5rem]">
+              <TabsTrigger value="creditos" className="flex items-center gap-2">
+                <CiCreditCard1 className="size-4" />
+                Créditos
+              </TabsTrigger>
+              <TabsTrigger value="meus-leads" className="flex items-center gap-2">
+                <FiShoppingBag className="size-4" />
+                Meus Leads
+              </TabsTrigger>
+              <TabsTrigger value="leiloes" className="flex items-center">
+                <IoMdTrendingUp className="mr-2" />
+                <span>Leilões</span>
+                {activeAuctions.length > 0 && (
+                  <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-yellow-400 text-xs font-semibold text-black">
+                    {activeAuctions.length}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="info" className="flex items-center gap-2">
+                <FiInfo className="size-4" />
+                Como funciona
+              </TabsTrigger>
+            </div>
+          </TabsList>
+          <TabsContent value="creditos">
+            <CreditosPanel currentCredits={userCredits} />
+          </TabsContent>
+          <TabsContent value="meus-leads">
+            <MeusLeadsPanel demoLead={demoLead} />
+          </TabsContent>
+          <TabsContent value="leiloes">
+            <LeiloesPanel setDemoLead={setDemoLead} />
+          </TabsContent>
+          <TabsContent value="info">
+            <InfoPanel />
+          </TabsContent>
+        </Tabs>
+      </div>
+    </TermsGate>
   );
 }

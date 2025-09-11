@@ -166,6 +166,7 @@ model users {
   leads               leads[]
   ledger_entries      ledger_entries[]
   checkout_sessions   checkout_sessions[]
+  accepted_terms_at   DateTime?             @db.Timestamptz(6)
 
   accounts Account[]
   sessions Session[]
