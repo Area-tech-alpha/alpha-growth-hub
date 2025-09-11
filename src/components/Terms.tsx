@@ -8,7 +8,7 @@ export default function Terms() {
             <div className="max-w-4xl mx-auto bg-card text-card-foreground p-6 sm:p-8 md:p-10 rounded-lg border">
 
                 <h1 className="text-3xl sm:text-4xl font-bold text-yellow-600 mb-4">
-                    Termos de Uso e Política de Reembolso - ALPHA Growth Hub
+                    Termos de Uso e Privacidade
                 </h1>
                 <p className="text-muted-foreground mb-8 text-justify">
                     A Plataforma ALPHA Growth Hub é um ambiente digital exclusivo, desenvolvido e disponibilizado pela Alpha Franchising, com o objetivo de fornecer aos franqueados recursos para aquisição de leads qualificados e contratos fechados, visando acelerar o processo de prospecção, conversão e expansão de resultados dentro da rede. O uso da plataforma está sujeito às condições previstas nesta Política de Uso e Reembolso, de caráter complementar ao Contrato de Franquia, às normas internas da rede e à legislação vigente.

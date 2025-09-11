@@ -17,6 +17,7 @@ import type { Bid, AuctionWithLead, AuctionRecord, LeadForAuction } from "./leil
 import LeiloesPanel from "./LeiloesPanel";
 import InfoPanel from "./InfoPanel";
 import { TermsGate } from "@/components/TermsGate";
+import Link from "next/link";
 
 export default function Dashboard({
   initialAuctions,
@@ -362,6 +363,12 @@ export default function Dashboard({
             <InfoPanel />
           </TabsContent>
         </Tabs>
+        <footer className="mt-8 border-t pt-4 text-center text-sm text-muted-foreground">
+          <span>Conheça nossos </span>
+          <Link href="/termos" className="underline underline-offset-2 hover:text-foreground">
+            Termos de Uso e Privacidade
+          </Link>
+        </footer>
       </div>
     </TermsGate>
   );
