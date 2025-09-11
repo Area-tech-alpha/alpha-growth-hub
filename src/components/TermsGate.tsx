@@ -46,7 +46,7 @@ export function TermsGate({ children }: { children: React.ReactNode }) {
                 <Dialog open={open} onOpenChange={() => { /* locked */ }}>
                     <DialogContent className="max-w-3xl">
                         <DialogHeader>
-                            <DialogTitle>Termos de Uso e Política de Reembolso</DialogTitle>
+                            <DialogTitle>Termos de Uso e Privacidade</DialogTitle>
                         </DialogHeader>
                         <div className="prose max-h-[60vh] overflow-y-auto text-sm">
                             <Terms />
