@@ -1,6 +1,31 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
+import type { auctions as AuctionsModel, leads as LeadsModel } from '@prisma/client'
+
+type CloseAuctionExpiredBody = {
+    outcome: 'expired_no_bids'
+    auction: AuctionsModel | null
+    lead: LeadsModel
+    triggerColdWebhook: boolean
+}
+type CloseAuctionWonBody = {
+    outcome: 'won'
+    auction: AuctionsModel | null
+    lead: LeadsModel
+    winningBidId: string
+}
+type CloseAuctionAlreadyClosedBody = { outcome: 'already_closed'; error: string }
+type CloseAuctionErrorBody = { error: string }
+type CloseAuctionResultBody =
+    | CloseAuctionExpiredBody
+    | CloseAuctionWonBody
+    | CloseAuctionAlreadyClosedBody
+    | CloseAuctionErrorBody
+type TransactionResult = { status: 200 | 404 | 409; body: CloseAuctionResultBody }
+
+const isExpiredNoBids = (body: CloseAuctionResultBody): body is CloseAuctionExpiredBody =>
+    'outcome' in body && body.outcome === 'expired_no_bids'
 
 export async function POST(
     _request: Request,
@@ -12,7 +37,7 @@ export async function POST(
     }
 
     try {
-        const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        const result = await prisma.$transaction<TransactionResult>(async (tx: Prisma.TransactionClient) => {
             const toNum = (v: unknown): number => {
                 if (v == null) return 0
                 const anyV = v as { toNumber?: () => number }
@@ -60,7 +85,16 @@ export async function POST(
                 })
                 const updatedAuction = await tx.auctions.findUnique({ where: { id: auctionId } })
                 console.log('[close-auction] no bids, marked expired', { auctionId })
-                return { status: 200 as const, body: { auction: updatedAuction, lead: updatedLead, outcome: 'expired_no_bids' as const } }
+                // Include flag to trigger webhook when original lead status was 'cold'
+                return {
+                    status: 200 as const,
+                    body: {
+                        auction: updatedAuction,
+                        lead: updatedLead,
+                        outcome: 'expired_no_bids' as const,
+                        triggerColdWebhook: currentLeadStatus === 'cold'
+                    }
+                }
             }
 
             // Idempotency guard: only transition from open -> closed_won once
@@ -112,7 +146,32 @@ export async function POST(
             console.log('[close-auction] debited winner balance', { userId: topBid.user_id, before: winnerBalance, amount: winningAmount, after: String(nextBalance) })
 
             return { status: 200 as const, body: { auction: updatedAuction, lead: updatedLead, outcome: 'won' as const, winningBidId: topBid.id } }
-        })
+        }, { timeout: 15000 })
+
+        // If an auction expired without bids and the original lead status was 'cold',
+        // send the lead information to the external webhook.
+        try {
+            if (
+                result.status === 200 &&
+                isExpiredNoBids(result.body) &&
+                result.body.triggerColdWebhook
+            ) {
+                const webhookUrl = 'https://webhook3.assessorialpha.com/webhook/growthhub'
+                const payload = {
+                    event: 'lead_expired_cold',
+                    auction: result.body.auction,
+                    lead: result.body.lead
+                }
+                await fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                })
+                console.log('[close-auction] webhook sent for cold lead expiration', { auctionId })
+            }
+        } catch (webhookError) {
+            console.error('[close-auction] webhook error', webhookError)
+        }
 
         return NextResponse.json(result.body, { status: result.status })
     } catch (error: unknown) {
