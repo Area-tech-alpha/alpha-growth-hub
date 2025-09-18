@@ -52,7 +52,6 @@ export async function POST(
                 where: { id: auctionId },
                 include: { leads: true }
             })
-            console.log('[close-auction] start', { auctionId, hasAuction: !!auction })
 
             if (!auction) {
                 console.warn('[close-auction] auction not found', { auctionId })
@@ -63,7 +62,6 @@ export async function POST(
                 where: { auction_id: auctionId },
                 orderBy: [{ amount: 'desc' }, { created_at: 'desc' }]
             })
-            console.log('[close-auction] topBid', { hasTopBid: !!topBid, topBidId: topBid?.id, user: topBid?.user_id, amount: String(topBid?.amount || '') })
 
             if (!topBid) {
                 const currentLeadStatus = auction.leads?.status || 'cold'
@@ -84,7 +82,6 @@ export async function POST(
                     data: { status: nextLeadStatus }
                 })
                 const updatedAuction = await tx.auctions.findUnique({ where: { id: auctionId } })
-                console.log('[close-auction] no bids, marked expired', { auctionId })
                 // Include flag to trigger webhook when original lead status was 'cold'
                 return {
                     status: 200 as const,
@@ -114,18 +111,15 @@ export async function POST(
                     data: { status: 'sold', owner_id: topBid.user_id }
                 })
             ])
-            console.log('[close-auction] marked closed_won and lead sold', { auctionId, winningBidId: topBid.id, winnerUserId: topBid.user_id })
 
             // Consume winner's hold and release others
             const holdsForAuction = await tx.credit_holds.findMany({ where: { auction_id: auctionId, status: 'active' } })
             const winningAmount = toNum(topBid.amount as unknown)
-            console.log('[close-auction] active holds found', { auctionId, count: holdsForAuction.length, winningAmount })
 
             // Mark winner hold as consumed
             const winnerHold = holdsForAuction.find(h => h.user_id === topBid.user_id)
             if (winnerHold) {
                 await tx.credit_holds.update({ where: { id: winnerHold.id }, data: { status: 'consumed', updated_at: new Date() as unknown as Date } })
-                console.log('[close-auction] winner hold consumed', { holdId: winnerHold.id, userId: topBid.user_id })
             } else {
                 console.warn('[close-auction] winner hold not found', { auctionId, winnerUserId: topBid.user_id })
             }
@@ -135,7 +129,6 @@ export async function POST(
             if (losers.length > 0) {
                 const loserIds = losers.map(h => h.id)
                 await tx.credit_holds.updateMany({ where: { id: { in: loserIds } }, data: { status: 'released', updated_at: new Date() as unknown as Date } })
-                console.log('[close-auction] loser holds released', { auctionId, releasedCount: losers.length })
             }
 
             // Deduct credits from winner balance equal to winning amount
@@ -143,7 +136,6 @@ export async function POST(
             const winnerBalance = toNum(winner?.credit_balance as unknown)
             const nextBalance = new Prisma.Decimal(winnerBalance).minus(new Prisma.Decimal(winningAmount))
             await tx.users.update({ where: { id: topBid.user_id }, data: { credit_balance: nextBalance } })
-            console.log('[close-auction] debited winner balance', { userId: topBid.user_id, before: winnerBalance, amount: winningAmount, after: String(nextBalance) })
 
             return { status: 200 as const, body: { auction: updatedAuction, lead: updatedLead, outcome: 'won' as const, winningBidId: topBid.id } }
         }, { timeout: 15000 })
@@ -167,7 +159,6 @@ export async function POST(
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 })
-                console.log('[close-auction] webhook sent for cold lead expiration', { auctionId })
             }
         } catch (webhookError) {
             console.error('[close-auction] webhook error', webhookError)
