@@ -64,15 +64,31 @@ export const authOptions: NextAuthOptions = {
             }
             return true;
         },
-        async jwt({ token, user }) {
+        async jwt({ token, user, account }) {
             if (user) {
                 token.id = user.id;
+            }
+            // Expose Google id_token on initial login so the client can bridge to Supabase Auth
+            if (account && account.provider === 'google') {
+                // id_token is needed for supabase.auth.signInWithIdToken({ provider: 'google' })
+                const maybeIdToken = (account as unknown as { id_token?: string }).id_token
+                if (maybeIdToken) {
+                    ; (token as Record<string, unknown>).supabaseIdToken = maybeIdToken
+                        ; (token as Record<string, unknown>).supabaseProvider = 'google'
+                }
             }
             return token;
         },
         async session({ session, token }) {
             if (session.user) {
                 session.user.id = token.id as string;
+            }
+            // Pass through the temporary id_token to allow client to establish Supabase session.
+            // It is short-lived and only needed once; Supabase will persist its own session.
+            const t = token as unknown as { supabaseIdToken?: string; supabaseProvider?: string }
+            if (t.supabaseIdToken) {
+                session.supabaseIdToken = t.supabaseIdToken
+                session.supabaseProvider = t.supabaseProvider
             }
             return session;
         },
