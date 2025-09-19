@@ -24,7 +24,16 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Valor inválido. Deve ser entre R$ 10,00 e R$ 50.000,00' }, { status: 400 });
         }
 
-        const customer = await fetch(`${ASAAS_API_URL}/customers?email=${session.user.email}`).then(res => res.json());
+        const customer = await fetch(`${ASAAS_API_URL}/customers?email=${session.user.email}`, {
+            method: 'GET',
+            headers: {
+                'accept': 'application/json',
+                'access_token': ASAAS_API_KEY,
+                'content-type': 'application/json',
+            },
+        }).then((res) => (
+            res.ok ? res.json() : console.error('Erro ao buscar cliente no Asaas:', res.statusText)
+        ));
 
         console.log(customer);
 
