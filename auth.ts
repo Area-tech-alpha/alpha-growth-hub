@@ -4,6 +4,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/prisma"
 import { randomUUID } from "crypto"
 import type { Adapter, AdapterUser } from "next-auth/adapters"
+import { createAdminClient } from "@/utils/supabase/admin"
 
 
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
@@ -101,14 +102,17 @@ export const authOptions: NextAuthOptions = {
         async signIn({ user }) {
             try {
                 if (!user?.id) return;
-                await prisma.$executeRawUnsafe(
-                    'insert into public.users (id, name, email, email_verified, avatar_url) values ($1, $2, $3, $4, $5) on conflict (id) do update set name = coalesce(excluded.name, public.users.name), email = coalesce(excluded.email, public.users.email), email_verified = coalesce(excluded.email_verified, public.users.email_verified), avatar_url = coalesce(excluded.avatar_url, public.users.avatar_url)',
-                    user.id,
-                    user.name ?? null,
-                    user.email ?? null,
-                    null,
-                    user.image ?? null
-                );
+                const admin = createAdminClient();
+                const upsert = {
+                    id: user.id,
+                    name: user.name ?? null,
+                    email: user.email ?? null,
+                    avatar_url: user.image ?? null
+                } as { id: string; name?: string | null; email?: string | null; avatar_url?: string | null }
+                const { error } = await admin.from('users').upsert(upsert, { onConflict: 'id' });
+                if (error) {
+                    console.error('[NextAuth][events.signIn] supabase admin upsert failed:', error);
+                }
             } catch (err) {
                 console.error('[NextAuth][events.signIn] upsert users failed:', err);
             }
