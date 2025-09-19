@@ -24,6 +24,10 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Valor inválido. Deve ser entre R$ 10,00 e R$ 50.000,00' }, { status: 400 });
         }
 
+        const customer = await fetch(`${ASAAS_API_URL}/customers?email=${session.user.email}`).then(res => res.json());
+
+        console.log(customer);
+
         const credits = Math.floor(amount);
         const internalCheckoutId = uuidv4();
         const externalReference = `ck:${internalCheckoutId}|uid:${session.user.id}`;
@@ -31,19 +35,8 @@ export async function POST(request: Request) {
         const checkoutData = {
             billingTypes: ['CREDIT_CARD', 'PIX'],
             chargeTypes: ['DETACHED', 'INSTALLMENT'],
+            customer: customer.id ? customer.id : null,
             installment: { 'maxInstallmentCount': 3 },
-            // customerData: {
-            //     name: session.user.name,
-            //     email: session.user.email,
-            //     cpfCnpj: "",
-            //     phone: "",
-            //     address: "",
-            //     addressNumber: 0,
-            //     complement: "",
-            //     province: "",
-            //     postalCode: "",
-            //     city: 0
-            // },
             dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             externalReference: externalReference,
             minutesToExpire: 60,
