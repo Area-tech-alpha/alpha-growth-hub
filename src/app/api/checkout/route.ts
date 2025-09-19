@@ -63,6 +63,7 @@ export async function POST(request: Request) {
                 console.error('Erro ao criar cliente no Asaas:', createRes.status, createRes.statusText, errorData);
             } else {
                 const created = await createRes.json();
+                console.log('Cliente criado:', created);
                 customerId = created?.id ?? null;
                 console.log('Cliente criado com sucesso no Asaas:', customerId);
             }
