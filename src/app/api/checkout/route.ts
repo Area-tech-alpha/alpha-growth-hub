@@ -44,7 +44,7 @@ export async function POST(request: Request) {
         const checkoutData = {
             billingTypes: ['CREDIT_CARD', 'PIX'],
             chargeTypes: ['DETACHED', 'INSTALLMENT'],
-            customer: customer.id ? customer.id : null,
+            customer: customer.data.id ? customer.data.id : null,
             installment: { 'maxInstallmentCount': 3 },
             dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             externalReference: externalReference,
