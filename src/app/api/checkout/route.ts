@@ -35,7 +35,7 @@ export async function POST(request: Request) {
             res.ok ? res.json() : console.error('Erro ao buscar cliente no Asaas:', res.statusText)
         ));
 
-        console.log(customer);
+        console.log(customer.data[0]);
 
         const credits = Math.floor(amount);
         const internalCheckoutId = uuidv4();
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
         const checkoutData = {
             billingTypes: ['CREDIT_CARD', 'PIX'],
             chargeTypes: ['DETACHED', 'INSTALLMENT'],
-            customer: customer.data.id ? customer.data.id : null,
+            customer: customer.data[0].id ? customer.data[0].id : null,
             installment: { 'maxInstallmentCount': 3 },
             dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             externalReference: externalReference,
