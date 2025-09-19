@@ -7,7 +7,7 @@ type CloseAuctionExpiredBody = {
     outcome: 'expired_no_bids'
     auction: AuctionsModel | null
     lead: LeadsModel
-    triggerColdWebhook: boolean
+    triggerWebhook: boolean
 }
 type CloseAuctionWonBody = {
     outcome: 'won'
@@ -82,14 +82,14 @@ export async function POST(
                     data: { status: nextLeadStatus }
                 })
                 const updatedAuction = await tx.auctions.findUnique({ where: { id: auctionId } })
-                // Include flag to trigger webhook when original lead status was 'cold'
+                // Include flag to trigger webhook when auction expires without bids (cold or hot)
                 return {
                     status: 200 as const,
                     body: {
                         auction: updatedAuction,
                         lead: updatedLead,
                         outcome: 'expired_no_bids' as const,
-                        triggerColdWebhook: currentLeadStatus === 'cold'
+                        triggerWebhook: currentLeadStatus === 'cold' || currentLeadStatus === 'hot'
                     }
                 }
             }
@@ -146,7 +146,7 @@ export async function POST(
             if (
                 result.status === 200 &&
                 isExpiredNoBids(result.body) &&
-                result.body.triggerColdWebhook
+                result.body.triggerWebhook
             ) {
                 const webhookUrl = 'https://webhook3.assessorialpha.com/webhook/growthhub'
                 const payload = {
