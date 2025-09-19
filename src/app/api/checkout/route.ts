@@ -23,7 +23,6 @@ export async function POST(request: Request) {
         if (!amount || amount < 10 || amount > 50000) {
             return NextResponse.json({ error: 'Valor inválido. Deve ser entre R$ 10,00 e R$ 50.000,00' }, { status: 400 });
         }
-        const customerName = (session.user.name ?? 'Cliente').substring(0, 30);
 
         const credits = Math.floor(amount);
         const internalCheckoutId = uuidv4();
@@ -31,8 +30,12 @@ export async function POST(request: Request) {
 
         const checkoutData = {
             billingTypes: ['CREDIT_CARD', 'PIX'],
-            chargeTypes: ['DETACHED'],
-            name: customerName,
+            chargeTypes: ['DETACHED', 'INSTALLMENT'],
+            installment: { 'maxInstallmentCount': 3 },
+            customerData: {
+                name: session.user.name,
+                email: session.user.email,
+            },
             dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             externalReference: externalReference,
             minutesToExpire: 60,
@@ -43,7 +46,7 @@ export async function POST(request: Request) {
             },
             items: [
                 {
-                    name: `Créditos Alpha Lead Broker`,
+                    name: `Créditos Alpha Growth Hub`,
                     description: `Compra de ${credits.toLocaleString()} créditos`,
                     quantity: 1,
                     value: amount
