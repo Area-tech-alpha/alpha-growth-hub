@@ -35,6 +35,14 @@ export async function POST(request: Request) {
             customerData: {
                 name: session.user.name,
                 email: session.user.email,
+                cpfCnpj: "",
+                phone: "",
+                address: "",
+                addressNumber: 0,
+                complement: "",
+                province: "",
+                postalCode: "",
+                city: 0
             },
             dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             externalReference: externalReference,
