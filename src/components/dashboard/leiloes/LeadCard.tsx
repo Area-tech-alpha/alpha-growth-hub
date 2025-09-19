@@ -21,7 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { CountdownTimer } from "../leads/CountdownTimer";
 import { Lead } from "../leads/types";
-import { maskPhone } from "@/lib/mask";
+import { maskName, maskPhone, maskCNPJ } from "@/lib/mask";
 
 interface LeadCardProps {
   lead: Lead;
@@ -45,8 +45,8 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
   };
 
   const isHot = lead.status === "hot";
-  const documentUrl = (lead as unknown as { document_url?: string })?.document_url;
-  const contractUrl = (lead as unknown as { contract_url?: string })?.contract_url;
+  const documentUrl = undefined;
+  const contractUrl = undefined;
 
   return (
     <>
@@ -83,8 +83,8 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
                   <span>HOT</span>
                 </div>
               )}
-              <CardTitle className="text-lg font-bold text-yellow-600 truncate flex-1" title={lead.company_name}>
-                {lead.company_name}
+              <CardTitle className="text-lg font-bold text-yellow-600 truncate flex-1" title={maskName(lead.company_name)}>
+                {maskName(lead.company_name)}
               </CardTitle>
             </div>
             <div className="flex-shrink-0">
@@ -134,7 +134,7 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
                 <div>
                   <div className="text-muted-foreground">Empresa</div>
                   <div className="font-semibold">
-                    {lead.company_name}
+                    {maskName(lead.company_name)}
                   </div>
                 </div>
               </div>
@@ -143,7 +143,7 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
                 <div>
                   <div className="text-muted-foreground">Contato</div>
                   <div className="font-semibold">
-                    {lead.contact_name}
+                    {maskName(lead.contact_name)}
                   </div>
                 </div>
               </div>
@@ -151,7 +151,7 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
                 <Phone className="h-3 w-3 text-yellow-600" />
                 <div>
                   <div className="text-muted-foreground">Telefone</div>
-                  <div className="font-semibold">
+                  <div className="font-semibold" data-value="masked">
                     {maskPhone(lead.phone)}
                   </div>
                 </div>
@@ -161,7 +161,7 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
                 <div>
                   <div className="text-muted-foreground">CNPJ</div>
                   <div className="font-semibold">
-                    {(lead as unknown as { cnpj?: string })?.cnpj || "N/A"}
+                    {maskCNPJ((lead as unknown as { cnpj?: string })?.cnpj)}
                   </div>
                 </div>
               </div>

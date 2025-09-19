@@ -58,6 +58,7 @@ export const AuctionModal = ({
     const bidsFromStore = useRealtimeStore((s) => (s.bidsByAuction[auctionId] ?? EMPTY_BIDS)) as Bid[];
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [hasWon, setHasWon] = useState(false);
+    const displayLeadName = hasWon ? lead.name : maskName(lead.name);
     const demoModeActive = useRealtimeStore((s) => s.demoModeActive);
     const demoCredits = useRealtimeStore((s) => s.demoCredits);
     const demoHolds = useRealtimeStore((s) => s.demoHolds);
@@ -347,7 +348,7 @@ export const AuctionModal = ({
                 <DialogHeader>
                     <div className="flex items-center justify-between pr-10">
                         <DialogTitle className="text-2xl font-bold text-yellow-600">
-                            {lead.name}
+                            {displayLeadName}
                         </DialogTitle>
                         <CountdownTimer
                             expiresAt={lead.expires_at}

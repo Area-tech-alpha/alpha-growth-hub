@@ -51,3 +51,12 @@ export const maskEmail = (email: string | null | undefined): string => {
 
   return `${mask(localPart)}@${mask(domainName)}.${topLevelDomain}`;
 };
+
+export const maskCNPJ = (cnpj: string | null | undefined): string => {
+  if (!cnpj) return "**.***.***/****-**";
+  const digits = cnpj.replace(/\D/g, "");
+  if (digits.length !== 14) return "**.***.***/****-**";
+  const start = digits.slice(0, 2);
+  const end = digits.slice(-2);
+  return `${start}.***.***/****-${end}`;
+};
