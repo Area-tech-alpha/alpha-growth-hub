@@ -24,19 +24,29 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Valor inválido. Deve ser entre R$ 10,00 e R$ 50.000,00' }, { status: 400 });
         }
 
-        let customer = await fetch(`${ASAAS_API_URL}/customers?email=${session.user.email}`, {
-            method: 'GET',
-            headers: {
-                'accept': 'application/json',
-                'access_token': ASAAS_API_KEY,
-                'content-type': 'application/json',
-            },
-        }).then((res) => (
-            res.ok ? res.json() : console.error('Erro ao buscar cliente no Asaas:', res.statusText)
-        ));
+        let customerId: string | null = null;
+        try {
+            const getRes = await fetch(`${ASAAS_API_URL}/customers?email=${encodeURIComponent(session.user.email ?? '')}`, {
+                method: 'GET',
+                headers: {
+                    'accept': 'application/json',
+                    'access_token': ASAAS_API_KEY,
+                    'content-type': 'application/json',
+                },
+            });
+            if (!getRes.ok) {
+                console.error('Erro ao buscar cliente no Asaas:', getRes.status, getRes.statusText);
+            } else {
+                const getJson = await getRes.json();
+                customerId = getJson?.data?.[0]?.id ?? null;
+            }
+        } catch (e) {
+            console.error('Exceção ao buscar cliente no Asaas:', e);
+        }
 
-        if (!customer.data[0].id) {
-            customer = await fetch(`${ASAAS_API_URL}/customers`, {
+        if (!customerId) {
+            console.log('Cliente não encontrado, criando...');
+            const createRes = await fetch(`${ASAAS_API_URL}/customers`, {
                 method: 'POST',
                 headers: {
                     'accept': 'application/json',
@@ -47,12 +57,16 @@ export async function POST(request: Request) {
                     email: session.user.email,
                     name: session.user.name,
                 }),
-            }).then((res) => (
-                res.ok ? customer = res.json() : console.error('Erro ao criar cliente no Asaas:', res.statusText)
-            ));
+            });
+            if (!createRes.ok) {
+                const errorData = await createRes.json().catch(() => undefined);
+                console.error('Erro ao criar cliente no Asaas:', createRes.status, createRes.statusText, errorData);
+            } else {
+                const created = await createRes.json();
+                customerId = created?.id ?? null;
+                console.log('Cliente criado com sucesso no Asaas:', customerId);
+            }
         }
-
-        console.log(customer.data[0]);
 
         const credits = Math.floor(amount);
         const internalCheckoutId = uuidv4();
@@ -61,7 +75,7 @@ export async function POST(request: Request) {
         const checkoutData = {
             billingTypes: ['CREDIT_CARD', 'PIX'],
             chargeTypes: ['DETACHED', 'INSTALLMENT'],
-            customer: customer.data[0].id ? customer.data[0].id : null,
+            customer: customerId ?? undefined,
             installment: { 'maxInstallmentCount': 3 },
             dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             externalReference: externalReference,
