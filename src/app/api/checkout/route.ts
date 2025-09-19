@@ -44,31 +44,6 @@ export async function POST(request: Request) {
             console.error('Exceção ao buscar cliente no Asaas:', e);
         }
 
-        if (!customerId) {
-            console.log('Cliente não encontrado, criando...');
-            const createRes = await fetch(`${ASAAS_API_URL}/customers`, {
-                method: 'POST',
-                headers: {
-                    'accept': 'application/json',
-                    'access_token': ASAAS_API_KEY,
-                    'content-type': 'application/json',
-                },
-                body: JSON.stringify({
-                    email: session.user.email,
-                    name: session.user.name,
-                }),
-            });
-            if (!createRes.ok) {
-                const errorData = await createRes.json().catch(() => undefined);
-                console.error('Erro ao criar cliente no Asaas:', createRes.status, createRes.statusText, errorData);
-            } else {
-                const created = await createRes.json();
-                console.log('Cliente criado:', created);
-                customerId = created?.id ?? null;
-                console.log('Cliente criado com sucesso no Asaas:', customerId);
-            }
-        }
-
         const credits = Math.floor(amount);
         const internalCheckoutId = uuidv4();
         const externalReference = `ck:${internalCheckoutId}|uid:${session.user.id}`;
