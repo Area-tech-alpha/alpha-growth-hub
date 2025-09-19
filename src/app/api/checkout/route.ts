@@ -35,11 +35,11 @@ export async function POST(request: Request) {
             name: customerName,
             dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             externalReference: externalReference,
+            minutesToExpire: 60,
             callback: {
-                successUrl: `${SITE_URL}/obrigado?status=success&checkoutId=${internalCheckoutId}`,
                 cancelUrl: `${SITE_URL}/comprar-creditos?status=cancelled`,
-                expireUrl: `${SITE_URL}/comprar-creditos?status=expired`,
-                autoRedirect: true,
+                expiredUrl: `${SITE_URL}/comprar-creditos?status=expired`,
+                successUrl: `${SITE_URL}/obrigado?status=success&checkoutId=${internalCheckoutId}`,
             },
             items: [
                 {
