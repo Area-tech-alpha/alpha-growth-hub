@@ -4,6 +4,13 @@ import { prisma } from '@/lib/prisma';
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
+    const asaasToken = request.headers.get("asaas-access-token")
+
+    if (asaasToken !== process.env.ASAAS_WEBHOOK_SECRET) {
+        console.warn('[Webhook] Tentativa de acesso com token inválido.');
+        return NextResponse.json({ error: 'Acesso não autorizado' }, { status: 401 });
+    }
+
     const rawBody = await request.text();
 
     try {
