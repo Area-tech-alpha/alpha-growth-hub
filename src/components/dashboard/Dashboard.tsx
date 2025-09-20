@@ -29,6 +29,7 @@ export default function Dashboard({
   const supabase = createClient();
   const { data: session } = useSession();
   const userId = session?.user?.id;
+  const [tabValue, setTabValue] = useState<string>("creditos");
   const userIdRef = useRef<string | undefined>(undefined);
   const [demoLead, setDemoLead] = useState<LeadForAuction | null>(null);
   // demoLead is passed to MeusLeadsPanel
@@ -126,6 +127,17 @@ export default function Dashboard({
     setInitialAuctions,
     setInitialPurchasedLeads,
   ]);
+
+  // Choose default tab based on initial auctions on first load
+  useEffect(() => {
+    if (normalizedInitialAuctions.length > 0) {
+      setTabValue("leiloes");
+    } else {
+      setTabValue("creditos");
+    }
+    // run only once for default selection purpose
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -324,7 +336,7 @@ export default function Dashboard({
   return (
     <TermsGate>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <Tabs defaultValue={activeAuctions.length > 0 ? "leiloes" : "creditos"} className="w-full">
+        <Tabs value={tabValue} onValueChange={setTabValue} className="w-full">
           <TabsList className="pb-3 px-4 mt-2 w-full justify-center sm:justify-start">
             <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-start [--tab-row-gap:0.5rem]">
               <TabsTrigger value="creditos" className="flex items-center gap-2">
