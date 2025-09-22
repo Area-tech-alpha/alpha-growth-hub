@@ -31,6 +31,7 @@ export default function PurchaseCreditsCard({
     const [amount, setAmount] = useState<string>(String(defaultAmount));
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [provider, setProvider] = useState<'infinitepay' | 'asaas'>('infinitepay');
     const realtimeCredits = useRealtimeStore(s => s.userCredits);
     const subscribeToUserCredits = useRealtimeStore(s => s.subscribeToUserCredits);
     const subscribeToUserCreditHolds = useRealtimeStore(s => s.subscribeToUserCreditHolds);
@@ -78,26 +79,28 @@ export default function PurchaseCreditsCard({
         setError(null);
 
         try {
-            // Asaas (anterior) – mantendo comentado por enquanto
-            // const response = await fetch("/api/checkout", {
-            //     method: "POST",
-            //     headers: { "Content-Type": "application/json" },
-            //     body: JSON.stringify({
-            //         amount: Number(amount),
-            //         customerEmail: session.user.email,
-            //         customerName: session.user.name,
-            //     }),
-            // });
-            // const data = await response.json();
-            // if (!response.ok) {
-            //     throw new Error(data.error || "Falha ao iniciar o checkout.");
-            // }
-            // if (data.checkoutUrl) {
-            //     ToastBus.checkoutRedirecting();
-            //     window.location.href = data.checkoutUrl;
-            // }
+            if (provider === 'asaas') {
+                const response = await fetch("/api/checkout", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        amount: Number(amount),
+                        customerEmail: session.user.email,
+                        customerName: session.user.name,
+                    }),
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || "Falha ao iniciar o checkout.");
+                }
+                if (data.checkoutUrl) {
+                    ToastBus.checkoutRedirecting();
+                    window.location.href = data.checkoutUrl;
+                }
+                return;
+            }
 
-            // InfinitePay (novo)
+            // InfinitePay
             const response = await fetch("/api/infinitepay-payment", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -165,6 +168,31 @@ export default function PurchaseCreditsCard({
                         <p id="valor-help" className="text-xs text-muted-foreground">
                             Você receberá <span className="font-medium">{(Number(amount) || 0).toLocaleString("pt-BR")} créditos</span>
                         </p>
+                        <div className="grid gap-2 mt-4">
+                            <span className="text-sm font-medium text-foreground">Forma de pagamento</span>
+                            <div className="flex items-center gap-4">
+                                <label className="flex items-center gap-2 text-sm">
+                                    <input
+                                        type="radio"
+                                        name="provider"
+                                        value="infinitepay"
+                                        checked={provider === 'infinitepay'}
+                                        onChange={() => setProvider('infinitepay')}
+                                    />
+                                    InfinitePay
+                                </label>
+                                <label className="flex items-center gap-2 text-sm">
+                                    <input
+                                        type="radio"
+                                        name="provider"
+                                        value="asaas"
+                                        checked={provider === 'asaas'}
+                                        onChange={() => setProvider('asaas')}
+                                    />
+                                    Asaas
+                                </label>
+                            </div>
+                        </div>
                     </div>
                     {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
                     {!session && <p className="text-xs text-center mt-2 text-muted-foreground">Faça login para poder comprar.</p>}
