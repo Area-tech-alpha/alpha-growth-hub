@@ -32,20 +32,23 @@ export async function POST(request: NextRequest) {
     // --- 2. Processamento do Payload e Lógica de Negócio ---
     try {
         const eventPayload = await request.json();
-        const { event_type, data: transaction } = eventPayload;
+        const event_type: string | undefined = eventPayload?.event_type;
+        // InfinitePay pode enviar tanto em eventPayload.data quanto no payload raiz
+        const transaction = eventPayload?.data ?? eventPayload;
         console.log('[Webhook InfinitePay] Evento recebido:', {
+            has_event_type: Boolean(event_type),
             event_type,
-            transaction_id: transaction?.transaction_id,
+            transaction_id: transaction?.transaction_id ?? transaction?.transaction_nsu,
             order_nsu: transaction?.order_nsu,
         });
 
-        if (!event_type || !transaction?.transaction_id || !transaction?.order_nsu) {
+        const infinitePayPaymentId: string | undefined = transaction?.transaction_id ?? transaction?.transaction_nsu;
+        const orderNsu: string | undefined = transaction?.order_nsu;
+
+        if (!infinitePayPaymentId || !orderNsu) {
             console.warn('[Webhook InfinitePay] Payload inválido ou campos essenciais ausentes:', eventPayload);
             return NextResponse.json({ error: 'Payload inválido' }, { status: 400 });
         }
-
-        const infinitePayPaymentId: string = transaction.transaction_id;
-        const orderNsu: string = transaction.order_nsu;
 
         const sessionMapping = await prisma.checkout_sessions.findFirst({
             where: { internal_checkout_id: orderNsu },
@@ -62,7 +65,9 @@ export async function POST(request: NextRequest) {
         console.log('[Webhook InfinitePay] Mapeamento encontrado:', { userId, internalCheckoutId });
         const eventKey = `checkout_status:${internalCheckoutId}`;
 
-        const isPaidEvent = event_type === 'transaction.paid';
+        const isPaidEvent = event_type
+            ? event_type === 'transaction.paid'
+            : (typeof transaction?.paid_amount === 'number' || transaction?.status === 'paid' || transaction?.paid === true);
         if (!isPaidEvent) {
             console.log('[Webhook InfinitePay] Evento não-pago ignorado:', { event_type });
             await prisma.processed_webhooks.upsert({
@@ -88,13 +93,11 @@ export async function POST(request: NextRequest) {
         }
 
         // Normaliza o payload para o mesmo formato utilizado pelo Asaas
+        // InfinitePay envia valores em centavos: paid_amount, amount e items[].price
         const valueCents = (
-            (typeof transaction?.amount_cents === 'number' && transaction.amount_cents) ||
-            (typeof transaction?.total_cents === 'number' && transaction.total_cents) ||
-            (typeof transaction?.price_cents === 'number' && transaction.price_cents) ||
-            (typeof transaction?.amount === 'number' && Math.round(Number(transaction.amount) * 100)) ||
-            (typeof transaction?.total === 'number' && Math.round(Number(transaction.total) * 100)) ||
-            (typeof transaction?.price === 'number' && Math.round(Number(transaction.price) * 100)) ||
+            (typeof transaction?.paid_amount === 'number' && transaction.paid_amount) ||
+            (typeof transaction?.amount === 'number' && transaction.amount) ||
+            (Array.isArray(transaction?.items) && typeof transaction.items?.[0]?.price === 'number' && transaction.items[0].price) ||
             undefined
         );
         const normalizedValue = typeof valueCents === 'number' ? valueCents / 100 : undefined;
