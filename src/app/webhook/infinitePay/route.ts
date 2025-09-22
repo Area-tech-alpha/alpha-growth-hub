@@ -27,11 +27,17 @@ export async function POST(request: NextRequest) {
         console.warn('[Webhook InfinitePay] Tentativa de acesso com segredo inválido ou ausente.');
         return NextResponse.json({ error: 'Acesso não autorizado' }, { status: 401 });
     }
+    console.log('[Webhook InfinitePay] Segredo validado com sucesso.');
 
     // --- 2. Processamento do Payload e Lógica de Negócio ---
     try {
         const eventPayload = await request.json();
         const { event_type, data: transaction } = eventPayload;
+        console.log('[Webhook InfinitePay] Evento recebido:', {
+            event_type,
+            transaction_id: transaction?.transaction_id,
+            order_nsu: transaction?.order_nsu,
+        });
 
         if (!event_type || !transaction?.transaction_id || !transaction?.order_nsu) {
             console.warn('[Webhook InfinitePay] Payload inválido ou campos essenciais ausentes:', eventPayload);
@@ -53,14 +59,16 @@ export async function POST(request: NextRequest) {
 
         const userId = sessionMapping.user_id;
         const internalCheckoutId = sessionMapping.internal_checkout_id;
+        console.log('[Webhook InfinitePay] Mapeamento encontrado:', { userId, internalCheckoutId });
         const eventKey = `checkout_status:${internalCheckoutId}`;
 
         const isPaidEvent = event_type === 'transaction.paid';
         if (!isPaidEvent) {
+            console.log('[Webhook InfinitePay] Evento não-pago ignorado:', { event_type });
             await prisma.processed_webhooks.upsert({
                 where: { event_key: eventKey },
-                update: { status: 'ignored' },
-                create: { event_key: eventKey, status: 'ignored' },
+                update: { status: 'failed' },
+                create: { event_key: eventKey, status: 'failed' },
             });
             return NextResponse.json({ status: 'ignored', event: event_type }, { status: 200 });
         }
@@ -70,6 +78,7 @@ export async function POST(request: NextRequest) {
         });
 
         if (alreadyProcessed) {
+            console.log('[Webhook InfinitePay] Evento idempotente (já processado):', { infinitePayPaymentId });
             await prisma.processed_webhooks.upsert({
                 where: { event_key: eventKey },
                 update: { status: 'processed' },
@@ -78,9 +87,34 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ status: 'already_processed' }, { status: 200 });
         }
 
+        // Normaliza o payload para o mesmo formato utilizado pelo Asaas
+        const valueCents = (
+            (typeof transaction?.amount_cents === 'number' && transaction.amount_cents) ||
+            (typeof transaction?.total_cents === 'number' && transaction.total_cents) ||
+            (typeof transaction?.price_cents === 'number' && transaction.price_cents) ||
+            (typeof transaction?.amount === 'number' && Math.round(Number(transaction.amount) * 100)) ||
+            (typeof transaction?.total === 'number' && Math.round(Number(transaction.total) * 100)) ||
+            (typeof transaction?.price === 'number' && Math.round(Number(transaction.price) * 100)) ||
+            undefined
+        );
+        const normalizedValue = typeof valueCents === 'number' ? valueCents / 100 : undefined;
+
+        const normalizedPayment = {
+            id: infinitePayPaymentId,
+            value: normalizedValue,
+            checkoutSession: internalCheckoutId,
+            provider: 'INFINITEPAY',
+            raw: transaction,
+        };
+        console.log('[Webhook InfinitePay] Pagamento normalizado:', {
+            id: normalizedPayment.id,
+            value: normalizedPayment.value,
+            checkoutSession: normalizedPayment.checkoutSession,
+        });
+
         const jobPayload = {
-            event_type,
-            transaction,
+            event: 'PAYMENT_CONFIRMED',
+            payment: normalizedPayment,
             userId,
             enqueuedAt: new Date().toISOString(),
         };
@@ -89,6 +123,7 @@ export async function POST(request: NextRequest) {
         try {
             const result = await prisma.$queryRaw<{ msg_id: bigint }[]>`SELECT pgmq.send('credit_jobs', ${JSON.stringify(jobPayload)}::jsonb) AS msg_id`;
             msgId = result[0].msg_id;
+            console.log('[Webhook InfinitePay] Job enfileirado com sucesso:', { msgId: String(msgId) });
         } catch (e) {
             console.error('[Webhook InfinitePay] Falha ao enfileirar job no PGMQ:', e);
             return NextResponse.json({ error: 'Falha ao enfileirar job' }, { status: 500 });
@@ -97,6 +132,7 @@ export async function POST(request: NextRequest) {
         try {
             // Tentativa de processamento imediato (não bloqueante)
             await prisma.$queryRaw`SELECT public.process_credit_jobs_worker()`;
+            console.log('[Webhook InfinitePay] Worker chamado para processamento imediato.');
         } catch (e) {
             console.error('[Webhook InfinitePay] Erro ao executar worker imediato. O job ainda está na fila.', e);
         }
@@ -106,7 +142,9 @@ export async function POST(request: NextRequest) {
             update: { status: 'processed' },
             create: { event_key: eventKey, status: 'processed' },
         });
+        console.log('[Webhook InfinitePay] Status atualizado em processed_webhooks:', { eventKey, status: 'processed' });
 
+        console.log('[Webhook InfinitePay] Sucesso total do processamento.');
         return NextResponse.json({ status: 'success', queued: true, msgId: String(msgId) }, { status: 200 });
 
     } catch (error) {

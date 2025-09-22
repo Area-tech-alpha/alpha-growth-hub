@@ -3,6 +3,9 @@
 import { NextResponse } from 'next/server';
 import { authOptions } from '../../../../auth';
 import { getServerSession } from 'next-auth/next';
+import { prisma } from '@/lib/prisma';
+import { v4 as uuidv4 } from 'uuid';
+import { createClient as createSupabaseServerClient } from '@/utils/supabase/server';
 
 export async function POST(request: Request) {
     const session = await getServerSession(authOptions);
@@ -31,6 +34,43 @@ export async function POST(request: Request) {
         }
 
         const SITE_URL = process.env.NEXTAUTH_URL!;
+        const WEBHOOK_SECRET = process.env.APP_WEBHOOK_SECRET;
+
+        // Gera um ID interno e persiste o mapeamento com o usuário antes de criar o link
+        const internalCheckoutId = uuidv4();
+        try {
+            const persist = async () => {
+                await prisma.checkout_sessions.create({
+                    data: {
+                        internal_checkout_id: internalCheckoutId,
+                        user_id: session.user.id,
+                    }
+                });
+            };
+            let lastErr: unknown = null;
+            for (let i = 0; i < 2; i++) {
+                try { await persist(); lastErr = null; break; } catch (err) {
+                    lastErr = err; await new Promise(r => setTimeout(r, 300 * (i + 1)));
+                }
+            }
+            if (lastErr) throw lastErr;
+        } catch (e) {
+            console.log('[InfinitePay Checkout] Prisma persist failed, trying Supabase upsert:', e);
+            // Fallback para Supabase caso Prisma falhe
+            try {
+                const supabase = await createSupabaseServerClient();
+                const { error } = await supabase
+                    .from('checkout_sessions')
+                    .insert({ internal_checkout_id: internalCheckoutId, user_id: session.user.id });
+                if (error) {
+                    console.error('[InfinitePay Checkout] Supabase insert fallback failed:', error);
+                    return NextResponse.json({ error: 'Falha ao persistir mapeamento do checkout' }, { status: 500 });
+                }
+            } catch (err2) {
+                console.error('[InfinitePay Checkout] Supabase client init failed:', err2);
+                return NextResponse.json({ error: 'Falha ao persistir mapeamento do checkout' }, { status: 500 });
+            }
+        }
 
         const response = await fetch('https://api.infinitepay.io/invoices/public/checkout/links', {
             method: 'POST',
@@ -38,10 +78,15 @@ export async function POST(request: Request) {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                handle: infiniteTag, // Valor sempre em centavos
-                order_nsu: `pedido-${Date.now()}`, // Gerar um número de pedido único
-                redirect_url: `${SITE_URL}/obrigado`,
-                webhook_url: `${SITE_URL}/webhook/infinitepay-payment`,
+                handle: infiniteTag,
+                // Usa o ID interno como order_nsu para casar no webhook
+                order_nsu: internalCheckoutId,
+                // Obrigado precisa do checkoutId para consultar status
+                redirect_url: `${SITE_URL}/obrigado?checkoutId=${internalCheckoutId}`,
+                // Aponta para o endpoint correto do webhook e inclui secret se disponível
+                webhook_url: WEBHOOK_SECRET
+                    ? `${SITE_URL}/webhook/infinitePay?secret=${encodeURIComponent(WEBHOOK_SECRET)}`
+                    : `${SITE_URL}/webhook/infinitePay`,
                 items: [
                     {
                         quantity: 1,
@@ -67,7 +112,7 @@ export async function POST(request: Request) {
 
         const data = await response.json();
         console.log('InfinitePay API response:', data);
-        return NextResponse.json({ payment_url: data.url });
+        return NextResponse.json({ payment_url: data.url, checkoutId: internalCheckoutId });
 
     } catch (error) {
         console.error('Internal server error:', error);

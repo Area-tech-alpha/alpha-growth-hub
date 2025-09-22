@@ -28,6 +28,14 @@ function ObrigadoContent() {
     );
 
     useEffect(() => {
+        if (!checkoutId) {
+            setUiState({
+                title: 'Pagamento recebido',
+                subtitle: 'Estamos finalizando sua compra. Se seus créditos não aparecerem em até 1 minuto, atualize a página ou contate o suporte.',
+                loading: false,
+            });
+            return;
+        }
         if (error) {
             setUiState({
                 title: 'Ocorreu um problema',
@@ -59,7 +67,7 @@ function ObrigadoContent() {
             });
         }
 
-    }, [data, error]);
+    }, [data, error, checkoutId]);
 
     if (!data && !error && uiState.loading) {
         return (
