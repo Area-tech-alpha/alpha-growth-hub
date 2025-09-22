@@ -91,7 +91,7 @@ export async function POST(request: Request) {
                     {
                         quantity: 1,
                         price: Math.round(amount * 100),
-                        description: description,
+                        description: `${description} - Growth Hub`,
                     }
                 ],
                 customer: {

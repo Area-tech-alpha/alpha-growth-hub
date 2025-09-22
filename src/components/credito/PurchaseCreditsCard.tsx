@@ -106,7 +106,7 @@ export default function PurchaseCreditsCard({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     amount: Number(amount),
-                    description: `Compra de ${Number(amount).toLocaleString("pt-BR")} créditos`,
+                    description: `Compra de ${Number(amount).toLocaleString("pt-BR")} créditos - Growth Hub`,
                 }),
             });
 
