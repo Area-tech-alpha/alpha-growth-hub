@@ -49,10 +49,9 @@ export async function POST(request: Request) {
         const externalReference = `ck:${internalCheckoutId}|uid:${session.user.id}`;
 
         const checkoutData = {
-            billingTypes: ['CREDIT_CARD', 'PIX'],
-            chargeTypes: ['DETACHED', 'INSTALLMENT'],
+            billingTypes: ['PIX'],
+            chargeTypes: ['DETACHED'],
             customer: customerId ?? undefined,
-            installment: { 'maxInstallmentCount': 3 },
             dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             externalReference: externalReference,
             minutesToExpire: 60,

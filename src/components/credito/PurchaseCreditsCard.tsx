@@ -179,7 +179,7 @@ export default function PurchaseCreditsCard({
                                         checked={provider === 'infinitepay'}
                                         onChange={() => setProvider('infinitepay')}
                                     />
-                                    InfinitePay
+                                    Cartão de crédito
                                 </label>
                                 <label className="flex items-center gap-2 text-sm">
                                     <input
@@ -189,7 +189,7 @@ export default function PurchaseCreditsCard({
                                         checked={provider === 'asaas'}
                                         onChange={() => setProvider('asaas')}
                                     />
-                                    Asaas
+                                    PIX
                                 </label>
                             </div>
                         </div>
