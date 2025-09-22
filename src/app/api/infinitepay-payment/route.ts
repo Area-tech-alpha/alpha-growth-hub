@@ -81,8 +81,8 @@ export async function POST(request: Request) {
                 handle: infiniteTag,
                 // Usa o ID interno como order_nsu para casar no webhook
                 order_nsu: internalCheckoutId,
-                // Obrigado precisa do checkoutId para consultar status
-                redirect_url: `${SITE_URL}/obrigado?checkoutId=${internalCheckoutId}`,
+                // Obrigado precisa do checkoutId para consultar status e do provider para UX
+                redirect_url: `${SITE_URL}/obrigado?checkoutId=${internalCheckoutId}&provider=infinitepay`,
                 // Aponta para o endpoint correto do webhook e inclui secret se disponível
                 webhook_url: WEBHOOK_SECRET
                     ? `${SITE_URL}/webhook/infinitePay?secret=${encodeURIComponent(WEBHOOK_SECRET)}`

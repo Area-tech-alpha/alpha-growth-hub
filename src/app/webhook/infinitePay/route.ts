@@ -116,6 +116,7 @@ export async function POST(request: NextRequest) {
         });
 
         const jobPayload = {
+            provider: 'INFINITEPAY',
             event: 'PAYMENT_CONFIRMED',
             payment: normalizedPayment,
             userId,
@@ -126,7 +127,12 @@ export async function POST(request: NextRequest) {
         try {
             const result = await prisma.$queryRaw<{ msg_id: bigint }[]>`SELECT pgmq.send('credit_jobs', ${JSON.stringify(jobPayload)}::jsonb) AS msg_id`;
             msgId = result[0].msg_id;
-            console.log('[Webhook InfinitePay] Job enfileirado com sucesso:', { msgId: String(msgId) });
+            console.log('[Webhook InfinitePay] Job enfileirado com sucesso:', {
+                msgId: String(msgId),
+                provider: jobPayload.provider,
+                paymentId: jobPayload.payment.id,
+                paymentValue: jobPayload.payment.value,
+            });
         } catch (e) {
             console.error('[Webhook InfinitePay] Falha ao enfileirar job no PGMQ:', e);
             return NextResponse.json({ error: 'Falha ao enfileirar job' }, { status: 500 });

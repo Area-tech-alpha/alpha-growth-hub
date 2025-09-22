@@ -10,6 +10,7 @@ const fetcher = (url: string) => fetch(url).then(res => res.json());
 function ObrigadoContent() {
     const searchParams = useSearchParams();
     const checkoutId = searchParams.get('checkoutId');
+    const provider = (searchParams.get('provider') || '').toLowerCase();
 
     const [uiState, setUiState] = useState<{ title: string; subtitle: string; loading: boolean }>({
         title: 'Verificando seu pagamento...',
@@ -26,6 +27,15 @@ function ObrigadoContent() {
             revalidateOnReconnect: false,
         }
     );
+
+    useEffect(() => {
+        if (provider === 'infinitepay') {
+            setUiState(prev => ({
+                ...prev,
+                subtitle: 'Pagamento via InfinitePay: pode levar até 1 minuto para ser processado.',
+            }));
+        }
+    }, [provider]);
 
     useEffect(() => {
         if (!checkoutId) {
@@ -55,7 +65,9 @@ function ObrigadoContent() {
         else if (data?.status === 'PENDING') {
             setUiState({
                 title: 'Aguardando confirmação...',
-                subtitle: 'Estamos verificando seu pagamento. Esta página será atualizada automaticamente.',
+                subtitle: provider === 'infinitepay'
+                    ? 'Pagamento via InfinitePay: pode levar até 1 minuto para ser processado. Esta página será atualizada automaticamente.'
+                    : 'Estamos verificando seu pagamento. Esta página será atualizada automaticamente.',
                 loading: true,
             });
         }
@@ -67,7 +79,7 @@ function ObrigadoContent() {
             });
         }
 
-    }, [data, error, checkoutId]);
+    }, [data, error, checkoutId, provider]);
 
     if (!data && !error && uiState.loading) {
         return (
