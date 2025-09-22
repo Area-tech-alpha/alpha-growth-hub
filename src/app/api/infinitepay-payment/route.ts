@@ -17,10 +17,10 @@ export async function POST(request: Request) {
         const body = await request.json();
         const { amount, description } = body;
 
-        // Validação dos dados recebidos
-        if (!amount || !description) {
+        // Validação dos dados recebidos (mínimo R$ 1,00)
+        if (!amount || amount < 1 || amount > 50000 || !description) {
             return NextResponse.json(
-                { error: 'Amount and description are required' },
+                { error: 'Valor inválido. Deve ser entre R$ 1,00 e R$ 50.000,00' },
                 { status: 400 }
             );
         }
