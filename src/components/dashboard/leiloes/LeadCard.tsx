@@ -21,7 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { CountdownTimer } from "../leads/CountdownTimer";
 import { Lead } from "../leads/types";
-import { maskName, maskPhone, maskCNPJ } from "@/lib/mask";
+import { maskName, maskPhone } from "@/lib/mask";
 
 interface LeadCardProps {
   lead: Lead;
@@ -84,7 +84,7 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
                 </div>
               )}
               <CardTitle className="text-lg font-bold text-yellow-600 truncate flex-1" title={maskName(lead.company_name)}>
-                {maskName(lead.company_name)}
+                {lead.company_name}
               </CardTitle>
             </div>
             <div className="flex-shrink-0">
@@ -134,7 +134,7 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
                 <div>
                   <div className="text-muted-foreground">Empresa</div>
                   <div className="font-semibold">
-                    {maskName(lead.company_name)}
+                    {lead.company_name}
                   </div>
                 </div>
               </div>
@@ -161,7 +161,7 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
                 <div>
                   <div className="text-muted-foreground">CNPJ</div>
                   <div className="font-semibold">
-                    {maskCNPJ((lead as unknown as { cnpj?: string })?.cnpj)}
+                    {(lead as unknown as { cnpj?: string })?.cnpj}
                   </div>
                 </div>
               </div>
