@@ -78,13 +78,32 @@ export default function PurchaseCreditsCard({
         setError(null);
 
         try {
-            const response = await fetch("/api/checkout", {
+            // Asaas (anterior) – mantendo comentado por enquanto
+            // const response = await fetch("/api/checkout", {
+            //     method: "POST",
+            //     headers: { "Content-Type": "application/json" },
+            //     body: JSON.stringify({
+            //         amount: Number(amount),
+            //         customerEmail: session.user.email,
+            //         customerName: session.user.name,
+            //     }),
+            // });
+            // const data = await response.json();
+            // if (!response.ok) {
+            //     throw new Error(data.error || "Falha ao iniciar o checkout.");
+            // }
+            // if (data.checkoutUrl) {
+            //     ToastBus.checkoutRedirecting();
+            //     window.location.href = data.checkoutUrl;
+            // }
+
+            // InfinitePay (novo)
+            const response = await fetch("/api/infinitepay-payment", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     amount: Number(amount),
-                    customerEmail: session.user.email,
-                    customerName: session.user.name,
+                    description: `Compra de ${Number(amount).toLocaleString("pt-BR")} créditos`,
                 }),
             });
 
@@ -93,9 +112,9 @@ export default function PurchaseCreditsCard({
                 throw new Error(data.error || "Falha ao iniciar o checkout.");
             }
 
-            if (data.checkoutUrl) {
+            if (data.payment_url) {
                 ToastBus.checkoutRedirecting();
-                window.location.href = data.checkoutUrl;
+                window.location.href = data.payment_url;
             }
         } catch (err: unknown) {
             const errorMessage =
@@ -135,7 +154,7 @@ export default function PurchaseCreditsCard({
                                 type="text"
                                 inputMode="numeric"
                                 pattern="[0-9]*"
-                                min={10}
+                                min={1}
                                 max={50000}
                                 value={amount}
                                 onChange={handleChange}
