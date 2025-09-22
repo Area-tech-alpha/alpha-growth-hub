@@ -123,6 +123,18 @@ export async function POST(request: NextRequest) {
             enqueuedAt: new Date().toISOString(),
         };
 
+        // Marca o event_key como queued antes de enfileirar
+        try {
+            await prisma.processed_webhooks.upsert({
+                where: { event_key: eventKey },
+                update: { status: 'queued' },
+                create: { event_key: eventKey, status: 'queued' },
+            });
+            console.log('[Webhook InfinitePay] processed_webhooks atualizado para queued:', { eventKey });
+        } catch (e) {
+            console.error('[Webhook InfinitePay] Falha ao marcar processed_webhooks como queued:', e);
+        }
+
         let msgId: bigint | number;
         try {
             const result = await prisma.$queryRaw<{ msg_id: bigint }[]>`SELECT pgmq.send('credit_jobs', ${JSON.stringify(jobPayload)}::jsonb) AS msg_id`;
@@ -140,20 +152,47 @@ export async function POST(request: NextRequest) {
 
         try {
             // Tentativa de processamento imediato (não bloqueante)
-            await prisma.$queryRaw`SELECT public.process_credit_jobs_worker()`;
-            console.log('[Webhook InfinitePay] Worker chamado para processamento imediato.');
+            type WorkerRow = { process_credit_jobs_worker: { status?: string; msg_id?: string; error?: string } };
+            const workerRes = await prisma.$queryRaw<WorkerRow[]>`SELECT public.process_credit_jobs_worker()`;
+            const workerOut = workerRes?.[0]?.process_credit_jobs_worker;
+            console.log('[Webhook InfinitePay] Worker chamado. Retorno:', workerOut);
         } catch (e) {
             console.error('[Webhook InfinitePay] Erro ao executar worker imediato. O job ainda está na fila.', e);
         }
 
-        await prisma.processed_webhooks.upsert({
-            where: { event_key: eventKey },
-            update: { status: 'processed' },
-            create: { event_key: eventKey, status: 'processed' },
-        });
-        console.log('[Webhook InfinitePay] Status atualizado em processed_webhooks:', { eventKey, status: 'processed' });
+        // Verifica se a transação foi realmente gravada antes de marcar como processed
+        try {
+            let txCheck = await prisma.credit_transactions.findUnique({
+                where: { infinitepay_payment_id: infinitePayPaymentId },
+                select: { id: true, credits_purchased: true }
+            });
+            if (!txCheck) {
+                // Compat: funções antigas podem ter gravado o ID do InfinitePay em asaas_payment_id
+                txCheck = await prisma.credit_transactions.findUnique({
+                    where: { asaas_payment_id: infinitePayPaymentId },
+                    select: { id: true, credits_purchased: true }
+                });
+            }
+            if (txCheck?.id) {
+                await prisma.processed_webhooks.upsert({
+                    where: { event_key: eventKey },
+                    update: { status: 'processed' },
+                    create: { event_key: eventKey, status: 'processed' },
+                });
+                console.log('[Webhook InfinitePay] Transação encontrada e status processed aplicado:', { eventKey, transactionId: txCheck.id });
+            } else {
+                await prisma.processed_webhooks.upsert({
+                    where: { event_key: eventKey },
+                    update: { status: 'failed' },
+                    create: { event_key: eventKey, status: 'failed' },
+                });
+                console.warn('[Webhook InfinitePay] Transação NÃO encontrada após worker. Marcado como failed.', { eventKey, infinitePayPaymentId });
+            }
+        } catch (e) {
+            console.error('[Webhook InfinitePay] Erro ao verificar/atualizar processed_webhooks:', e);
+        }
 
-        console.log('[Webhook InfinitePay] Sucesso total do processamento.');
+        console.log('[Webhook InfinitePay] Finalizado o processamento do webhook.');
         return NextResponse.json({ status: 'success', queued: true, msgId: String(msgId) }, { status: 200 });
 
     } catch (error) {
