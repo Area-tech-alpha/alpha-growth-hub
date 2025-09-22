@@ -41,6 +41,7 @@ export async function POST(request: Request) {
                 handle: infiniteTag, // Valor sempre em centavos
                 order_nsu: `pedido-${Date.now()}`, // Gerar um número de pedido único
                 redirect_url: `${SITE_URL}/obrigado`,
+                webhook_url: `${SITE_URL}/webhook/infinitepay-payment`,
                 items: [
                     {
                         quantity: 1,
