@@ -55,7 +55,7 @@ export async function POST(request: Request) {
             }
             if (lastErr) throw lastErr;
         } catch (e) {
-            console.log('[InfinitePay Checkout] Prisma persist failed, trying Supabase upsert:', e);
+            console.warn('[InfinitePay Checkout] Prisma persist failed, trying Supabase upsert:', e);
             // Fallback para Supabase caso Prisma falhe
             try {
                 const supabase = await createSupabaseServerClient();
@@ -111,7 +111,6 @@ export async function POST(request: Request) {
         }
 
         const data = await response.json();
-        console.log('InfinitePay API response:', data);
         return NextResponse.json({ payment_url: data.url, checkoutId: internalCheckoutId });
 
     } catch (error) {

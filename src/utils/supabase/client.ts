@@ -10,7 +10,6 @@ export function createClient() {
         })
     } else {
         if (typeof window !== 'undefined') {
-            console.log('[Supabase] Client env OK. Initializing browser client')
         }
     }
     return createBrowserClient(
