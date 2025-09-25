@@ -12,6 +12,7 @@ import { useRealtimeStore } from "@/store/realtime-store";
 import type { RealtimeState } from "@/store/realtime-store";
 import { ToastBus } from "@/lib/toastBus";
 import RevenueFilterSort, { type RevenueFilterValue } from "./leiloes/RevenueFilterSort";
+import { stateToUf } from "@/lib/br-states";
 import { useSession } from "next-auth/react";
 import { LeadForAuction } from "./leiloes/types";
 
@@ -82,7 +83,7 @@ export default function MeusLeadsPanel({ demoLead }: { demoLead: LeadForAuction 
     }
     const setUF = new Set<string>();
     leads.forEach(l => {
-      const uf = String(l.state || "").toUpperCase();
+      const uf = stateToUf(l.state) || undefined;
       if (uf) setUF.add(uf);
     });
     return Array.from(setUF);
@@ -100,7 +101,7 @@ export default function MeusLeadsPanel({ demoLead }: { demoLead: LeadForAuction 
     }
     if ((revFilter.locationQuery || "").trim() !== "") {
       const uf = (revFilter.locationQuery as string).toUpperCase();
-      leads = leads.filter(l => String(l.state || "").toUpperCase() === uf);
+      leads = leads.filter(l => (stateToUf(l.state) || "").toUpperCase() === uf);
     }
 
     // Sorting

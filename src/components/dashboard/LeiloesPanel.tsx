@@ -12,7 +12,7 @@ import { ToastBus } from "@/lib/toastBus";
 import { sortLeads } from "@/lib/sortLeads";
 import RevenueFilterSort, { RevenueFilterValue } from "./leiloes/RevenueFilterSort";
 import DemoAuctionsButton from "./leiloes/DemoAuctionsButton";
-import { BRAZIL_STATES } from "@/lib/br-states";
+import { BRAZIL_STATES, stateToUf } from "@/lib/br-states";
 
 type AuctionWithLeadLocal = AuctionWithLead;
 
@@ -74,8 +74,8 @@ export default function LeiloesPanel({ setDemoLead }: { setDemoLead: (lead: Lead
     // Available UFs based on the currently revenue-filtered leads
     const availableUFSet = new Set<string>();
     leads.forEach(l => {
-      const uf = String(l.state || "").toUpperCase();
-      if (uf) availableUFSet.add(uf);
+      const uf = stateToUf(l.state) || undefined;
+      if (uf) availableUFSet.add(uf.toUpperCase());
     });
     const availableUFs = Array.from(availableUFSet);
 
@@ -83,8 +83,7 @@ export default function LeiloesPanel({ setDemoLead }: { setDemoLead: (lead: Lead
     if ((revFilter.locationQuery || "").trim() !== "") {
       const q = normalizeStr(revFilter.locationQuery as string);
       leads = leads.filter((l) => {
-        const ufRaw = String(l.state || "");
-        const uf = ufRaw.toUpperCase();
+        const uf = (stateToUf(l.state) || "").toUpperCase();
         const name = ufToName.get(uf) || "";
         const norm = `${normalizeStr(name)} ${uf.toLowerCase()}`;
         const qUf = uf.toLowerCase();
