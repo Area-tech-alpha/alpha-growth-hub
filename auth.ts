@@ -58,13 +58,13 @@ export const authOptions: NextAuthOptions = {
         maxAge: TWENTY_FOUR_HOURS_IN_SECONDS,
     },
     callbacks: {
-        // async signIn({ user }) {
-        //     if (!user.email || !user.email.endsWith('@assessorialpha.com')) {
-        //         console.warn('[NextAuth] signIn blocked: invalid domain for', user.email)
-        //         return false;
-        //     }
-        //     return true;
-        // },
+        async signIn({ user }) {
+            if (!user.email || !user.email.endsWith('@assessorialpha.com')) {
+                console.warn('[NextAuth] signIn blocked: invalid domain for', user.email)
+                return false;
+            }
+            return true;
+        },
         async jwt({ token, user, account }) {
             if (user) {
                 token.id = user.id;
