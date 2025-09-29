@@ -312,7 +312,7 @@ export default function LeiloesPanel({ setDemoLead }: { setDemoLead: (lead: Lead
           <p className="text-gray-500">Aguarde novos leads</p>
         </div>
       )}
-      {(session?.user?.email === 'yago@assessorialpha.com' || session?.user?.email === 'maxwell.tech@assessorialpha.com') && (
+      {(session?.user?.email === 'yago@assessorialpha.com' || session?.user?.email === 'maxwell.tech@assessorialpha.com' || session?.user?.email === 'samuel.lacerda@assessorialpha.com') && (
         <DemoAuctionsButton
           visible={demoAuctions.length === 0}
           onCreate={(auctions) => {
