@@ -23,6 +23,7 @@ import {
     Coins,
     User,
     Info,
+    Hash,
 } from "lucide-react";
 import { CountdownTimer } from "../leads/CountdownTimer";
 import { Lead } from "../leads/types";
@@ -407,6 +408,10 @@ export const AuctionModal = ({
                                 <div className="flex items-center gap-3">
                                     <Mail className="h-4 w-4 flex-shrink-0" />
                                     <span>{hasWon ? lead.email : maskEmail(lead.email)}</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <Hash className="h-4 w-4 flex-shrink-0" />
+                                    <span>{(lead as unknown as { cnpj?: string })?.cnpj}</span>
                                 </div>
                             </div>
                         </div>
