@@ -50,6 +50,9 @@ export default function DemoAuctionsButton({
                 currentBid: 0,
                 bidders: 0,
                 category: "Demo",
+                document_url: (status === "hot" ? "https://example.com/documento-demo.pdf" : ""),
+                contract_url: (status === "hot" ? "https://example.com/contrato-demo.pdf" : ""),
+                cal_url: (status === "hot" ? "https://example.com/gravacao-demo.mp4" : undefined),
                 tags: [],
             } as unknown as AuctionWithLead["leads"],
         });

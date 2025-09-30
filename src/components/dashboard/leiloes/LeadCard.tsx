@@ -45,8 +45,9 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
   };
 
   const isHot = lead.status === "hot";
-  const documentUrl = undefined;
-  const contractUrl = undefined;
+  const documentUrl = (lead as unknown as { document_url?: string })?.document_url;
+  const contractUrl = (lead as unknown as { contract_url?: string })?.contract_url;
+  const calUrl = lead.cal_url as string | undefined;
 
   return (
     <>
@@ -167,19 +168,26 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
               </div>
 
             </div>
-            {isHot && (documentUrl || contractUrl) && (
-              <div className="mt-2 flex items-center gap-2">
+            {isHot && (documentUrl || contractUrl || calUrl) && (
+              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {documentUrl && (
-                  <Button asChild variant="outline" size="sm" className="h-7 px-2.5">
+                  <Button asChild variant="outline" size="sm" className="h-9 sm:h-7 px-3 sm:px-2.5 w-full">
                     <a href={documentUrl} target="_blank" rel="noopener noreferrer">
                       Abrir documento
                     </a>
                   </Button>
                 )}
                 {contractUrl && (
-                  <Button asChild variant="outline" size="sm" className="h-7 px-2.5">
+                  <Button asChild variant="outline" size="sm" className="h-9 sm:h-7 px-3 sm:px-2.5 w-full">
                     <a href={contractUrl} target="_blank" rel="noopener noreferrer">
                       Abrir contrato
+                    </a>
+                  </Button>
+                )}
+                {calUrl && (
+                  <Button asChild variant="default" size="sm" className="h-9 sm:h-7 px-3 sm:px-2.5 w-full sm:col-span-2 bg-green-600 hover:bg-green-700 text-white">
+                    <a href={calUrl} target="_blank" rel="noopener noreferrer">
+                      Ver gravação
                     </a>
                   </Button>
                 )}

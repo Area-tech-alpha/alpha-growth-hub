@@ -26,6 +26,7 @@ export interface Lead {
     category: string;
     document_url: string;
     contract_url: string;
+    cal_url?: string;
     tags: string[];
     [key: string]: unknown;
 }
