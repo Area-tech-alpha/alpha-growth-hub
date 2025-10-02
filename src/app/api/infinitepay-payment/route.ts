@@ -87,9 +87,6 @@ export async function POST(request: Request) {
                 webhook_url: WEBHOOK_SECRET
                     ? `${SITE_URL}/webhook/infinitePay?secret=${encodeURIComponent(WEBHOOK_SECRET)}`
                     : `${SITE_URL}/webhook/infinitePay`,
-                config: {
-                    payment_methods: ["credit_card"]
-                },
                 items: [
                     {
                         quantity: 1,
