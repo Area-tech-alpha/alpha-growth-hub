@@ -27,7 +27,12 @@ export default async function AdminDashboardPage() {
     if (!res.ok) {
         return <div>Falha ao carregar dados</div>
     }
-    const data = await res.json() as { leadsEntered: unknown[]; leadsSold: unknown[] }
+    const data = await res.json() as {
+        leadsEntered: unknown[];
+        leadsSold: unknown[];
+        topBuyers?: { userId: string | null; count: number; name?: string | null; email?: string | null; avatar_url?: string | null }[];
+        topBidders?: { userId: string; count: number; name?: string | null; email?: string | null; avatar_url?: string | null }[];
+    }
 
     const enteredCount = Array.isArray(data.leadsEntered) ? data.leadsEntered.length : 0
     const soldCount = Array.isArray(data.leadsSold) ? data.leadsSold.length : 0
@@ -51,6 +56,36 @@ export default async function AdminDashboardPage() {
                     },
                 ]}
             />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                    <h2 className="text-base font-semibold">Top compradores</h2>
+                    <ul className="divide-y rounded-md border">
+                        {(data.topBuyers ?? []).map((b, idx) => (
+                            <li key={`buyer-${b.userId}-${idx}`} className="flex items-center justify-between p-3 text-sm">
+                                <span className="truncate max-w-[70%]">{b.name || b.email || b.userId || '—'}</span>
+                                <span className="font-medium">{b.count}</span>
+                            </li>
+                        ))}
+                        {(!data.topBuyers || data.topBuyers.length === 0) && (
+                            <li className="p-3 text-sm text-muted-foreground">Sem dados</li>
+                        )}
+                    </ul>
+                </div>
+                <div className="space-y-2">
+                    <h2 className="text-base font-semibold">Top lances</h2>
+                    <ul className="divide-y rounded-md border">
+                        {(data.topBidders ?? []).map((b, idx) => (
+                            <li key={`bidder-${b.userId}-${idx}`} className="flex items-center justify-between p-3 text-sm">
+                                <span className="truncate max-w-[70%]">{b.name || b.email || b.userId || '—'}</span>
+                                <span className="font-medium">{b.count}</span>
+                            </li>
+                        ))}
+                        {(!data.topBidders || data.topBidders.length === 0) && (
+                            <li className="p-3 text-sm text-muted-foreground">Sem dados</li>
+                        )}
+                    </ul>
+                </div>
+            </div>
         </div>
     )
 }
