@@ -1,6 +1,6 @@
 "use client";
 import StatsCards from '@/components/dashboard/leiloes/statsCards'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 type Ranked = { userId: string | null; count: number; name?: string | null; email?: string | null }
 
@@ -10,17 +10,25 @@ export default function AdminOverview() {
     const [counts, setCounts] = useState<{ entered: number; sold: number } | null>(null)
     const [topBuyers, setTopBuyers] = useState<Ranked[]>([])
     const [topBidders, setTopBidders] = useState<Ranked[]>([])
+    const [monthOptions, setMonthOptions] = useState<string[]>([])
 
-    const monthOptions = useMemo(() => {
-        const now = new Date()
-        const list: string[] = []
-        for (let i = 0; i < 12; i++) {
-            const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1))
-            const yyyy = d.getUTCFullYear()
-            const mm = String(d.getUTCMonth() + 1).padStart(2, '0')
-            list.push(`${yyyy}-${mm}`)
+    // Fetch available months from backend
+    useEffect(() => {
+        let active = true
+        async function fetchMonths() {
+            try {
+                const res = await fetch('/api/admin/available-months?source=leads', { cache: 'no-store' })
+                if (!active) return
+                if (res.ok) {
+                    const data = await res.json()
+                    setMonthOptions(Array.isArray(data.months) ? data.months : [])
+                }
+            } catch {
+                if (!active) return
+            }
         }
-        return list
+        fetchMonths()
+        return () => { active = false }
     }, [])
 
     useEffect(() => {
@@ -57,6 +65,13 @@ export default function AdminOverview() {
         return () => { active = false; controller.abort() }
     }, [selectedMonth])
 
+    const formatMonthLabel = (yyyyMm: string) => {
+        const [yyyy, mm] = yyyyMm.split('-')
+        const monthNames = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
+        const idx = parseInt(mm, 10) - 1
+        return `${monthNames[idx] ?? mm}/${yyyy.slice(2)}`
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -66,10 +81,15 @@ export default function AdminOverview() {
                 </div>
                 <div className="flex items-center gap-2">
                     <label className="text-sm">Mês</label>
-                    <select className="h-9 rounded-md border px-2 text-sm" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
+                    <select
+                        className="h-9 rounded-md border px-2 text-sm bg-background text-foreground"
+                        value={selectedMonth}
+                        onChange={e => setSelectedMonth(e.target.value)}
+                        disabled={loading}
+                    >
                         <option value="">Geral</option>
                         {monthOptions.map(m => (
-                            <option key={m} value={m}>{m}</option>
+                            <option key={m} value={m}>{formatMonthLabel(m)}</option>
                         ))}
                     </select>
                 </div>
