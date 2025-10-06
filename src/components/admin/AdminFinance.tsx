@@ -1,6 +1,7 @@
 "use client";
 import StatsCards from '@/components/dashboard/leiloes/statsCards'
 import AdminInvestorsList from './AdminInvestorsList'
+import AdminLeadsByType from './AdminLeadsByType'
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -129,6 +130,8 @@ export default function AdminFinance() {
                 </div>
                 <AdminInvestorsList month={selectedMonth} />
             </div>
+
+            <AdminLeadsByType month={selectedMonth} />
         </div>
     )
 }
