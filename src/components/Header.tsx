@@ -205,13 +205,22 @@ export default function Header({
                                         </div>
                                     </div>
 
-                                    <div className="mt-4 flex items-center justify-between">
-                                        {showThemeSwitch && (
-                                            <div>
-                                                <ThemeSwitcher />
-                                            </div>
+                                    <div className="mt-4 space-y-3">
+                                        {userRole === 'admin' && (
+                                            <Link href="/admin" className="block w-full">
+                                                <Button variant="outline" className="w-full">
+                                                    Admin
+                                                </Button>
+                                            </Link>
                                         )}
-                                        <LogoutButton mobile />
+                                        <div className="flex items-center justify-between">
+                                            {showThemeSwitch && (
+                                                <div>
+                                                    <ThemeSwitcher />
+                                                </div>
+                                            )}
+                                            <LogoutButton mobile />
+                                        </div>
                                     </div>
                                 </DialogContent>
                             </Dialog>
