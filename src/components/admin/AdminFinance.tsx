@@ -1,40 +1,113 @@
+"use client";
 import StatsCards from '@/components/dashboard/leiloes/statsCards'
-import { headers } from 'next/headers'
 import AdminInvestorsList from './AdminInvestorsList'
+import { useEffect, useMemo, useState } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-export default async function AdminFinance() {
-    const h = await headers()
-    const cookieHeader = h.get('cookie') ?? ''
-    const host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000'
-    const protocol = h.get('x-forwarded-proto') ?? 'http'
-    const baseUrl = `${protocol}://${host}`
-    const res = await fetch(`${baseUrl}/api/admin/finance`, {
-        cache: 'no-store',
-        headers: cookieHeader ? { cookie: cookieHeader } : undefined,
-    })
-    if (!res.ok) {
-        return <div className="text-sm text-red-600">Falha ao carregar dados financeiros</div>
-    }
-    const data = await res.json() as { total: number; pix: number; card: number; held: number }
+type FinanceData = { total: number; pix: number; card: number; held: number }
 
+function SkeletonCard({ title }: { title: string }) {
+    return (
+        <Card>
+            <CardHeader className="space-y-1">
+                <CardTitle className="text-sm text-muted-foreground">{title}</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="h-7 w-32 bg-muted animate-pulse rounded" />
+                <div className="mt-1 h-4 w-44 bg-muted animate-pulse rounded" />
+            </CardContent>
+        </Card>
+    )
+}
+
+export default function AdminFinance() {
+    const [selectedMonth, setSelectedMonth] = useState<string>('')
+    const [loading, setLoading] = useState<boolean>(true)
+    const [data, setData] = useState<FinanceData | null>(null)
     const formatBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+
+    const monthOptions = useMemo(() => {
+        const now = new Date()
+        const list: string[] = []
+        for (let i = 0; i < 12; i++) {
+            const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1))
+            const yyyy = d.getUTCFullYear()
+            const mm = String(d.getUTCMonth() + 1).padStart(2, '0')
+            list.push(`${yyyy}-${mm}`)
+        }
+        return list
+    }, [])
+
+    useEffect(() => {
+        let active = true
+        const controller = new AbortController()
+        async function run() {
+            try {
+                setLoading(true)
+                const qs = selectedMonth ? `?month=${selectedMonth}` : ''
+                const res = await fetch(`/api/admin/finance${qs}`, { cache: 'no-store', signal: controller.signal })
+                if (!active) return
+                if (!res.ok) {
+                    setData(null)
+                } else {
+                    const json = await res.json()
+                    setData(json)
+                }
+            } catch {
+                if (!active) return
+                setData(null)
+            } finally {
+                if (active) setLoading(false)
+            }
+        }
+        run()
+        return () => { active = false; controller.abort() }
+    }, [selectedMonth])
 
     return (
         <div className="space-y-6">
-            <StatsCards
-                items={[
-                    { title: 'Total recebido', icon: <span className="text-green-600">⬤</span>, contentTitle: formatBRL(data.total), contentDescription: 'Soma de amount_paid' },
-                    { title: 'Recebido via PIX', icon: <span className="text-green-600">⬤</span>, contentTitle: formatBRL(data.pix), contentDescription: 'Com asaas_payment_id' },
-                    { title: 'Recebido via Crédito', icon: <span className="text-green-600">⬤</span>, contentTitle: formatBRL(data.card), contentDescription: 'Com infinitepay_payment_id' },
-                ]}
-            />
+            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                <div>
+                    <h2 className="text-lg font-semibold">Financeiro</h2>
+                    <p className="text-sm text-muted-foreground">Filtre por mês para analisar períodos.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <label className="text-sm">Mês</label>
+                    <select className="h-9 rounded-md border px-2 text-sm" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
+                        <option value="">Geral</option>
+                        {monthOptions.map(m => (
+                            <option key={m} value={m}>{m}</option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
+            {loading || !data ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <SkeletonCard title="Total recebido" />
+                    <SkeletonCard title="Recebido via PIX" />
+                    <SkeletonCard title="Recebido via Crédito" />
+                </div>
+            ) : (
+                <StatsCards
+                    items={[
+                        { title: 'Total recebido', icon: <span className="text-green-600">⬤</span>, contentTitle: formatBRL(data.total), contentDescription: 'Soma de amount_paid' },
+                        { title: 'Recebido via PIX', icon: <span className="text-green-600">⬤</span>, contentTitle: formatBRL(data.pix), contentDescription: 'Com asaas_payment_id' },
+                        { title: 'Recebido via Crédito', icon: <span className="text-green-600">⬤</span>, contentTitle: formatBRL(data.card), contentDescription: 'Com infinitepay_payment_id' },
+                    ]}
+                />
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                     <h2 className="text-base font-semibold">Saldo parado na plataforma</h2>
-                    <div className="rounded-md border p-4 text-2xl font-bold text-yellow-600">{formatBRL(data.held)}</div>
+                    {loading || !data ? (
+                        <div className="h-10 w-40 bg-muted animate-pulse rounded" />
+                    ) : (
+                        <div className="rounded-md border p-4 text-2xl font-bold text-yellow-600">{formatBRL(data.held)}</div>
+                    )}
                 </div>
-                <AdminInvestorsList />
+                <AdminInvestorsList month={selectedMonth} />
             </div>
         </div>
     )

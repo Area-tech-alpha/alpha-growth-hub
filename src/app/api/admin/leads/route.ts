@@ -2,10 +2,12 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../../auth'
 import { prisma } from '@/lib/prisma'
-import type { leads as LeadRow } from '@prisma/client'
+// import type { leads as LeadRow } from '@prisma/client'
 
-export async function GET() {
+export async function GET(request: Request) {
     try {
+        const url = new URL(request.url)
+        const monthParam = url.searchParams.get('month') // YYYY-MM
         const session = await getServerSession(authOptions)
         if (!session?.user?.id) {
             return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
@@ -21,14 +23,24 @@ export async function GET() {
         }
 
         // considerar apenas leads com status não-nulo (exclui registros com status NULL)
-        const leadsEntered = await prisma.$queryRaw<LeadRow[]>`SELECT * FROM "leads" WHERE status IS NOT NULL`
+        let createdAtWhere: { gte?: Date; lt?: Date } | undefined
+        if (monthParam) {
+            const [yyyy, mm] = monthParam.split('-').map(Number)
+            if (yyyy && mm && mm >= 1 && mm <= 12) {
+                const start = new Date(Date.UTC(yyyy, mm - 1, 1, 0, 0, 0))
+                const end = new Date(Date.UTC(yyyy, mm, 1, 0, 0, 0))
+                createdAtWhere = { gte: start, lt: end }
+            }
+        }
 
-        const leadsSold = await prisma.leads.findMany({ where: { status: 'sold' } })
+        const leadsEntered = await prisma.leads.findMany({ where: { status: { not: '' }, ...(createdAtWhere ? { created_at: createdAtWhere } : {}) } })
+
+        const leadsSold = await prisma.leads.findMany({ where: { status: 'sold', ...(createdAtWhere ? { created_at: createdAtWhere } : {}) } })
 
         // Top buyers (users who purchased the most leads)
         const buyersGroup = await prisma.leads.groupBy({
             by: ['owner_id'],
-            where: { owner_id: { not: null }, status: 'sold' },
+            where: { owner_id: { not: null }, status: 'sold', ...(createdAtWhere ? { created_at: createdAtWhere } : {}) },
             _count: { owner_id: true },
             orderBy: { _count: { owner_id: 'desc' } },
             take: 10,
@@ -45,6 +57,7 @@ export async function GET() {
         // Top bidders (users who placed the most bids)
         const biddersGroup = await prisma.bids.groupBy({
             by: ['user_id'],
+            where: createdAtWhere ? { created_at: createdAtWhere } : undefined,
             _count: { user_id: true },
             orderBy: { _count: { user_id: 'desc' } },
             take: 10,

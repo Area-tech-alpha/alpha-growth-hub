@@ -3,8 +3,10 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../../auth'
 import { prisma } from '@/lib/prisma'
 
-export async function GET() {
+export async function GET(request: Request) {
     try {
+        const url = new URL(request.url)
+        const monthParam = url.searchParams.get('month') // YYYY-MM
         const session = await getServerSession(authOptions)
         if (!session?.user?.id) {
             return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
@@ -30,9 +32,19 @@ export async function GET() {
         }
 
         // Sum winning bid amounts by user
+        let createdAtWhere: { gte?: Date; lt?: Date } | undefined
+        if (monthParam) {
+            const [yyyy, mm] = monthParam.split('-').map(Number)
+            if (yyyy && mm && mm >= 1 && mm <= 12) {
+                const start = new Date(Date.UTC(yyyy, mm - 1, 1, 0, 0, 0))
+                const end = new Date(Date.UTC(yyyy, mm, 1, 0, 0, 0))
+                createdAtWhere = { gte: start, lt: end }
+            }
+        }
+
         const groups = await prisma.bids.groupBy({
             by: ['user_id'],
-            where: { id: { in: winningIds } },
+            where: { id: { in: winningIds }, ...(createdAtWhere ? { created_at: createdAtWhere } : {}) },
             _sum: { amount: true },
             orderBy: { _sum: { amount: 'desc' } },
             take: 50,
