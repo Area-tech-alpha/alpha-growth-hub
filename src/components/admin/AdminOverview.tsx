@@ -72,6 +72,31 @@ export default function AdminOverview() {
         return `${monthNames[idx] ?? mm}/${yyyy.slice(2)}`
     }
 
+    const handleRefresh = () => {
+        setSelectedMonth(prev => prev) // force re-fetch by triggering dependency
+        const controller = new AbortController()
+        async function run() {
+            try {
+                setLoading(true)
+                const qs = selectedMonth ? `?month=${selectedMonth}` : ''
+                const res = await fetch(`/api/admin/leads${qs}`, { cache: 'no-store', signal: controller.signal })
+                if (res.ok) {
+                    const data = await res.json()
+                    const entered = Array.isArray(data.leadsEntered) ? data.leadsEntered.length : 0
+                    const sold = Array.isArray(data.leadsSold) ? data.leadsSold.length : 0
+                    setCounts({ entered, sold })
+                    setTopBuyers(Array.isArray(data.topBuyers) ? data.topBuyers : [])
+                    setTopBidders(Array.isArray(data.topBidders) ? data.topBidders : [])
+                }
+            } catch {
+                // ignore
+            } finally {
+                setLoading(false)
+            }
+        }
+        run()
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -92,6 +117,14 @@ export default function AdminOverview() {
                             <option key={m} value={m}>{formatMonthLabel(m)}</option>
                         ))}
                     </select>
+                    <button
+                        onClick={handleRefresh}
+                        disabled={loading}
+                        className="h-9 px-3 rounded-md border bg-background hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                        title="Atualizar dados"
+                    >
+                        ↻
+                    </button>
                 </div>
             </div>
 
