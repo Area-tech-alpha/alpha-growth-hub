@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '../../../auth'
 import { prisma } from '@/lib/prisma'
 import { headers } from 'next/headers'
+import StatsCards from '@/components/dashboard/leiloes/statsCards'
 
 export default async function AdminDashboardPage() {
     const session = await getServerSession(authOptions)
@@ -32,26 +33,24 @@ export default async function AdminDashboardPage() {
     const soldCount = Array.isArray(data.leadsSold) ? data.leadsSold.length : 0
 
     return (
-        <div style={{ padding: 24 }}>
-            <h1>Admin Dashboard</h1>
-            <div style={{ display: 'flex', gap: 16, marginTop: 16 }}>
-                <div>
-                    <div>Total Entraram</div>
-                    <div>{enteredCount}</div>
-                </div>
-                <div>
-                    <div>Total Vendidos</div>
-                    <div>{soldCount}</div>
-                </div>
-            </div>
-            <div style={{ marginTop: 24 }}>
-                <h2>Leads Entraram</h2>
-                <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{JSON.stringify(data.leadsEntered?.slice(0, 20), null, 2)}</pre>
-            </div>
-            <div style={{ marginTop: 24 }}>
-                <h2>Leads Vendidos</h2>
-                <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{JSON.stringify(data.leadsSold?.slice(0, 20), null, 2)}</pre>
-            </div>
+        <div className="p-6 space-y-4">
+            <h1 className="text-xl font-semibold">Admin Dashboard</h1>
+            <StatsCards
+                items={[
+                    {
+                        title: 'Leads que entraram',
+                        icon: <span className="text-yellow-600">⬤</span>,
+                        contentTitle: String(enteredCount),
+                        contentDescription: 'Total de leads que entraram',
+                    },
+                    {
+                        title: 'Leads vendidos',
+                        icon: <span className="text-yellow-600">⬤</span>,
+                        contentTitle: String(soldCount),
+                        contentDescription: 'Total de leads vendidos',
+                    },
+                ]}
+            />
         </div>
     )
 }
