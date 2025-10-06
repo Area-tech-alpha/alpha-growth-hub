@@ -2,6 +2,8 @@
 import StatsCards from '@/components/dashboard/leiloes/statsCards'
 import AdminInvestorsList from './AdminInvestorsList'
 import AdminLeadsByType from './AdminLeadsByType'
+import AdminLeadsByStatus from './AdminLeadsByStatus'
+import AdminSoldSummary from './AdminSoldSummary'
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -26,6 +28,7 @@ export default function AdminFinance() {
     const [loading, setLoading] = useState<boolean>(true)
     const [data, setData] = useState<FinanceData | null>(null)
     const [monthOptions, setMonthOptions] = useState<string[]>([])
+    const [heldByUser, setHeldByUser] = useState<{ userId: string; name: string | null; email: string | null; balance: number }[]>([])
     const formatBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
     // Fetch available months from backend
@@ -73,6 +76,25 @@ export default function AdminFinance() {
         return () => { active = false; controller.abort() }
     }, [selectedMonth])
 
+    // Fetch held by user (no filter)
+    useEffect(() => {
+        let active = true
+        async function fetchHeld() {
+            try {
+                const res = await fetch('/api/admin/finance/held-by-user', { cache: 'no-store' })
+                if (!active) return
+                if (res.ok) {
+                    const json = await res.json()
+                    setHeldByUser(Array.isArray(json.users) ? json.users : [])
+                }
+            } catch {
+                if (!active) return
+            }
+        }
+        fetchHeld()
+        return () => { active = false }
+    }, [])
+
     const formatMonthLabel = (yyyyMm: string) => {
         const [yyyy, mm] = yyyyMm.split('-')
         const monthNames = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
@@ -112,26 +134,52 @@ export default function AdminFinance() {
             ) : (
                 <StatsCards
                     items={[
-                        { title: 'Total recebido', icon: <span className="text-green-600">⬤</span>, contentTitle: formatBRL(data.total), contentDescription: 'Soma de amount_paid' },
-                        { title: 'Recebido via PIX', icon: <span className="text-green-600">⬤</span>, contentTitle: formatBRL(data.pix), contentDescription: 'Com asaas_payment_id' },
-                        { title: 'Recebido via Crédito', icon: <span className="text-green-600">⬤</span>, contentTitle: formatBRL(data.card), contentDescription: 'Com infinitepay_payment_id' },
+                        { title: 'Total recebido', icon: <span className="text-green-600">⬤</span>, contentTitle: formatBRL(data.total), contentDescription: '' },
+                        { title: 'Recebido via PIX', icon: <span className="text-green-600">⬤</span>, contentTitle: formatBRL(data.pix), contentDescription: '' },
+                        { title: 'Recebido via Crédito', icon: <span className="text-green-600">⬤</span>, contentTitle: formatBRL(data.card), contentDescription: '' },
                     ]}
                 />
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
+            <div className="space-y-4">
+                <div className="flex items-center gap-2">
                     <h2 className="text-base font-semibold">Saldo parado na plataforma</h2>
-                    {loading || !data ? (
-                        <div className="h-10 w-40 bg-muted animate-pulse rounded" />
-                    ) : (
-                        <div className="rounded-md border p-4 text-2xl font-bold text-yellow-600">{formatBRL(data.held)}</div>
-                    )}
+                    <span className="text-xs text-muted-foreground italic">(filtros não se aplicam)</span>
                 </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                        <div className="text-sm font-medium">Total geral</div>
+                        {loading || !data ? (
+                            <div className="h-10 w-40 bg-muted animate-pulse rounded" />
+                        ) : (
+                            <div className="rounded-md border p-4 text-2xl font-bold text-yellow-600">{formatBRL(data.held)}</div>
+                        )}
+                    </div>
+                    <div className="space-y-2">
+                        <div className="text-sm font-medium">Top 10 usuários</div>
+                        <ul className="divide-y rounded-md border max-h-60 overflow-y-auto">
+                            {heldByUser.length > 0 ? (
+                                heldByUser.map((u, idx) => (
+                                    <li key={`held-${u.userId}-${idx}`} className="flex items-center justify-between p-2 text-sm">
+                                        <span className="truncate max-w-[60%]">{u.name || u.email || u.userId || '—'}</span>
+                                        <span className="font-medium text-yellow-600">{formatBRL(u.balance)}</span>
+                                    </li>
+                                ))
+                            ) : (
+                                <li className="p-2 text-sm text-muted-foreground">Sem dados</li>
+                            )}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <AdminInvestorsList month={selectedMonth} />
+                <AdminSoldSummary month={selectedMonth} />
             </div>
 
             <AdminLeadsByType month={selectedMonth} />
+            <AdminLeadsByStatus month={selectedMonth} />
         </div>
     )
 }
