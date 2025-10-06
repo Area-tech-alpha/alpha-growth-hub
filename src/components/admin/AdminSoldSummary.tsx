@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 type SummaryData = { count: number; total: number; avg: number; max: number }
 
@@ -37,11 +36,9 @@ export default function AdminSoldSummary({ month }: { month?: string }) {
     const formatBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-base">Resumo geral de vendas</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
+        <div className="space-y-2">
+            <h2 className="text-base font-semibold">Resumo geral de vendas</h2>
+            <ul className="divide-y rounded-md border p-3 space-y-2 text-sm bg-card">
                 {loading ? (
                     <>
                         <div className="h-4 bg-muted animate-pulse rounded w-3/4" />
@@ -51,16 +48,16 @@ export default function AdminSoldSummary({ month }: { month?: string }) {
                     </>
                 ) : data ? (
                     <>
-                        <div><span className="font-medium">Total vendidos:</span> {data.count}</div>
-                        <div><span className="font-medium">Valor total:</span> {formatBRL(data.total)}</div>
-                        <div><span className="font-medium">Média:</span> {formatBRL(data.avg)}</div>
-                        <div><span className="font-medium">Mais caro:</span> {formatBRL(data.max)}</div>
+                        <li><span className="font-medium">Total vendidos:</span> {data.count}</li>
+                        <li><span className="font-medium">Valor total:</span> {formatBRL(data.total)}</li>
+                        <li><span className="font-medium">Média:</span> {formatBRL(data.avg)}</li>
+                        <li><span className="font-medium">Mais caro:</span> {formatBRL(data.max)}</li>
                     </>
                 ) : (
-                    <div className="text-muted-foreground">Sem dados</div>
+                    <li className="text-muted-foreground">Sem dados</li>
                 )}
-            </CardContent>
-        </Card>
+            </ul>
+        </div>
     )
 }
 

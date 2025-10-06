@@ -32,6 +32,7 @@ export default function LeiloesPanel({ setDemoLead }: { setDemoLead: (lead: Lead
   const [demoAuctions, setDemoAuctions] = useState<AuctionWithLeadLocal[]>([]);
   const setDemoAuctionsGlobal = useRealtimeStore((s) => (s as unknown as { setDemoAuctions: (a: AuctionWithLeadLocal[]) => void }).setDemoAuctions);
   const [isFiltering, setIsFiltering] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const bidsByAuctionStore = useRealtimeStore(
     (s: RealtimeState) => s.bidsByAuction
   ) as Record<string, Bid[]>;
@@ -53,6 +54,26 @@ export default function LeiloesPanel({ setDemoLead }: { setDemoLead: (lead: Lead
       setDemoAuctions(globalDemoAuctions);
     }
   }, [globalDemoAuctions, demoAuctions.length]);
+
+  // Fetch user role
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    let active = true;
+    async function fetchRole() {
+      try {
+        const res = await fetch('/api/me/role', { cache: 'no-store' });
+        if (!active) return;
+        if (res.ok) {
+          const data = await res.json();
+          setUserRole(data.role ?? null);
+        }
+      } catch {
+        if (!active) return;
+      }
+    }
+    fetchRole();
+    return () => { active = false; };
+  }, [session?.user?.id]);
 
   const { sortedAuctions, availableStateUFs } = useMemo(() => {
     const source = [...activeAuctions, ...(globalDemoAuctions.length ? globalDemoAuctions : demoAuctions)];
@@ -312,7 +333,7 @@ export default function LeiloesPanel({ setDemoLead }: { setDemoLead: (lead: Lead
           <p className="text-gray-500">Aguarde novos leads</p>
         </div>
       )}
-      {(session?.user?.email === 'yago@assessorialpha.com' || session?.user?.email === 'maxwell.tech@assessorialpha.com' || session?.user?.email === 'samuel.lacerda@assessorialpha.com') && (
+      {userRole === 'admin' && (
         <DemoAuctionsButton
           visible={demoAuctions.length === 0}
           onCreate={(auctions) => {

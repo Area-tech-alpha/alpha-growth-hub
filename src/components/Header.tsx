@@ -55,6 +55,7 @@ export default function Header({
     const demoHolds = useRealtimeStore(s => s.demoHolds);
     const subscribeToUserCreditHolds = useRealtimeStore(s => s.subscribeToUserCreditHolds);
     const subscribeToUserCredits = useRealtimeStore(s => s.subscribeToUserCredits);
+    const [userRole, setUserRole] = useState<string | null>(null);
 
     useEffect(() => {
         if (session?.user?.id) {
@@ -62,6 +63,26 @@ export default function Header({
             subscribeToUserCreditHolds(session.user.id);
         }
     }, [session?.user?.id, subscribeToUserCredits, subscribeToUserCreditHolds]);
+
+    // Fetch user role
+    useEffect(() => {
+        if (!session?.user?.id) return;
+        let active = true;
+        async function fetchRole() {
+            try {
+                const res = await fetch('/api/me/role', { cache: 'no-store' });
+                if (!active) return;
+                if (res.ok) {
+                    const data = await res.json();
+                    setUserRole(data.role ?? null);
+                }
+            } catch {
+                if (!active) return;
+            }
+        }
+        fetchRole();
+        return () => { active = false; };
+    }, [session?.user?.id]);
 
     const demoAvailable = Math.max(0, demoCredits - Object.values(demoHolds || {}).reduce((a, b) => a + (Number(b) || 0), 0));
     const displayCredits = session?.user?.id ? (demoModeActive ? demoAvailable : realtimeCredits) : userCredits;
@@ -94,6 +115,13 @@ export default function Header({
                     </div>
 
                     <div className="flex items-center space-x-3 sm:space-x-4">
+                        {userRole === 'admin' && (
+                            <Link href="/admin">
+                                <Button variant="outline" size="sm" className="hidden md:flex">
+                                    Admin
+                                </Button>
+                            </Link>
+                        )}
                         <div className="flex items-center gap-2 bg-yellow-50 dark:bg-yellow-900/20 px-3 py-1 rounded-lg border border-yellow-200 dark:border-yellow-700">
                             <LuCoins className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                             <span className="font-semibold text-yellow-900 dark:text-yellow-200">
