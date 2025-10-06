@@ -69,6 +69,15 @@ export const authOptions: NextAuthOptions = {
             if (user) {
                 token.id = user.id;
             }
+            // attach role to token (fetch once if missing)
+            if (token.id && !(token as unknown as { role?: string }).role) {
+                try {
+                    const row = await prisma.users.findUnique({ where: { id: String(token.id) }, select: { role: true } })
+                        ; (token as unknown as { role?: string }).role = row?.role ?? 'user'
+                } catch (e) {
+                    // ignore
+                }
+            }
             // Expose Google id_token on initial login so the client can bridge to Supabase Auth
             if (account && account.provider === 'google') {
                 // id_token is needed for supabase.auth.signInWithIdToken({ provider: 'google' })
@@ -83,6 +92,11 @@ export const authOptions: NextAuthOptions = {
         async session({ session, token }) {
             if (session.user) {
                 session.user.id = token.id as string;
+                // propagate role to session
+                const t = token as unknown as { role?: string }
+                if (t.role) {
+                    ; (session.user as unknown as { role?: string }).role = t.role
+                }
             }
             // Pass through the temporary id_token to allow client to establish Supabase session.
             // It is short-lived and only needed once; Supabase will persist its own session.
@@ -113,6 +127,22 @@ export const authOptions: NextAuthOptions = {
                 if (error) {
                     console.error('[NextAuth][events.signIn] supabase admin upsert failed:', error);
                 }
+                // ensure prisma users row exists with default role
+                await prisma.users.upsert({
+                    where: { id: user.id },
+                    update: {
+                        name: user.name ?? null,
+                        email: user.email ?? null,
+                        avatar_url: user.image ?? null,
+                    },
+                    create: {
+                        id: user.id,
+                        name: user.name ?? null,
+                        email: user.email ?? null,
+                        avatar_url: user.image ?? null,
+                        role: 'user',
+                    },
+                })
             } catch (err) {
                 console.error('[NextAuth][events.signIn] upsert users failed:', err);
             }
