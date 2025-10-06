@@ -1,5 +1,6 @@
 import StatsCards from '@/components/dashboard/leiloes/statsCards'
 import { headers } from 'next/headers'
+import AdminInvestorsList from './AdminInvestorsList'
 
 export default async function AdminFinance() {
     const h = await headers()
@@ -33,6 +34,7 @@ export default async function AdminFinance() {
                     <h2 className="text-base font-semibold">Saldo parado na plataforma</h2>
                     <div className="rounded-md border p-4 text-2xl font-bold text-yellow-600">{formatBRL(data.held)}</div>
                 </div>
+                <AdminInvestorsList />
             </div>
         </div>
     )
