@@ -10,6 +10,7 @@ import {
   Flame,
   Hash,
   MapPin,
+  Clock,
 } from "lucide-react";
 import {
   Card,
@@ -47,7 +48,10 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
   const isHot = lead.status === "hot";
   const documentUrl = (lead as unknown as { document_url?: string })?.document_url;
   const contractUrl = (lead as unknown as { contract_url?: string })?.contract_url;
+  const contractValue = (lead as unknown as { contract_value?: number })?.contract_value;
+  const contractTime = (lead as unknown as { contract_time?: string })?.contract_time;
   const calUrl = lead.cal_url as string | undefined;
+
 
   return (
     <>
@@ -166,6 +170,28 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
                   </div>
                 </div>
               </div>
+              {typeof contractValue === "number" && !isNaN(contractValue) && (
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-3 w-3 text-yellow-600" />
+                  <div>
+                    <div className="text-muted-foreground">Valor do Contrato</div>
+                    <div className="font-semibold">
+                      {formatCurrency(contractValue)}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {contractTime && (
+                <div className="flex items-center gap-2">
+                  <Clock className="h-3 w-3 text-yellow-600" />
+                  <div>
+                    <div className="text-muted-foreground">Tempo de Contrato</div>
+                    <div className="font-semibold">
+                      {contractTime}
+                    </div>
+                  </div>
+                </div>
+              )}
 
             </div>
             {isHot && (documentUrl || contractUrl || calUrl) && (

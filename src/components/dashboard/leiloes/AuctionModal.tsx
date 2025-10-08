@@ -24,6 +24,7 @@ import {
     User,
     Info,
     Hash,
+    Clock,
 } from "lucide-react";
 import { CountdownTimer } from "../leads/CountdownTimer";
 import { Lead } from "../leads/types";
@@ -59,7 +60,7 @@ export const AuctionModal = ({
     const bidsFromStore = useRealtimeStore((s) => (s.bidsByAuction[auctionId] ?? EMPTY_BIDS)) as Bid[];
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [hasWon, setHasWon] = useState(false);
-    const displayLeadName = hasWon ? lead.name : maskName(lead.name);
+    const displayLeadName = lead.name;
     const demoModeActive = useRealtimeStore((s) => s.demoModeActive);
     const demoCredits = useRealtimeStore((s) => s.demoCredits);
     const demoHolds = useRealtimeStore((s) => s.demoHolds);
@@ -256,6 +257,9 @@ export const AuctionModal = ({
         }
     };
 
+    const contractValue = (lead as unknown as { contract_value?: number })?.contract_value;
+    const contractTime = (lead as unknown as { contract_time?: string })?.contract_time;
+
     const handleBuyNow = async () => {
         // Abre confirmação em vez de executar direto
         setConfirmBuyNowOpen(true);
@@ -368,7 +372,7 @@ export const AuctionModal = ({
                             {hasWon ? "Informações Completas do Lead" : "Prévia do Lead"}
                         </h3>
 
-                        <div className="grid grid-cols-1 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
                                 <div className="flex items-center gap-2 mb-1">
                                     <DollarSign className="h-4 w-4" />
@@ -387,6 +391,28 @@ export const AuctionModal = ({
                                     {String(lead.marketing_investment)}
                                 </div>
                             </div>
+                            {typeof contractValue === "number" && !isNaN(contractValue) && (
+                                <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <DollarSign className="h-4 w-4" />
+                                        <span className="text-sm">Valor do Contrato</span>
+                                    </div>
+                                    <div className="font-bold text-base sm:text-xl truncate">
+                                        {formatCurrency(contractValue)}
+                                    </div>
+                                </div>
+                            )}
+                            {contractTime && (
+                                <div className="p-4 bg-muted rounded-lg">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <Clock className="h-4 w-4" />
+                                        <span className="text-sm">Tempo de Contrato</span>
+                                    </div>
+                                    <div className="font-bold text-base sm:text-xl truncate" title={String(contractTime)}>
+                                        {contractTime}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div
