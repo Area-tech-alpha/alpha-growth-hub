@@ -29,6 +29,7 @@ export interface Lead {
     contract_time: string;
     contract_value: number;
     cal_url?: string;
+    briefing_url?: string;
     tags: string[];
     [key: string]: unknown;
 }

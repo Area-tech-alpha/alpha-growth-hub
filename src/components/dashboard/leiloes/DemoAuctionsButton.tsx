@@ -55,6 +55,7 @@ export default function DemoAuctionsButton({
                 cal_url: (status === "hot" ? "https://example.com/gravacao-demo.mp4" : undefined),
                 contract_time: (status === "hot" && "1 ano"),
                 contract_value: (status === "hot" && 100000),
+                briefing_url: (status === "hot" ? "https://example.com/briefing-demo.pdf" : ""),
                 tags: [],
             } as unknown as AuctionWithLead["leads"],
         });
