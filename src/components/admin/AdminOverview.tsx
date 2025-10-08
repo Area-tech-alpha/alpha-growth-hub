@@ -3,6 +3,16 @@ import StatsCards from '@/components/dashboard/leiloes/statsCards'
 import { useEffect, useState } from 'react'
 
 type Ranked = { userId: string | null; count: number; name?: string | null; email?: string | null }
+type RecentLead = {
+    id: string;
+    company_name: string | null;
+    created_at: string | Date | null;
+    sold: boolean;
+    type: 'hot' | 'cold';
+    buyer: { id: string | null; name: string | null; email: string | null } | null;
+    price: number | null;
+    bids_count: number;
+}
 
 export default function AdminOverview() {
     const [selectedMonth, setSelectedMonth] = useState<string>('')
@@ -47,7 +57,7 @@ export default function AdminOverview() {
                     const data = await res.json()
                     const items = Array.isArray(data.items) ? data.items : []
                     // normalize created_at to ISO strings
-                    setRecent(items.map((it: any) => ({
+                    setRecent(items.map((it: RecentLead) => ({
                         ...it,
                         created_at: it.created_at ? new Date(it.created_at).toISOString() : null,
                     })))

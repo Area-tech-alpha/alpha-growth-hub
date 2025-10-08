@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 type Investor = { userId: string; total: number; name?: string | null; email?: string | null }
 
