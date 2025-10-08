@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+ï»¿import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
@@ -7,7 +7,7 @@ const escapeCsvCell = (
     cellData: string | number | null | undefined
 ): string => {
     if (cellData === null || cellData === undefined) {
-        return "\"\"";
+        return '""';
     }
     const stringData = String(cellData);
     if (/[",\n\r]/.test(stringData)) {
@@ -21,7 +21,7 @@ export async function GET() {
         const session = await getServerSession(authOptions);
         const userId = session?.user?.id;
         if (!userId) {
-            return NextResponse.json({ error: "NÃ£o autenticado" }, { status: 401 });
+            return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
         }
 
         const leads = await prisma.leads.findMany({
@@ -31,7 +31,7 @@ export async function GET() {
 
         const headers = [
             "Nome",
-            "Descri??uo",
+            "Descricao",
             "Canal",
             "Faturamento",
             "Investimento em Marketing",
@@ -47,7 +47,7 @@ export async function GET() {
             "Valor do Contrato",
             "Tempo de Contrato",
             "Briefing (URL)",
-            "Gravação (URL)",
+            "Gravacao (URL)",
         ];
 
         const rows = leads.map((lead) => {
@@ -91,8 +91,3 @@ export async function GET() {
         return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
     }
 }
-
-
-
-
-

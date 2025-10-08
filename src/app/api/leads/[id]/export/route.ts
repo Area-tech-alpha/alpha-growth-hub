@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+ï»¿import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -10,7 +10,6 @@ const escapeCsvCell = (
     return '""';
   }
   const stringData = String(cellData);
-
   if (/[",\n\r]/.test(stringData)) {
     return `"${stringData.replace(/"/g, '""')}"`;
   }
@@ -19,13 +18,12 @@ const escapeCsvCell = (
 
 export async function GET(
   _request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
-  const { id: leadId } = await params;
-
+  const { id: leadId } = params;
   if (!leadId) {
     return NextResponse.json(
-      { error: "ID do Lead nÃ£o fornecido" },
+      { error: "ID do Lead nao fornecido" },
       { status: 400 }
     );
   }
@@ -37,14 +35,14 @@ export async function GET(
 
     if (!lead) {
       return NextResponse.json(
-        { error: "Lead nÃ£o encontrado" },
+        { error: "Lead nao encontrado" },
         { status: 404 }
       );
     }
 
     const headers = [
       "Nome",
-      "Descrição",
+      "Descricao",
       "Canal",
       "Faturamento",
       "Investimento em Marketing",
@@ -60,7 +58,7 @@ export async function GET(
       "Valor do Contrato",
       "Tempo de Contrato",
       "Briefing (URL)",
-      "Gravação (URL)",
+      "Gravacao (URL)",
     ];
 
     const rec = lead as unknown as Record<string, unknown>;
@@ -88,11 +86,7 @@ export async function GET(
     ];
 
     const csvContent = [headers.join(","), rowData.join(",")].join("\n");
-
-    const filename = `lead_${lead.company_name.replace(
-      /[^a-z0-9]/gi,
-      "_"
-    )}.csv`;
+    const filename = `lead_${lead.company_name.replace(/[^a-z0-9]/gi, "_")}.csv`;
 
     return new NextResponse(csvContent, {
       status: 200,
@@ -109,4 +103,3 @@ export async function GET(
     );
   }
 }
-
