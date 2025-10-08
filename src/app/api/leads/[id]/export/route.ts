@@ -44,7 +44,7 @@ export async function GET(
 
     const headers = [
       "Nome",
-      "DescriÃ§Ã£o",
+      "Descrição",
       "Canal",
       "Faturamento",
       "Investimento em Marketing",
@@ -57,6 +57,10 @@ export async function GET(
       "Email",
       "Documento (URL)",
       "Contrato (URL)",
+      "Valor do Contrato",
+      "Tempo de Contrato",
+      "Briefing (URL)",
+      "Gravação (URL)",
     ];
 
     const rec = lead as unknown as Record<string, unknown>;
@@ -77,6 +81,10 @@ export async function GET(
       escapeCsvCell((rec["email"] as string) ?? null),
       escapeCsvCell((rec["document_url"] as string) ?? null),
       escapeCsvCell((rec["contract_url"] as string) ?? null),
+      escapeCsvCell((rec["contract_value"] as number | string | undefined) as unknown as string),
+      escapeCsvCell((rec["contract_time"] as string) ?? null),
+      escapeCsvCell((rec["briefing_url"] as string) ?? null),
+      escapeCsvCell((rec["cal_url"] as string) ?? null),
     ];
 
     const csvContent = [headers.join(","), rowData.join(",")].join("\n");
@@ -101,3 +109,4 @@ export async function GET(
     );
   }
 }
+

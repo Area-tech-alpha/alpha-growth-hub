@@ -31,7 +31,7 @@ export async function GET() {
 
         const headers = [
             "Nome",
-            "DescriÃ§Ã£o",
+            "Descri??uo",
             "Canal",
             "Faturamento",
             "Investimento em Marketing",
@@ -44,6 +44,10 @@ export async function GET() {
             "Email",
             "Documento (URL)",
             "Contrato (URL)",
+            "Valor do Contrato",
+            "Tempo de Contrato",
+            "Briefing (URL)",
+            "Gravação (URL)",
         ];
 
         const rows = leads.map((lead) => {
@@ -65,6 +69,10 @@ export async function GET() {
                 escapeCsvCell((rec["email"] as string) ?? null),
                 escapeCsvCell((rec["document_url"] as string) ?? null),
                 escapeCsvCell((rec["contract_url"] as string) ?? null),
+                escapeCsvCell((rec["contract_value"] as number | string | undefined) as unknown as string),
+                escapeCsvCell((rec["contract_time"] as string) ?? null),
+                escapeCsvCell((rec["briefing_url"] as string) ?? null),
+                escapeCsvCell((rec["cal_url"] as string) ?? null),
             ].join(",");
         });
 
@@ -83,5 +91,8 @@ export async function GET() {
         return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
     }
 }
+
+
+
 
 

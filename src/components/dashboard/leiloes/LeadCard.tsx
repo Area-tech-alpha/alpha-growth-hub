@@ -258,3 +258,4 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
     </>
   );
 };
+
