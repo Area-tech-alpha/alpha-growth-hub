@@ -22,8 +22,8 @@ type HistoryItem = {
 type LiteUser = { id: string; name: string | null; email: string | null }
 
 export default function AdminCredits() {
-    const [form, setForm] = useState<{ userId: string; credits: string; reason: string }>(
-        { userId: '', credits: '', reason: '' }
+    const [form, setForm] = useState<{ userId: string; credits: string; reason: string; action: 'grant' | 'refund' }>(
+        { userId: '', credits: '', reason: '', action: 'grant' }
     )
     const [submitting, setSubmitting] = useState(false)
     const [message, setMessage] = useState<string | null>(null)
@@ -109,6 +109,7 @@ export default function AdminCredits() {
                     userId: form.userId,
                     credits: creditsNum,
                     reason: form.reason || undefined,
+                    action: form.action,
                     idempotencyKey: idemKeyRef.current,
                 }),
             })
@@ -117,7 +118,7 @@ export default function AdminCredits() {
                 setMessage(err?.error || 'Falha ao conceder créditos')
             } else {
                 setMessage('Créditos concedidos com sucesso.')
-                setForm({ userId: '', credits: '', reason: '' })
+                setForm({ userId: '', credits: '', reason: '', action: 'grant' })
                 setUserSearch('')
                 setUserOptions([])
                 setSelectedUser(null)
@@ -219,6 +220,18 @@ export default function AdminCredits() {
                                 disabled={submitting}
                                 min={1}
                             />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <label className="text-sm">Ação</label>
+                            <select
+                                className="h-9 rounded border px-2 bg-background"
+                                value={form.action}
+                                onChange={e => setForm(f => ({ ...f, action: e.target.value as 'grant' | 'refund' }))}
+                                disabled={submitting}
+                            >
+                                <option value="grant">Conceder (Recompensa)</option>
+                                <option value="refund">Extornar (Ajuste)</option>
+                            </select>
                         </div>
                         <div className="flex flex-col gap-1">
                             <label className="text-sm">Motivo</label>

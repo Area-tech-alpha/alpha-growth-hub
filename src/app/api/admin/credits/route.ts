@@ -12,6 +12,7 @@ type PostBody = {
     reason?: string
     metadata?: Record<string, unknown>
     idempotencyKey?: string
+    action?: 'grant' | 'refund'
 }
 
 type RawCreditRow = {
@@ -34,13 +35,15 @@ async function requireAdmin() {
 }
 
 export async function POST(request: Request) {
+    let parsedBody: PostBody | null = null
     try {
         const adminCheck = await requireAdmin()
         if (!adminCheck.ok) return NextResponse.json({ error: adminCheck.error }, { status: adminCheck.status })
         const admin = adminCheck.me!
 
         const body = (await request.json()) as PostBody
-        const { userId, email, credits, reason, metadata, idempotencyKey } = body
+        parsedBody = body
+        const { userId, email, credits, reason, metadata, idempotencyKey, action } = body
 
         if (!credits || typeof credits !== 'number' || credits <= 0) {
             return NextResponse.json({ error: 'Créditos inválidos. Deve ser número positivo.' }, { status: 400 })
@@ -67,43 +70,67 @@ export async function POST(request: Request) {
             idempotency_key: idempotencyKey || null,
         }
 
+        const mode = action === 'refund' ? 'refund' : 'grant'
+
         const result = await prisma.$transaction(async (tx) => {
-            const ct = await tx.credit_transactions.create({
-                data: {
-                    user_id: user.id,
-                    amount_paid: 0,
-                    credits_purchased: credits,
-                    status: 'completed',
-                    source: 'reward',
-                    metadata: meta as unknown as object,
-                },
-            })
-
-            await tx.users.update({
-                where: { id: user.id },
-                data: { credit_balance: { increment: credits } },
-            })
-
-            await tx.ledger_entries.create({
-                data: {
-                    transaction_id: ct.id,
-                    user_id: user.id,
-                    account_type: 'USER_CREDITS',
-                    amount: credits,
-                    credit_source: 'reward',
-                },
-            })
-
-            return { transactionId: String(ct.id) }
+            if (mode === 'refund') {
+                const adjMeta = { ...meta, source: 'adjustment', kind: 'admin_adjustment', adjustment_type: 'refund' }
+                const ct = await tx.credit_transactions.create({
+                    data: {
+                        user_id: user.id,
+                        amount_paid: 0,
+                        credits_purchased: credits,
+                        status: 'completed',
+                        source: 'adjustment',
+                        metadata: adjMeta as unknown as object,
+                    },
+                })
+                await tx.users.update({ where: { id: user.id }, data: { credit_balance: { increment: credits } } })
+                await tx.ledger_entries.create({
+                    data: {
+                        transaction_id: ct.id,
+                        user_id: user.id,
+                        account_type: 'USER_CREDITS',
+                        amount: credits,
+                        credit_source: 'adjustment',
+                    },
+                })
+                return { transactionId: String(ct.id) }
+            } else {
+                const ct = await tx.credit_transactions.create({
+                    data: {
+                        user_id: user.id,
+                        amount_paid: 0,
+                        credits_purchased: credits,
+                        status: 'completed',
+                        source: 'reward',
+                        metadata: meta as unknown as object,
+                    },
+                })
+                await tx.users.update({ where: { id: user.id }, data: { credit_balance: { increment: credits } } })
+                await tx.ledger_entries.create({
+                    data: {
+                        transaction_id: ct.id,
+                        user_id: user.id,
+                        account_type: 'USER_CREDITS',
+                        amount: credits,
+                        credit_source: 'reward',
+                    },
+                })
+                return { transactionId: String(ct.id) }
+            }
         })
 
         return NextResponse.json({ ok: true, transactionId: result.transactionId })
     } catch (error) {
         // Handle unique violation on idempotency (if index applied)
-        const e = error as unknown as { code?: string; message?: string }
-        if ((e as any)?.code === 'P2002' || String(e?.message || '').includes('duplicate key')) {
+        type MaybePrismaError = { code?: string; message?: string }
+        const e = error as MaybePrismaError
+        const code = typeof e?.code === 'string' ? e.code : undefined
+        const msg = typeof e?.message === 'string' ? e.message : ''
+        if (code === 'P2002' || msg.includes('duplicate key')) {
             try {
-                const urlKey = (await request.json().catch(() => ({})) as { idempotencyKey?: string })?.idempotencyKey
+                const urlKey = parsedBody?.idempotencyKey
                 if (urlKey) {
                     const rows = await prisma.$queryRawUnsafe<{ id: bigint }[]>(
                         `SELECT id FROM credit_transactions WHERE (metadata->>'idempotency_key') = $1 LIMIT 1`,

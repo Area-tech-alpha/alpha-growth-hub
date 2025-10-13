@@ -205,7 +205,7 @@ export default function AdminFinance() {
                         </Card>
                         <Card>
                             <CardHeader className="space-y-1">
-                                <CardTitle className="text-sm text-muted-foreground">Ajuste (créditos)</CardTitle>
+                                <CardTitle className="text-sm text-muted-foreground">Estorno (créditos)</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-semibold">{(data.bySource?.adjustment?.credits || 0).toLocaleString('pt-BR')}</div>
