@@ -30,9 +30,12 @@ export default function AdminCredits() {
     const [history, setHistory] = useState<HistoryItem[]>([])
     const [userSearch, setUserSearch] = useState('')
     const [userOptions, setUserOptions] = useState<LiteUser[]>([])
+    const [selectedUser, setSelectedUser] = useState<LiteUser | null>(null)
     const [usersOpen, setUsersOpen] = useState(false)
     const [usersLoading, setUsersLoading] = useState(false)
     const selectRef = useRef<HTMLDivElement | null>(null)
+    const usersCacheRef = useRef<{ data: Record<string, LiteUser[]>; ts: Record<string, number> }>({ data: {}, ts: {} })
+    const USERS_TTL_MS = 60_000
     const creditsNum = useMemo(() => Number(form.credits || '0'), [form.credits])
 
     const loadHistory = async () => {
@@ -47,6 +50,45 @@ export default function AdminCredits() {
     }
 
     useEffect(() => { loadHistory() }, [])
+
+    // Click outside to close users dropdown
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (!selectRef.current) return
+            if (!selectRef.current.contains(e.target as Node)) {
+                setUsersOpen(false)
+            }
+        }
+        window.addEventListener('mousedown', handler)
+        return () => window.removeEventListener('mousedown', handler)
+    }, [])
+
+    // Fetch users with simple in-memory cache + TTL
+    const fetchUsers = async (q: string) => {
+        const key = (q || '').toLowerCase()
+        const now = Date.now()
+        const ts = usersCacheRef.current.ts[key]
+        if (ts && now - ts < USERS_TTL_MS) {
+            setUserOptions(usersCacheRef.current.data[key] || [])
+            return
+        }
+        setUsersLoading(true)
+        try {
+            const qs = key ? `?q=${encodeURIComponent(key)}` : ''
+            const res = await fetch(`/api/admin/users${qs}`, { cache: 'no-store' })
+            if (res.ok) {
+                const json = await res.json()
+                const arr: LiteUser[] = Array.isArray(json.users) ? json.users : []
+                usersCacheRef.current.data[key] = arr
+                usersCacheRef.current.ts[key] = now
+                setUserOptions(arr)
+            }
+        } catch {
+            // ignore
+        } finally {
+            setUsersLoading(false)
+        }
+    }
 
     const idemKeyRef = useRef<string | null>(null)
 
@@ -78,6 +120,7 @@ export default function AdminCredits() {
                 setForm({ userId: '', credits: '', reason: '' })
                 setUserSearch('')
                 setUserOptions([])
+                setSelectedUser(null)
                 idemKeyRef.current = null
                 loadHistory()
             }
@@ -110,37 +153,16 @@ export default function AdminCredits() {
                                 <input
                                     className="h-9 w-full rounded border pl-2 pr-16 bg-background"
                                     placeholder="Digite para buscar por nome ou email..."
-                                    value={form.userId ? (userOptions.find(u => u.id === form.userId)?.name || userOptions.find(u => u.id === form.userId)?.email || userSearch) : userSearch}
+                                    value={form.userId ? (selectedUser?.name || selectedUser?.email || userSearch) : userSearch}
                                     onChange={async (e) => {
                                         const v = e.target.value
                                         setUserSearch(v)
                                         setUsersOpen(true)
-                                        setUsersLoading(true)
-                                        try {
-                                            const qs = v ? `?q=${encodeURIComponent(v)}` : ''
-                                            const res = await fetch(`/api/admin/users${qs}`, { cache: 'no-store' })
-                                            if (res.ok) {
-                                                const json = await res.json()
-                                                setUserOptions(Array.isArray(json.users) ? json.users : [])
-                                            }
-                                        } catch {
-                                            // ignore
-                                        } finally {
-                                            setUsersLoading(false)
-                                        }
+                                        fetchUsers(v)
                                     }}
                                     onFocus={async () => {
                                         setUsersOpen(true)
-                                        if (userOptions.length === 0) {
-                                            setUsersLoading(true)
-                                            try {
-                                                const res = await fetch('/api/admin/users', { cache: 'no-store' })
-                                                if (res.ok) {
-                                                    const json = await res.json()
-                                                    setUserOptions(Array.isArray(json.users) ? json.users : [])
-                                                }
-                                            } catch { } finally { setUsersLoading(false) }
-                                        }
+                                        if (userOptions.length === 0) { fetchUsers('') }
                                     }}
                                     disabled={submitting}
                                 />
@@ -149,7 +171,7 @@ export default function AdminCredits() {
                                         <button
                                             type="button"
                                             className="h-7 w-7 text-xs rounded border hover:bg-muted"
-                                            onClick={() => { setForm(f => ({ ...f, userId: '' })); setUserSearch(''); setUsersOpen(false) }}
+                                            onClick={() => { setForm(f => ({ ...f, userId: '' })); setSelectedUser(null); setUserSearch(''); setUsersOpen(false) }}
                                             title="Limpar seleção"
                                         >×</button>
                                     )}
@@ -173,7 +195,7 @@ export default function AdminCredits() {
                                                         <button
                                                             type="button"
                                                             className={`w-full text-left p-2 text-sm hover:bg-muted ${form.userId === u.id ? 'bg-muted' : ''}`}
-                                                            onClick={() => { setForm(f => ({ ...f, userId: u.id })); setUsersOpen(false) }}
+                                                            onClick={() => { setForm(f => ({ ...f, userId: u.id })); setSelectedUser(u); setUsersOpen(false) }}
                                                         >
                                                             <span className="font-medium">{u.name || u.email || u.id}</span>
                                                             <span className="block text-xs text-muted-foreground">{u.email || u.id}</span>
