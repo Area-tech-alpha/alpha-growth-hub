@@ -13,6 +13,17 @@ type PostBody = {
     metadata?: Record<string, unknown>
 }
 
+type RawCreditRow = {
+    id: bigint | number
+    user_id: string
+    credits_purchased: unknown
+    amount_paid: unknown
+    created_at: Date | string
+    metadata: unknown
+    email: string | null
+    name: string | null
+}
+
 async function requireAdmin() {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) return { ok: false as const, status: 401 as const, error: 'Não autenticado' }
@@ -98,30 +109,33 @@ export async function GET(request: Request) {
         const url = new URL(request.url)
         const limit = Math.min(parseInt(url.searchParams.get('limit') || '20', 10) || 20, 100)
 
-        // Preferimos filtrar por metadata->>'source' = 'reward' (até o campo source existir no schema)
-        const rows = await prisma.$queryRawUnsafe<any[]>(
+        // Filtra usando a coluna `source` (credit_source_enum)
+        const rows = await prisma.$queryRawUnsafe<RawCreditRow[]>(
             `
             SELECT ct.id, ct.user_id, ct.credits_purchased, ct.amount_paid, ct.created_at, ct.metadata,
                    u.email, u.name
             FROM credit_transactions ct
             JOIN users u ON u.id = ct.user_id
-            WHERE (ct.metadata->>'source') = 'reward'
+            WHERE ct.source = 'reward'::credit_source_enum
             ORDER BY ct.created_at DESC
             LIMIT $1
             `,
             limit,
         )
 
-        const items = rows.map((r) => ({
-            id: String(r.id),
-            userId: r.user_id as string,
-            email: r.email as string | null,
-            name: r.name as string | null,
-            credits: Number(r.credits_purchased) || 0,
-            amountPaid: Number(r.amount_paid) || 0,
-            createdAt: r.created_at,
-            metadata: r.metadata,
-        }))
+        const items = rows.map((r) => {
+            const rawMd = (r.metadata ?? {}) as Record<string, unknown>
+            return {
+                id: String(r.id),
+                userId: r.user_id as string,
+                email: r.email as string | null,
+                name: r.name as string | null,
+                credits: Number(r.credits_purchased) || 0,
+                amountPaid: Number(r.amount_paid) || 0,
+                createdAt: typeof r.created_at === 'string' ? r.created_at : (r.created_at as Date).toISOString(),
+                metadata: rawMd,
+            }
+        })
 
         return NextResponse.json({ items })
     } catch (error) {

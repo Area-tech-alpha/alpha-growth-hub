@@ -38,7 +38,8 @@ export async function GET(request: Request) {
         const heldAgg = await prisma.users.aggregate({ _sum: { credit_balance: true } })
 
         // Segmentar por origem (tenta usar coluna `source`; se falhar, usa fallback no metadata)
-        let bySourceRows: { derived_source: string | null, amount_paid_sum: any, credits_sum: any }[] = []
+        type GroupRow = { derived_source: string | null; amount_paid_sum: unknown; credits_sum: unknown }
+        let bySourceRows: GroupRow[] = []
         try {
             const where = createdAtWhere ? { created_at: createdAtWhere } : undefined
             const grouped = await prisma.credit_transactions.groupBy({
@@ -54,7 +55,7 @@ export async function GET(request: Request) {
         } catch {
             const start = createdAtWhere?.gte ?? null
             const end = createdAtWhere?.lt ?? null
-            bySourceRows = await prisma.$queryRawUnsafe<{ derived_source: string | null, amount_paid_sum: any, credits_sum: any }[]>(
+            bySourceRows = await prisma.$queryRawUnsafe<GroupRow[]>(
                 `
                 WITH filtered AS (
                   SELECT

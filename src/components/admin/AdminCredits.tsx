@@ -3,6 +3,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
+type RewardMetadata = {
+    reason?: string
+    granted_by?: { id?: string; email?: string; name?: string }
+} & Record<string, unknown>
+
 type HistoryItem = {
     id: string
     userId: string
@@ -11,7 +16,7 @@ type HistoryItem = {
     credits: number
     amountPaid: number
     createdAt: string
-    metadata?: any
+    metadata?: RewardMetadata
 }
 
 export default function AdminCredits() {
@@ -158,7 +163,7 @@ export default function AdminCredits() {
                                     <tr><td className="py-3 text-muted-foreground" colSpan={5}>Sem registros</td></tr>
                                 )}
                                 {history.map((h) => {
-                                    const reason = h?.metadata?.reason || h?.metadata?.motivo || ''
+                                    const reason = h?.metadata?.reason || ''
                                     const by = h?.metadata?.granted_by?.email || h?.metadata?.granted_by?.id || ''
                                     return (
                                         <tr key={h.id} className="border-b last:border-b-0">
