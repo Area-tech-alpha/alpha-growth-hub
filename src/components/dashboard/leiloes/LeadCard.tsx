@@ -50,6 +50,7 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
   const contractUrl = (lead as unknown as { contract_url?: string })?.contract_url;
   const contractValue = (lead as unknown as { contract_value?: number })?.contract_value;
   const contractTime = (lead as unknown as { contract_time?: string })?.contract_time;
+  const briefingUrl = (lead as unknown as { briefing_url?: string })?.briefing_url;
   const calUrl = lead.cal_url as string | undefined;
 
 
@@ -194,12 +195,12 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
               )}
 
             </div>
-            {isHot && (documentUrl || contractUrl || calUrl) && (
+            {isHot && (documentUrl || contractUrl || calUrl || briefingUrl) && (
               <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {documentUrl && (
+                {briefingUrl && (
                   <Button asChild variant="outline" size="sm" className="h-9 sm:h-7 px-3 sm:px-2.5 w-full">
-                    <a href={documentUrl} target="_blank" rel="noopener noreferrer">
-                      Abrir documento
+                    <a href={briefingUrl} target="_blank" rel="noopener noreferrer">
+                      Abrir briefing
                     </a>
                   </Button>
                 )}
@@ -207,6 +208,13 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
                   <Button asChild variant="outline" size="sm" className="h-9 sm:h-7 px-3 sm:px-2.5 w-full">
                     <a href={contractUrl} target="_blank" rel="noopener noreferrer">
                       Abrir contrato
+                    </a>
+                  </Button>
+                )}
+                {documentUrl && (
+                  <Button asChild variant="outline" size="sm" className="h-9 sm:h-7 px-3 sm:px-2.5 w-full sm:col-span-2">
+                    <a href={documentUrl} target="_blank" rel="noopener noreferrer">
+                      Abrir documento
                     </a>
                   </Button>
                 )}
@@ -250,3 +258,4 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
     </>
   );
 };
+

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -10,7 +10,6 @@ const escapeCsvCell = (
     return '""';
   }
   const stringData = String(cellData);
-
   if (/[",\n\r]/.test(stringData)) {
     return `"${stringData.replace(/"/g, '""')}"`;
   }
@@ -22,10 +21,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: leadId } = await params;
-
   if (!leadId) {
     return NextResponse.json(
-      { error: "ID do Lead não fornecido" },
+      { error: "ID do Lead nao fornecido" },
       { status: 400 }
     );
   }
@@ -37,14 +35,14 @@ export async function GET(
 
     if (!lead) {
       return NextResponse.json(
-        { error: "Lead não encontrado" },
+        { error: "Lead nao encontrado" },
         { status: 404 }
       );
     }
 
     const headers = [
       "Nome",
-      "Descrição",
+      "Descricao",
       "Canal",
       "Faturamento",
       "Investimento em Marketing",
@@ -57,6 +55,10 @@ export async function GET(
       "Email",
       "Documento (URL)",
       "Contrato (URL)",
+      "Valor do Contrato",
+      "Tempo de Contrato",
+      "Briefing (URL)",
+      "Gravacao (URL)",
     ];
 
     const rec = lead as unknown as Record<string, unknown>;
@@ -77,14 +79,14 @@ export async function GET(
       escapeCsvCell((rec["email"] as string) ?? null),
       escapeCsvCell((rec["document_url"] as string) ?? null),
       escapeCsvCell((rec["contract_url"] as string) ?? null),
+      escapeCsvCell((rec["contract_value"] as number | string | undefined) as unknown as string),
+      escapeCsvCell((rec["contract_time"] as string) ?? null),
+      escapeCsvCell((rec["briefing_url"] as string) ?? null),
+      escapeCsvCell((rec["cal_url"] as string) ?? null),
     ];
 
     const csvContent = [headers.join(","), rowData.join(",")].join("\n");
-
-    const filename = `lead_${lead.company_name.replace(
-      /[^a-z0-9]/gi,
-      "_"
-    )}.csv`;
+    const filename = `lead_${lead.company_name.replace(/[^a-z0-9]/gi, "_")}.csv`;
 
     return new NextResponse(csvContent, {
       status: 200,

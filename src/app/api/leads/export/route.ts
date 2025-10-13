@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
@@ -7,7 +7,7 @@ const escapeCsvCell = (
     cellData: string | number | null | undefined
 ): string => {
     if (cellData === null || cellData === undefined) {
-        return "\"\"";
+        return '""';
     }
     const stringData = String(cellData);
     if (/[",\n\r]/.test(stringData)) {
@@ -21,7 +21,7 @@ export async function GET() {
         const session = await getServerSession(authOptions);
         const userId = session?.user?.id;
         if (!userId) {
-            return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+            return NextResponse.json({ error: "Nao autenticado" }, { status: 401 });
         }
 
         const leads = await prisma.leads.findMany({
@@ -31,7 +31,7 @@ export async function GET() {
 
         const headers = [
             "Nome",
-            "Descrição",
+            "Descricao",
             "Canal",
             "Faturamento",
             "Investimento em Marketing",
@@ -44,6 +44,10 @@ export async function GET() {
             "Email",
             "Documento (URL)",
             "Contrato (URL)",
+            "Valor do Contrato",
+            "Tempo de Contrato",
+            "Briefing (URL)",
+            "Gravacao (URL)",
         ];
 
         const rows = leads.map((lead) => {
@@ -65,6 +69,10 @@ export async function GET() {
                 escapeCsvCell((rec["email"] as string) ?? null),
                 escapeCsvCell((rec["document_url"] as string) ?? null),
                 escapeCsvCell((rec["contract_url"] as string) ?? null),
+                escapeCsvCell((rec["contract_value"] as number | string | undefined) as unknown as string),
+                escapeCsvCell((rec["contract_time"] as string) ?? null),
+                escapeCsvCell((rec["briefing_url"] as string) ?? null),
+                escapeCsvCell((rec["cal_url"] as string) ?? null),
             ].join(",");
         });
 
@@ -83,5 +91,3 @@ export async function GET() {
         return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
     }
 }
-
-

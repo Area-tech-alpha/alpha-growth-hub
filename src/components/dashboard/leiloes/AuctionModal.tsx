@@ -259,6 +259,10 @@ export const AuctionModal = ({
 
     const contractValue = (lead as unknown as { contract_value?: number })?.contract_value;
     const contractTime = (lead as unknown as { contract_time?: string })?.contract_time;
+    const documentUrl = (lead as unknown as { document_url?: string })?.document_url;
+    const contractUrl = (lead as unknown as { contract_url?: string })?.contract_url;
+    const briefingUrl = (lead as unknown as { briefing_url?: string })?.briefing_url;
+    const calUrl = lead.cal_url as string | undefined;
 
     const handleBuyNow = async () => {
         // Abre confirmação em vez de executar direto
@@ -414,6 +418,31 @@ export const AuctionModal = ({
                                 </div>
                             )}
                         </div>
+
+                        {(documentUrl || contractUrl || briefingUrl || calUrl) && (
+                            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {briefingUrl && (
+                                    <Button asChild variant="outline" size="sm" className="h-9 sm:h-7 px-3 sm:px-2.5 w-full">
+                                        <a href={briefingUrl} target="_blank" rel="noopener noreferrer">Abrir briefing</a>
+                                    </Button>
+                                )}
+                                {contractUrl && (
+                                    <Button asChild variant="outline" size="sm" className="h-9 sm:h-7 px-3 sm:px-2.5 w-full">
+                                        <a href={contractUrl} target="_blank" rel="noopener noreferrer">Abrir contrato</a>
+                                    </Button>
+                                )}
+                                {documentUrl && (
+                                    <Button asChild variant="outline" size="sm" className="h-9 sm:h-7 px-3 sm:px-2.5 w-full sm:col-span-2">
+                                        <a href={documentUrl} target="_blank" rel="noopener noreferrer">Abrir documento</a>
+                                    </Button>
+                                )}
+                                {calUrl && (
+                                    <Button asChild variant="default" size="sm" className="h-9 sm:h-7 px-3 sm:px-2.5 w-full sm:col-span-2 bg-green-600 hover:bg-green-700 text-white">
+                                        <a href={calUrl} target="_blank" rel="noopener noreferrer">Ver gravação</a>
+                                    </Button>
+                                )}
+                            </div>
+                        )}
 
                         <div
                             className={`p-4 rounded-lg ${hasWon ? "bg-green-50 dark:bg-green-900/20" : "bg-muted"

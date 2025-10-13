@@ -174,6 +174,20 @@ export const PurchasedLeadCard = ({
               label="Invest. Marketing"
               value={String(lead.marketing_investment)}
             />
+            {typeof lead.contract_value === "number" && !isNaN(lead.contract_value) && (
+              <InfoRow
+                icon={DollarSign}
+                label="Valor do Contrato"
+                value={formatCurrency(lead.contract_value)}
+              />
+            )}
+            {lead.contract_time && (
+              <InfoRow
+                icon={Clock}
+                label="Tempo de Contrato"
+                value={String(lead.contract_time)}
+              />
+            )}
           </div>
         </div>
 
@@ -201,6 +215,44 @@ export const PurchasedLeadCard = ({
             />
           </div>
         </div>
+
+        {(lead.briefing_url || lead.contract_url || lead.document_url || lead.cal_url) && (
+          <div>
+            <h4 className="font-semibold text-foreground text-sm mb-2">
+              Links
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {lead.briefing_url && (
+                <Button asChild variant="outline" size="sm" className="h-9 sm:h-7 px-3 sm:px-2.5 w-full">
+                  <a href={lead.briefing_url} target="_blank" rel="noopener noreferrer">
+                    Abrir briefing
+                  </a>
+                </Button>
+              )}
+              {lead.contract_url && (
+                <Button asChild variant="outline" size="sm" className="h-9 sm:h-7 px-3 sm:px-2.5 w-full">
+                  <a href={lead.contract_url} target="_blank" rel="noopener noreferrer">
+                    Abrir contrato
+                  </a>
+                </Button>
+              )}
+              {lead.document_url && (
+                <Button asChild variant="outline" size="sm" className="h-9 sm:h-7 px-3 sm:px-2.5 w-full sm:col-span-2">
+                  <a href={lead.document_url} target="_blank" rel="noopener noreferrer">
+                    Abrir documento
+                  </a>
+                </Button>
+              )}
+              {lead.cal_url && (
+                <Button asChild variant="default" size="sm" className="h-9 sm:h-7 px-3 sm:px-2.5 w-full sm:col-span-2 bg-green-600 hover:bg-green-700 text-white">
+                  <a href={lead.cal_url} target="_blank" rel="noopener noreferrer">
+                    Ver gravação
+                  </a>
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
       </CardContent>
       <CardFooter className="border-t border-border pt-4">
         <Button

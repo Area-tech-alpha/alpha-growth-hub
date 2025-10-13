@@ -3,6 +3,16 @@ import StatsCards from '@/components/dashboard/leiloes/statsCards'
 import { useEffect, useState } from 'react'
 
 type Ranked = { userId: string | null; count: number; name?: string | null; email?: string | null }
+type RecentLead = {
+    id: string;
+    company_name: string | null;
+    created_at: string | Date | null;
+    sold: boolean;
+    type: 'hot' | 'cold';
+    buyer: { id: string | null; name: string | null; email: string | null } | null;
+    price: number | null;
+    bids_count: number;
+}
 
 export default function AdminOverview() {
     const [selectedMonth, setSelectedMonth] = useState<string>('')
@@ -11,6 +21,16 @@ export default function AdminOverview() {
     const [topBuyers, setTopBuyers] = useState<Ranked[]>([])
     const [topBidders, setTopBidders] = useState<Ranked[]>([])
     const [monthOptions, setMonthOptions] = useState<string[]>([])
+    const [recent, setRecent] = useState<Array<{
+        id: string;
+        company_name: string | null;
+        created_at: string | null;
+        sold: boolean;
+        type: 'hot' | 'cold';
+        buyer: { id: string | null; name: string | null; email: string | null } | null;
+        price: number | null;
+        bids_count: number;
+    }>>([])
 
     // Fetch available months from backend
     useEffect(() => {
@@ -28,6 +48,26 @@ export default function AdminOverview() {
             }
         }
         fetchMonths()
+        // also fetch recent timeline once on load
+        async function fetchRecent() {
+            try {
+                const res = await fetch('/api/admin/leads/recent', { cache: 'no-store' })
+                if (!active) return
+                if (res.ok) {
+                    const data = await res.json()
+                    const items = Array.isArray(data.items) ? data.items : []
+                    // normalize created_at to ISO strings
+                    setRecent(items.map((it: RecentLead) => ({
+                        ...it,
+                        created_at: it.created_at ? new Date(it.created_at).toISOString() : null,
+                    })))
+                }
+            } catch {
+                if (!active) return
+                setRecent([])
+            }
+        }
+        fetchRecent()
         return () => { active = false }
     }, [])
 
@@ -182,6 +222,41 @@ export default function AdminOverview() {
                         )}
                     </ul>
                 </div>
+            </div>
+
+            <div className="space-y-2">
+                <h2 className="text-base font-semibold">Linha do tempo (10 mais recentes)</h2>
+                <ul className="divide-y rounded-md border">
+                    {recent.length === 0 ? (
+                        <li className="p-3 text-sm text-muted-foreground">Sem eventos recentes</li>
+                    ) : recent.map((item) => (
+                        <li key={item.id} className="p-3 text-sm flex flex-col gap-1">
+                            <div className="flex items-center justify-between">
+                                <div className="font-medium truncate">
+                                    {item.company_name || item.id}
+                                </div>
+                                <div className={`text-xs px-2 py-0.5 rounded-full ${item.type === 'hot' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
+                                    {item.type.toUpperCase()}
+                                </div>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                                {item.created_at ? new Date(item.created_at).toLocaleString('pt-BR') : 'sem data'}
+                            </div>
+                            <div className="mt-1">
+                                {item.sold ? (
+                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                        <span className="text-green-700 bg-green-100 text-xs px-2 py-0.5 rounded">Vendido</span>
+                                        <span className="text-xs">Comprador: <strong>{item.buyer?.name || item.buyer?.email || item.buyer?.id || 'desconhecido'}</strong></span>
+                                        <span className="text-xs">Valor: <strong>{typeof item.price === 'number' ? item.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'N/A'}</strong></span>
+                                        <span className="text-xs">Lances: <strong>{item.bids_count}</strong></span>
+                                    </div>
+                                ) : (
+                                    <span className="text-yellow-700 bg-yellow-100 text-xs px-2 py-0.5 rounded">Nao vendido</span>
+                                )}
+                            </div>
+                        </li>
+                    ))}
+                </ul>
             </div>
         </div>
     )

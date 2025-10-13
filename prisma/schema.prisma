@@ -117,6 +117,7 @@ model leads {
   contract_value       Float?
   call_url             String?
   contract_time        String?
+  briefing_url         String?
   auctions             auctions[]
   users                users?     @relation(fields: [owner_id], references: [id], onUpdate: NoAction)
 
