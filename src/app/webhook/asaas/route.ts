@@ -87,6 +87,7 @@ export async function POST(request: Request) {
             event,
             payment,
             userId,
+            source: 'monetary',
             enqueuedAt: new Date().toISOString(),
         };
 

@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 type FinanceData = { total: number; pix: number; card: number; held: number }
+type BySource = { [k: string]: { amountPaid: number; credits: number } }
 
 function SkeletonCard({ title }: { title: string }) {
     return (
@@ -26,7 +27,7 @@ function SkeletonCard({ title }: { title: string }) {
 export default function AdminFinance() {
     const [selectedMonth, setSelectedMonth] = useState<string>('')
     const [loading, setLoading] = useState<boolean>(true)
-    const [data, setData] = useState<FinanceData | null>(null)
+    const [data, setData] = useState<(FinanceData & { bySource?: BySource }) | null>(null)
     const [monthOptions, setMonthOptions] = useState<string[]>([])
     const [heldByUser, setHeldByUser] = useState<{ userId: string; name: string | null; email: string | null; balance: number }[]>([])
     const formatBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -168,6 +169,61 @@ export default function AdminFinance() {
                     ]}
                 />
             )}
+
+            {/* Por origem */}
+            <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                    <h2 className="text-base font-semibold">Por origem</h2>
+                    <span className="text-xs text-muted-foreground italic">(monetário em R$, demais em créditos)</span>
+                </div>
+                {loading || !data ? (
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <SkeletonCard title="Monetário (R$)" />
+                        <SkeletonCard title="Recompensa (créditos)" />
+                        <SkeletonCard title="Ajuste (créditos)" />
+                        <SkeletonCard title="Outros (créditos)" />
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <Card>
+                            <CardHeader className="space-y-1">
+                                <CardTitle className="text-sm text-muted-foreground">Monetário (R$)</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-semibold">{formatBRL(data.bySource?.monetary?.amountPaid || 0)}</div>
+                                <div className="mt-1 text-xs text-muted-foreground">créditos: {(data.bySource?.monetary?.credits || 0).toLocaleString('pt-BR')}</div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader className="space-y-1">
+                                <CardTitle className="text-sm text-muted-foreground">Recompensa (créditos)</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-semibold">{(data.bySource?.reward?.credits || 0).toLocaleString('pt-BR')}</div>
+                                <div className="mt-1 text-xs text-muted-foreground">recebido: {formatBRL(data.bySource?.reward?.amountPaid || 0)}</div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader className="space-y-1">
+                                <CardTitle className="text-sm text-muted-foreground">Ajuste (créditos)</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-semibold">{(data.bySource?.adjustment?.credits || 0).toLocaleString('pt-BR')}</div>
+                                <div className="mt-1 text-xs text-muted-foreground">recebido: {formatBRL(data.bySource?.adjustment?.amountPaid || 0)}</div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader className="space-y-1">
+                                <CardTitle className="text-sm text-muted-foreground">Outros (créditos)</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-semibold">{(data.bySource?.unknown?.credits || 0).toLocaleString('pt-BR')}</div>
+                                <div className="mt-1 text-xs text-muted-foreground">recebido: {formatBRL(data.bySource?.unknown?.amountPaid || 0)}</div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
+            </div>
 
             <div className="space-y-4">
                 <div className="flex items-center gap-2">

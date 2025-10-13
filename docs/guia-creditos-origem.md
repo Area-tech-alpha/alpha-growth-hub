@@ -23,6 +23,8 @@
    - Script (migration + SQL) marcando transações existentes como `monetary`.  
    - Validar consistência entre `credit_transactions` e `ledger_entries`.
 
+Observação (compatibilidade): antes da migração, a origem será salva em `credit_transactions.metadata.source` e já estará visível via API admin/histórico. Após a migração, popular o novo campo `source` com base nesse JSON.
+
 ## Fluxos de Processamento
 - **Asaas / InfinitePay**  
   - Na criação do job (`jobPayload`), incluir `source: 'monetary'`.  
@@ -52,4 +54,15 @@
 3. Criar rota/admin para concessão de créditos e conectá-la à fila PGMQ.  
 4. Ajustar relatórios internos e, se desejado, etiqueta visual no histórico.  
 5. Validar dados pós-backfill com o financeiro e documentar o processo operacional.
+
+Implementado neste PR:
+- API `POST /api/admin/credits` (verifica role admin, credita saldo, cria `credit_transactions` com `amount_paid = 0`, `credits_purchased = <valor>` e marca `metadata.source = 'reward'`; cria `ledger_entries` do tipo `USER_CREDITS`).  
+- API `GET /api/admin/credits?limit=20` para histórico de recompensas (filtra por `metadata.source = 'reward'`).  
+- Webhooks Asaas/InfinitePay passam a enviar `source: 'monetary'` no payload do job.  
+- Nova aba no painel admin “Créditos” com formulário para conceder créditos e lista das últimas concessões.
+
+Próximos passos no banco (Supabase/SQL):
+- Criar enum `credit_source_enum` e adicionar colunas `credit_transactions.source` e `ledger_entries.credit_source`.  
+- Backfill: setar `credit_transactions.source = 'monetary'` onde `amount_paid > 0`; setar `'reward'` quando `metadata->>'source' = 'reward'`; `adjustment` conforme regras internas.  
+- Atualizar `process_credit_jobs_worker()` para persistir `source` em ambas as tabelas e manter o saldo em `users.credit_balance` consistente.
 

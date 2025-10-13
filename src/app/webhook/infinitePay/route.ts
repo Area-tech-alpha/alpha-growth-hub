@@ -111,6 +111,7 @@ export async function POST(request: NextRequest) {
             event: 'PAYMENT_CONFIRMED',
             payment: normalizedPayment,
             userId,
+            source: 'monetary',
             enqueuedAt: new Date().toISOString(),
         };
 

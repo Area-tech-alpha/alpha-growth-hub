@@ -87,6 +87,7 @@ model credit_transactions {
   status                 String           @default("completed") @db.VarChar(50)
   created_at             DateTime?        @default(now()) @db.Timestamptz(6)
   infinitepay_payment_id String?          @unique
+  source                 credit_source_enum @default(monetary)
   users                  users            @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   ledger_entries         ledger_entries[]
 
@@ -131,6 +132,7 @@ model ledger_entries {
   account_type        account_type_enum
   amount              Decimal             @db.Decimal(10, 2)
   created_at          DateTime?           @default(now()) @db.Timestamptz(6)
+  credit_source       credit_source_enum?
   credit_transactions credit_transactions @relation(fields: [transaction_id], references: [id], onUpdate: NoAction)
   users               users               @relation(fields: [user_id], references: [id], onUpdate: NoAction)
 
@@ -230,6 +232,12 @@ model v_lead_count {
 enum account_type_enum {
   USER_CREDITS
   PLATFORM_REVENUE
+}
+
+enum credit_source_enum {
+  monetary
+  reward
+  adjustment
 }
 
 enum webhook_status_enum {
