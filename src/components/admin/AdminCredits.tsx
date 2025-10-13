@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 type RewardMetadata = {
@@ -19,13 +19,20 @@ type HistoryItem = {
     metadata?: RewardMetadata
 }
 
+type LiteUser = { id: string; name: string | null; email: string | null }
+
 export default function AdminCredits() {
-    const [form, setForm] = useState<{ userId: string; email: string; credits: string; reason: string }>(
-        { userId: '', email: '', credits: '', reason: '' }
+    const [form, setForm] = useState<{ userId: string; credits: string; reason: string }>(
+        { userId: '', credits: '', reason: '' }
     )
     const [submitting, setSubmitting] = useState(false)
     const [message, setMessage] = useState<string | null>(null)
     const [history, setHistory] = useState<HistoryItem[]>([])
+    const [userSearch, setUserSearch] = useState('')
+    const [userOptions, setUserOptions] = useState<LiteUser[]>([])
+    const [usersOpen, setUsersOpen] = useState(false)
+    const [usersLoading, setUsersLoading] = useState(false)
+    const selectRef = useRef<HTMLDivElement | null>(null)
     const creditsNum = useMemo(() => Number(form.credits || '0'), [form.credits])
 
     const loadHistory = async () => {
@@ -41,21 +48,26 @@ export default function AdminCredits() {
 
     useEffect(() => { loadHistory() }, [])
 
+    const idemKeyRef = useRef<string | null>(null)
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setMessage(null)
-        if (!form.userId && !form.email) { setMessage('Informe userId ou email.'); return }
+        if (!form.userId) { setMessage('Selecione um usuário.'); return }
         if (!(creditsNum > 0)) { setMessage('Créditos inválidos.'); return }
         setSubmitting(true)
+        if (!idemKeyRef.current) {
+            try { idemKeyRef.current = crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2) } catch { idemKeyRef.current = Math.random().toString(36).slice(2) }
+        }
         try {
             const res = await fetch('/api/admin/credits', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    userId: form.userId || undefined,
-                    email: form.email || undefined,
+                    userId: form.userId,
                     credits: creditsNum,
                     reason: form.reason || undefined,
+                    idempotencyKey: idemKeyRef.current,
                 }),
             })
             if (!res.ok) {
@@ -63,7 +75,10 @@ export default function AdminCredits() {
                 setMessage(err?.error || 'Falha ao conceder créditos')
             } else {
                 setMessage('Créditos concedidos com sucesso.')
-                setForm({ userId: '', email: '', credits: '', reason: '' })
+                setForm({ userId: '', credits: '', reason: '' })
+                setUserSearch('')
+                setUserOptions([])
+                idemKeyRef.current = null
                 loadHistory()
             }
         } catch {
@@ -88,25 +103,88 @@ export default function AdminCredits() {
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleSubmit} className="grid gap-3 md:grid-cols-2">
-                        <div className="flex flex-col gap-1">
-                            <label className="text-sm">User ID</label>
-                            <input
-                                className="h-9 rounded border px-2 bg-background"
-                                placeholder="opcional se email informado"
-                                value={form.userId}
-                                onChange={e => setForm(f => ({ ...f, userId: e.target.value }))}
-                                disabled={submitting}
-                            />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                            <label className="text-sm">Email</label>
-                            <input
-                                className="h-9 rounded border px-2 bg-background"
-                                placeholder="opcional se userId informado"
-                                value={form.email}
-                                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                                disabled={submitting}
-                            />
+                        {/* Seletor de usuário com busca */}
+                        <div className="flex flex-col gap-1 md:col-span-2" ref={selectRef}>
+                            <label className="text-sm">Usuário</label>
+                            <div className="relative">
+                                <input
+                                    className="h-9 w-full rounded border pl-2 pr-16 bg-background"
+                                    placeholder="Digite para buscar por nome ou email..."
+                                    value={form.userId ? (userOptions.find(u => u.id === form.userId)?.name || userOptions.find(u => u.id === form.userId)?.email || userSearch) : userSearch}
+                                    onChange={async (e) => {
+                                        const v = e.target.value
+                                        setUserSearch(v)
+                                        setUsersOpen(true)
+                                        setUsersLoading(true)
+                                        try {
+                                            const qs = v ? `?q=${encodeURIComponent(v)}` : ''
+                                            const res = await fetch(`/api/admin/users${qs}`, { cache: 'no-store' })
+                                            if (res.ok) {
+                                                const json = await res.json()
+                                                setUserOptions(Array.isArray(json.users) ? json.users : [])
+                                            }
+                                        } catch {
+                                            // ignore
+                                        } finally {
+                                            setUsersLoading(false)
+                                        }
+                                    }}
+                                    onFocus={async () => {
+                                        setUsersOpen(true)
+                                        if (userOptions.length === 0) {
+                                            setUsersLoading(true)
+                                            try {
+                                                const res = await fetch('/api/admin/users', { cache: 'no-store' })
+                                                if (res.ok) {
+                                                    const json = await res.json()
+                                                    setUserOptions(Array.isArray(json.users) ? json.users : [])
+                                                }
+                                            } catch { } finally { setUsersLoading(false) }
+                                        }
+                                    }}
+                                    disabled={submitting}
+                                />
+                                <div className="absolute inset-y-0 right-0 flex items-center gap-1 pr-2">
+                                    {form.userId && (
+                                        <button
+                                            type="button"
+                                            className="h-7 w-7 text-xs rounded border hover:bg-muted"
+                                            onClick={() => { setForm(f => ({ ...f, userId: '' })); setUserSearch(''); setUsersOpen(false) }}
+                                            title="Limpar seleção"
+                                        >×</button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        className="h-7 w-14 text-xs rounded border hover:bg-muted"
+                                        onClick={() => setUsersOpen(o => !o)}
+                                        title="Abrir/fechar"
+                                    >{usersOpen ? 'Fechar' : 'Buscar'}</button>
+                                </div>
+                                {usersOpen && (
+                                    <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded border bg-background shadow">
+                                        {usersLoading ? (
+                                            <div className="p-2 text-sm text-muted-foreground">Carregando...</div>
+                                        ) : userOptions.length === 0 ? (
+                                            <div className="p-2 text-sm text-muted-foreground">Nenhum usuário encontrado</div>
+                                        ) : (
+                                            <ul>
+                                                {userOptions.map(u => (
+                                                    <li key={u.id}>
+                                                        <button
+                                                            type="button"
+                                                            className={`w-full text-left p-2 text-sm hover:bg-muted ${form.userId === u.id ? 'bg-muted' : ''}`}
+                                                            onClick={() => { setForm(f => ({ ...f, userId: u.id })); setUsersOpen(false) }}
+                                                        >
+                                                            <span className="font-medium">{u.name || u.email || u.id}</span>
+                                                            <span className="block text-xs text-muted-foreground">{u.email || u.id}</span>
+                                                        </button>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                         <div className="flex flex-col gap-1">
                             <label className="text-sm">Créditos</label>

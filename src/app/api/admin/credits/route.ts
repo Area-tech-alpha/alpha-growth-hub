@@ -11,6 +11,7 @@ type PostBody = {
     credits: number
     reason?: string
     metadata?: Record<string, unknown>
+    idempotencyKey?: string
 }
 
 type RawCreditRow = {
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
         const admin = adminCheck.me!
 
         const body = (await request.json()) as PostBody
-        const { userId, email, credits, reason, metadata } = body
+        const { userId, email, credits, reason, metadata, idempotencyKey } = body
 
         if (!credits || typeof credits !== 'number' || credits <= 0) {
             return NextResponse.json({ error: 'Créditos inválidos. Deve ser número positivo.' }, { status: 400 })
@@ -63,6 +64,7 @@ export async function POST(request: Request) {
             reason: reason || null,
             granted_by: { id: admin.id, email: admin.email, name: admin.name },
             granted_at: new Date().toISOString(),
+            idempotency_key: idempotencyKey || null,
         }
 
         const result = await prisma.$transaction(async (tx) => {
@@ -92,11 +94,27 @@ export async function POST(request: Request) {
                 },
             })
 
-            return { transactionId: ct.id }
+            return { transactionId: String(ct.id) }
         })
 
         return NextResponse.json({ ok: true, transactionId: result.transactionId })
     } catch (error) {
+        // Handle unique violation on idempotency (if index applied)
+        const e = error as unknown as { code?: string; message?: string }
+        if ((e as any)?.code === 'P2002' || String(e?.message || '').includes('duplicate key')) {
+            try {
+                const urlKey = (await request.json().catch(() => ({})) as { idempotencyKey?: string })?.idempotencyKey
+                if (urlKey) {
+                    const rows = await prisma.$queryRawUnsafe<{ id: bigint }[]>(
+                        `SELECT id FROM credit_transactions WHERE (metadata->>'idempotency_key') = $1 LIMIT 1`,
+                        urlKey,
+                    )
+                    if (rows.length > 0) {
+                        return NextResponse.json({ ok: true, transactionId: String(rows[0].id) })
+                    }
+                }
+            } catch { /* ignore */ }
+        }
         console.error('[admin/credits][POST] error:', error)
         return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
     }
