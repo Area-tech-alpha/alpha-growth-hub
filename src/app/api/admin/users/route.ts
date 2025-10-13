@@ -19,12 +19,13 @@ export async function GET(request: Request) {
 
         const where = q
             ? {
+                role: 'user' as const,
                 OR: [
                     { name: { contains: q, mode: 'insensitive' as const } },
                     { email: { contains: q, mode: 'insensitive' as const } },
                 ],
             }
-            : undefined
+            : { role: 'user' as const }
 
         const users = await prisma.users.findMany({
             where,
@@ -39,4 +40,3 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
     }
 }
-

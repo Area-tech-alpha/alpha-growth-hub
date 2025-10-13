@@ -154,8 +154,8 @@ export async function GET(request: Request) {
         const url = new URL(request.url)
         const limit = Math.min(parseInt(url.searchParams.get('limit') || '20', 10) || 20, 100)
 
-        // Filtra usando a coluna `source` (credit_source_enum)
-        const rows = await prisma.$queryRawUnsafe<RawCreditRow[]>(
+        // Recompensas
+        const rewardRows = await prisma.$queryRawUnsafe<RawCreditRow[]>(
             `
             SELECT ct.id, ct.user_id, ct.credits_purchased, ct.amount_paid, ct.created_at, ct.metadata,
                    u.email, u.name
@@ -168,7 +168,21 @@ export async function GET(request: Request) {
             limit,
         )
 
-        const items = rows.map((r) => {
+        // Estornos (ajustes marcados como refund)
+        const refundRows = await prisma.$queryRawUnsafe<RawCreditRow[]>(
+            `
+            SELECT ct.id, ct.user_id, ct.credits_purchased, ct.amount_paid, ct.created_at, ct.metadata,
+                   u.email, u.name
+            FROM credit_transactions ct
+            JOIN users u ON u.id = ct.user_id
+            WHERE ct.source = 'adjustment'::credit_source_enum AND (ct.metadata->>'adjustment_type') = 'refund'
+            ORDER BY ct.created_at DESC
+            LIMIT $1
+            `,
+            limit,
+        )
+
+        const mapRow = (r: RawCreditRow) => {
             const rawMd = (r.metadata ?? {}) as Record<string, unknown>
             return {
                 id: String(r.id),
@@ -180,9 +194,12 @@ export async function GET(request: Request) {
                 createdAt: typeof r.created_at === 'string' ? r.created_at : (r.created_at as Date).toISOString(),
                 metadata: rawMd,
             }
-        })
+        }
 
-        return NextResponse.json({ items })
+        const rewards = rewardRows.map(mapRow)
+        const refunds = refundRows.map(mapRow)
+
+        return NextResponse.json({ rewards, refunds })
     } catch (error) {
         console.error('[admin/credits][GET] error:', error)
         return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })

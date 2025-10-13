@@ -27,7 +27,8 @@ export default function AdminCredits() {
     )
     const [submitting, setSubmitting] = useState(false)
     const [message, setMessage] = useState<string | null>(null)
-    const [history, setHistory] = useState<HistoryItem[]>([])
+    const [rewards, setRewards] = useState<HistoryItem[]>([])
+    const [refunds, setRefunds] = useState<HistoryItem[]>([])
     const [userSearch, setUserSearch] = useState('')
     const [userOptions, setUserOptions] = useState<LiteUser[]>([])
     const [selectedUser, setSelectedUser] = useState<LiteUser | null>(null)
@@ -43,7 +44,8 @@ export default function AdminCredits() {
             const res = await fetch('/api/admin/credits?limit=20', { cache: 'no-store' })
             if (!res.ok) return
             const json = await res.json()
-            setHistory(Array.isArray(json.items) ? json.items : [])
+            setRewards(Array.isArray(json.rewards) ? json.rewards : [])
+            setRefunds(Array.isArray(json.refunds) ? json.refunds : [])
         } catch {
             // ignore
         }
@@ -137,8 +139,8 @@ export default function AdminCredits() {
     return (
         <div className="space-y-6">
             <div>
-                <h2 className="text-lg font-semibold">Créditos (Admin)</h2>
-                <p className="text-sm text-muted-foreground">Conceda créditos de recompensa aos usuários. Os créditos entram no saldo normalmente.</p>
+                <h2 className="text-lg font-semibold">Créditos</h2>
+                <p className="text-sm text-muted-foreground">Conceda créditos de recompensa ou estorno aos usuários. O saldo do usuário é único; a origem aparecerá na auditoria do admin.</p>
             </div>
 
             <Card>
@@ -257,39 +259,76 @@ export default function AdminCredits() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-base">Últimas concessões (recompensa)</CardTitle>
+                    <CardTitle className="text-base">Últimas transações de créditos</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="text-left border-b">
-                                    <th className="py-2 pr-2">Quando</th>
-                                    <th className="py-2 pr-2">Usuário</th>
-                                    <th className="py-2 pr-2">Créditos</th>
-                                    <th className="py-2 pr-2">Motivo</th>
-                                    <th className="py-2 pr-2">Por</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {history.length === 0 && (
-                                    <tr><td className="py-3 text-muted-foreground" colSpan={5}>Sem registros</td></tr>
-                                )}
-                                {history.map((h) => {
-                                    const reason = h?.metadata?.reason || ''
-                                    const by = h?.metadata?.granted_by?.email || h?.metadata?.granted_by?.id || ''
-                                    return (
-                                        <tr key={h.id} className="border-b last:border-b-0">
-                                            <td className="py-2 pr-2 whitespace-nowrap">{formatDate(h.createdAt)}</td>
-                                            <td className="py-2 pr-2 truncate max-w-[220px]">{h.name || h.email || h.userId}</td>
-                                            <td className="py-2 pr-2">{h.credits.toLocaleString('pt-BR')}</td>
-                                            <td className="py-2 pr-2 truncate max-w-[280px]">{reason}</td>
-                                            <td className="py-2 pr-2 truncate max-w-[200px]">{by}</td>
+                        <div className="space-y-4">
+                            <div>
+                                <div className="mb-2 text-sm font-medium">Recompensas</div>
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="text-left border-b">
+                                            <th className="py-2 pr-2">Quando</th>
+                                            <th className="py-2 pr-2">Usuário</th>
+                                            <th className="py-2 pr-2">Créditos</th>
+                                            <th className="py-2 pr-2">Motivo</th>
+                                            <th className="py-2 pr-2">Por</th>
                                         </tr>
-                                    )
-                                })}
-                            </tbody>
-                        </table>
+                                    </thead>
+                                    <tbody>
+                                        {rewards.length === 0 && (
+                                            <tr><td className="py-3 text-muted-foreground" colSpan={5}>Sem registros</td></tr>
+                                        )}
+                                        {rewards.map((h) => {
+                                            const reason = h?.metadata?.reason || ''
+                                            const by = h?.metadata?.granted_by?.email || h?.metadata?.granted_by?.id || ''
+                                            return (
+                                                <tr key={`rw-${h.id}`} className="border-b last:border-b-0">
+                                                    <td className="py-2 pr-2 whitespace-nowrap">{formatDate(h.createdAt)}</td>
+                                                    <td className="py-2 pr-2 truncate max-w-[220px]">{h.name || h.email || h.userId}</td>
+                                                    <td className="py-2 pr-2">{h.credits.toLocaleString('pt-BR')}</td>
+                                                    <td className="py-2 pr-2 truncate max-w-[280px]">{reason}</td>
+                                                    <td className="py-2 pr-2 truncate max-w-[200px]">{by}</td>
+                                                </tr>
+                                            )
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div>
+                                <div className="mb-2 text-sm font-medium">Estornos</div>
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="text-left border-b">
+                                            <th className="py-2 pr-2">Quando</th>
+                                            <th className="py-2 pr-2">Usuário</th>
+                                            <th className="py-2 pr-2">Créditos</th>
+                                            <th className="py-2 pr-2">Motivo</th>
+                                            <th className="py-2 pr-2">Por</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {refunds.length === 0 && (
+                                            <tr><td className="py-3 text-muted-foreground" colSpan={5}>Sem registros</td></tr>
+                                        )}
+                                        {refunds.map((h) => {
+                                            const reason = h?.metadata?.reason || ''
+                                            const by = h?.metadata?.granted_by?.email || h?.metadata?.granted_by?.id || ''
+                                            return (
+                                                <tr key={`rf-${h.id}`} className="border-b last:border-b-0">
+                                                    <td className="py-2 pr-2 whitespace-nowrap">{formatDate(h.createdAt)}</td>
+                                                    <td className="py-2 pr-2 truncate max-w-[220px]">{h.name || h.email || h.userId}</td>
+                                                    <td className="py-2 pr-2">{h.credits.toLocaleString('pt-BR')}</td>
+                                                    <td className="py-2 pr-2 truncate max-w-[280px]">{reason}</td>
+                                                    <td className="py-2 pr-2 truncate max-w-[200px]">{by}</td>
+                                                </tr>
+                                            )
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </CardContent>
             </Card>

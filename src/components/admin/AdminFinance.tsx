@@ -191,7 +191,6 @@ export default function AdminFinance() {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-semibold">{formatBRL(data.bySource?.monetary?.amountPaid || 0)}</div>
-                                <div className="mt-1 text-xs text-muted-foreground">créditos: {(data.bySource?.monetary?.credits || 0).toLocaleString('pt-BR')}</div>
                             </CardContent>
                         </Card>
                         <Card>
@@ -200,7 +199,6 @@ export default function AdminFinance() {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-semibold">{(data.bySource?.reward?.credits || 0).toLocaleString('pt-BR')}</div>
-                                <div className="mt-1 text-xs text-muted-foreground">recebido: {formatBRL(data.bySource?.reward?.amountPaid || 0)}</div>
                             </CardContent>
                         </Card>
                         <Card>
@@ -209,7 +207,6 @@ export default function AdminFinance() {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-semibold">{(data.bySource?.adjustment?.credits || 0).toLocaleString('pt-BR')}</div>
-                                <div className="mt-1 text-xs text-muted-foreground">recebido: {formatBRL(data.bySource?.adjustment?.amountPaid || 0)}</div>
                             </CardContent>
                         </Card>
                         <Card>
@@ -218,55 +215,13 @@ export default function AdminFinance() {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-semibold">{(data.bySource?.unknown?.credits || 0).toLocaleString('pt-BR')}</div>
-                                <div className="mt-1 text-xs text-muted-foreground">recebido: {formatBRL(data.bySource?.unknown?.amountPaid || 0)}</div>
                             </CardContent>
                         </Card>
                     </div>
                 )}
             </div>
 
-            {/* Ticket médio por origem (filtro aplicado) */}
-            <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                    <h2 className="text-base font-semibold">Ticket médio por origem</h2>
-                    <span className="text-xs text-muted-foreground italic">aplica o filtro de mês selecionado</span>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead>
-                            <tr className="text-left border-b">
-                                <th className="py-2 pr-2">Origem</th>
-                                <th className="py-2 pr-2">Transações</th>
-                                <th className="py-2 pr-2">Ticket médio</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {(() => {
-                                const rows: { label: string; count: number; value: string }[] = []
-                                const src = data?.bySource || {}
-                                const monetaryCount = Math.max(0, Number(src.monetary?.count || 0))
-                                const rewardCount = Math.max(0, Number(src.reward?.count || 0))
-                                const adjustmentCount = Math.max(0, Number(src.adjustment?.count || 0))
-                                // ticket monetário: média em R$ por transação
-                                const monetaryAvg = monetaryCount > 0 ? (src.monetary!.amountPaid / monetaryCount) : 0
-                                // ticket de recompensa/ajuste: média de créditos por concessão
-                                const rewardAvg = rewardCount > 0 ? (src.reward!.credits / rewardCount) : 0
-                                const adjustmentAvg = adjustmentCount > 0 ? (src.adjustment!.credits / adjustmentCount) : 0
-                                rows.push({ label: 'Monetário', count: monetaryCount, value: formatBRL(monetaryAvg) })
-                                rows.push({ label: 'Recompensa', count: rewardCount, value: (rewardAvg || 0).toLocaleString('pt-BR') + ' cr' })
-                                rows.push({ label: 'Ajuste', count: adjustmentCount, value: (adjustmentAvg || 0).toLocaleString('pt-BR') + ' cr' })
-                                return rows.map((r, idx) => (
-                                    <tr key={`avg-${idx}`} className="border-b last:border-b-0">
-                                        <td className="py-2 pr-2">{r.label}</td>
-                                        <td className="py-2 pr-2">{r.count}</td>
-                                        <td className="py-2 pr-2">{r.value}</td>
-                                    </tr>
-                                ))
-                            })()}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            
 
             <div className="space-y-4">
                 <div className="flex items-center gap-2">
@@ -310,5 +265,3 @@ export default function AdminFinance() {
         </div>
     )
 }
-
-
