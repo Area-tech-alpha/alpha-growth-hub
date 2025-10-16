@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
-const PUBLIC_PREFIXES = ['/api/auth', '/api/webhook']
+const PUBLIC_PREFIXES = ['/api/auth', '/api/webhook', '/webhook']
 
 const PUBLIC_FILES = /\.(.*)$/
 
