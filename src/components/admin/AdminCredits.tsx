@@ -21,9 +21,15 @@ type HistoryItem = {
 
 type LiteUser = { id: string; name: string | null; email: string | null }
 
+type PurchasedLeadItem = {
+    leadId: string
+    company_name: string | null
+    price: number | null
+}
+
 export default function AdminCredits() {
-    const [form, setForm] = useState<{ userId: string; credits: string; reason: string; action: 'grant' | 'refund' }>(
-        { userId: '', credits: '', reason: '', action: 'grant' }
+    const [form, setForm] = useState<{ userId: string; credits: string; reason: string; action: 'grant' | 'refund'; leadId?: string | null }>(
+        { userId: '', credits: '', reason: '', action: 'grant', leadId: null }
     )
     const [submitting, setSubmitting] = useState(false)
     const [message, setMessage] = useState<string | null>(null)
@@ -34,6 +40,8 @@ export default function AdminCredits() {
     const [selectedUser, setSelectedUser] = useState<LiteUser | null>(null)
     const [usersOpen, setUsersOpen] = useState(false)
     const [usersLoading, setUsersLoading] = useState(false)
+    const [userLeads, setUserLeads] = useState<{ leadId: string; company_name: string | null; price: number | null }[]>([])
+    const [userLeadsLoading, setUserLeadsLoading] = useState(false)
     const selectRef = useRef<HTMLDivElement | null>(null)
     const usersCacheRef = useRef<{ data: Record<string, LiteUser[]>; ts: Record<string, number> }>({ data: {}, ts: {} })
     const USERS_TTL_MS = 60_000
@@ -94,11 +102,41 @@ export default function AdminCredits() {
 
     const idemKeyRef = useRef<string | null>(null)
 
+    // Carrega leads comprados para a ação de estorno
+    useEffect(() => {
+        let active = true
+        async function run() {
+            if (form.action !== 'refund' || !form.userId) {
+                if (active) setUserLeads([])
+                return
+            }
+            setUserLeadsLoading(true)
+            try {
+                const res = await fetch(`/api/admin/users/${encodeURIComponent(form.userId)}/purchased-leads`, { cache: 'no-store' })
+                if (!active) return
+                if (res.ok) {
+                    const json = await res.json()
+                    const items = Array.isArray(json.items) ? json.items.map((i: PurchasedLeadItem) => ({ leadId: i.leadId, company_name: i.company_name, price: Number(i.price || 0) || null })) : []
+                    setUserLeads(items)
+                } else {
+                    setUserLeads([])
+                }
+            } catch {
+                if (!active) return
+                setUserLeads([])
+            } finally {
+                if (active) setUserLeadsLoading(false)
+            }
+        }
+        run()
+        return () => { active = false }
+    }, [form.userId, form.action])
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setMessage(null)
         if (!form.userId) { setMessage('Selecione um usuário.'); return }
-        if (!(creditsNum > 0)) { setMessage('Créditos inválidos.'); return }
+        if (!(creditsNum > 0) && !(form.action === 'refund' && form.leadId)) { setMessage('Cr�ditos inv�lidos.'); return }
         setSubmitting(true)
         if (!idemKeyRef.current) {
             try { idemKeyRef.current = crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2) } catch { idemKeyRef.current = Math.random().toString(36).slice(2) }
@@ -113,6 +151,7 @@ export default function AdminCredits() {
                     reason: form.reason || undefined,
                     action: form.action,
                     idempotencyKey: idemKeyRef.current,
+                    leadId: form.action === 'refund' && form.leadId ? form.leadId : undefined,
                 }),
             })
             if (!res.ok) {
@@ -120,10 +159,11 @@ export default function AdminCredits() {
                 setMessage(err?.error || 'Falha ao conceder créditos')
             } else {
                 setMessage('Créditos concedidos com sucesso.')
-                setForm({ userId: '', credits: '', reason: '', action: 'grant' })
+                setForm({ userId: '', credits: '', reason: '', action: 'grant', leadId: null })
                 setUserSearch('')
                 setUserOptions([])
                 setSelectedUser(null)
+                setUserLeads([])
                 idemKeyRef.current = null
                 loadHistory()
             }
@@ -174,7 +214,7 @@ export default function AdminCredits() {
                                         <button
                                             type="button"
                                             className="h-7 w-7 text-xs rounded border hover:bg-muted"
-                                            onClick={() => { setForm(f => ({ ...f, userId: '' })); setSelectedUser(null); setUserSearch(''); setUsersOpen(false) }}
+                                            onClick={() => { setForm(f => ({ ...f, userId: '', leadId: null })); setSelectedUser(null); setUserSearch(''); setUsersOpen(false); setUserLeads([]) }}
                                             title="Limpar seleção"
                                         >×</button>
                                     )}
@@ -198,7 +238,7 @@ export default function AdminCredits() {
                                                         <button
                                                             type="button"
                                                             className={`w-full text-left p-2 text-sm hover:bg-muted ${form.userId === u.id ? 'bg-muted' : ''}`}
-                                                            onClick={() => { setForm(f => ({ ...f, userId: u.id })); setSelectedUser(u); setUsersOpen(false) }}
+                                                            onClick={() => { setForm(f => ({ ...f, userId: u.id })); setSelectedUser(u); setUsersOpen(false); setUserLeads([]) }}
                                                         >
                                                             <span className="font-medium">{u.name || u.email || u.id}</span>
                                                             <span className="block text-xs text-muted-foreground">{u.email || u.id}</span>
@@ -219,7 +259,7 @@ export default function AdminCredits() {
                                 placeholder="ex: 100"
                                 value={form.credits}
                                 onChange={e => setForm(f => ({ ...f, credits: e.target.value }))}
-                                disabled={submitting}
+                                disabled={submitting || (form.action === 'refund' && !!form.leadId)}
                                 min={1}
                             />
                         </div>
@@ -228,13 +268,40 @@ export default function AdminCredits() {
                             <select
                                 className="h-9 rounded border px-2 bg-background"
                                 value={form.action}
-                                onChange={e => setForm(f => ({ ...f, action: e.target.value as 'grant' | 'refund' }))}
+                                onChange={e => setForm(f => ({ ...f, action: e.target.value as 'grant' | 'refund', leadId: null }))}
                                 disabled={submitting}
                             >
                                 <option value="grant">Conceder (Recompensa)</option>
                                 <option value="refund">Extornar (Ajuste)</option>
                             </select>
                         </div>
+                        {form.action === 'refund' && (
+                            <div className="flex flex-col gap-1 md:col-span-2">
+                                <label className="text-sm">Lead (opcional)</label>
+                                <div className="flex items-center gap-2">
+                                    <select
+                                        className="h-9 rounded border px-2 bg-background min-w-[280px]"
+                                        disabled={!form.userId || submitting || userLeadsLoading}
+                                        value={form.leadId || ''}
+                                        onChange={(e) => {
+                                            const val = e.target.value || ''
+                                            const leadId = val || null
+                                            const selected = userLeads.find(l => l.leadId === leadId)
+                                            setForm(f => ({ ...f, leadId, credits: selected?.price ? String(selected.price) : f.credits }))
+                                        }}
+                                    >
+                                        <option value="">Nenhum</option>
+                                        {userLeads.map(l => (
+                                            <option key={l.leadId} value={l.leadId}>
+                                                {(l.company_name || l.leadId) + (l.price ? ` — R$ ${l.price.toLocaleString('pt-BR')}` : '')}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {userLeadsLoading && <span className="text-xs text-muted-foreground">carregando...</span>}
+                                </div>
+                                <span className="text-xs text-muted-foreground">Se um lead for escolhido, o valor do estorno usa o preço de venda; o lead será desvinculado do usuário e o leilão fechado como expirado.</span>
+                            </div>
+                        )}
                         <div className="flex flex-col gap-1">
                             <label className="text-sm">Motivo</label>
                             <input
@@ -335,4 +402,6 @@ export default function AdminCredits() {
         </div>
     )
 }
+
+
 

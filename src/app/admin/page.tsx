@@ -18,7 +18,7 @@ export default async function AdminDashboardPage() {
                 return <div>403 - Acesso negado</div>
             }
         } catch (e) {
-            // Quando o banco estiver indisponível, não derrubar a página
+            console.warn(e)
             return (
                 <div className="p-6 space-y-2">
                     <div className="text-red-600 font-semibold">Serviço de banco indisponível</div>
