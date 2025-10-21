@@ -19,16 +19,17 @@ export async function GET(request: Request) {
 
         const where = q
             ? {
+                role: 'user' as const,
                 OR: [
                     { name: { contains: q, mode: 'insensitive' as const } },
                     { email: { contains: q, mode: 'insensitive' as const } },
                 ],
             }
-            : {}
+            : { role: 'user' as const }
 
         const users = await prisma.users.findMany({
             where,
-            select: { id: true, name: true, email: true, role: true },
+            select: { id: true, name: true, email: true },
             orderBy: [{ name: 'asc' }, { email: 'asc' }],
             take: limit,
         })
