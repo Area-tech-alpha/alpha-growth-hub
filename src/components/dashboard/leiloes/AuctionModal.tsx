@@ -171,6 +171,80 @@ export const AuctionModal = ({
         }).format(numericValue);
     };
 
+    const extractNumeric = (value: unknown): number | null => {
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? numeric : null;
+    };
+
+    const handleBidErrorResponse = (
+        payload: unknown,
+        status: number,
+        attemptedAmount: number
+    ): { handled: boolean; message?: string } => {
+        const data =
+            payload && typeof payload === "object"
+                ? (payload as { error?: unknown; code?: unknown; meta?: unknown })
+                : {};
+        const code = typeof data.code === "string" ? data.code : "";
+        const meta =
+            data.meta && typeof data.meta === "object" && data.meta !== null
+                ? (data.meta as Record<string, unknown>)
+                : {};
+        const pickNumber = (key: string, fallback?: number): number | undefined => {
+            const parsed = extractNumeric(meta[key]);
+            if (parsed != null) return parsed;
+            if (typeof fallback === "number" && Number.isFinite(fallback)) return fallback;
+            return undefined;
+        };
+
+        switch (code) {
+            case "AUCTION_CLOSED":
+                ToastBus.bidAuctionClosed();
+                return { handled: true };
+            case "BID_TOO_LOW": {
+                const minimum = pickNumber("minimumAmount", attemptedAmount) ?? attemptedAmount;
+                ToastBus.bidTooLow(minimum);
+                return { handled: true };
+            }
+            case "INSUFFICIENT_CREDITS": {
+                const required = pickNumber("requiredCredits", attemptedAmount) ?? attemptedAmount;
+                ToastBus.bidInsufficientCredits(required);
+                return { handled: true };
+            }
+            case "DUPLICATE_REQUEST":
+                ToastBus.bidFailed("Notamos um envio duplicado. Aguarde um instante e atualize o leilão.");
+                return { handled: true };
+            case "INVALID_AMOUNT":
+            case "INVALID_PAYLOAD":
+                ToastBus.bidFailed("O valor informado não parece válido. Confira o formulário antes de tentar novamente.");
+                return { handled: true };
+            case "AUCTION_NOT_FOUND":
+                ToastBus.bidFailed("Não encontramos esse leilão. Atualize a lista e tente novamente.");
+                return { handled: true };
+            case "NOT_AUTHENTICATED":
+                ToastBus.bidFailed("Faça login novamente para enviar lances.");
+                return { handled: true };
+            case "UNEXPECTED_ERROR":
+                ToastBus.bidFailed("Não conseguimos registrar seu lance agora. Tente novamente em instantes.");
+                return { handled: true };
+            default:
+                break;
+        }
+
+        if (status === 409) {
+            ToastBus.bidFailed("Outro lance está sendo processado. Atualize a tela e tente novamente.");
+            return { handled: true };
+        }
+
+        if (status === 402) {
+            ToastBus.bidInsufficientCredits(attemptedAmount);
+            return { handled: true };
+        }
+
+        const message = typeof data.error === "string" ? data.error : undefined;
+        return { handled: false, message };
+    };
+
     const handleBid = async () => {
         if (!isAuctionActive) {
             ToastBus.bidAuctionClosed();
@@ -228,19 +302,9 @@ export const AuctionModal = ({
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok) {
-                if (res.status === 402) {
-                    ToastBus.bidInsufficientCredits(amount);
-                    return;
-                }
-                if (res.status === 409) {
-                    ToastBus.bidFailed(String(json?.error || 'Outra ação está em processamento. Tente novamente.'));
-                    return;
-                }
-                if (res.status === 400) {
-                    ToastBus.bidFailed(String(json?.error || 'Parâmetros inválidos'));
-                    return;
-                }
-                throw new Error(json?.error || "Falha ao registrar o lance");
+                const { handled, message } = handleBidErrorResponse(json, res.status, amount);
+                if (handled) return;
+                throw new Error(message || "Nao foi possivel registrar o lance.");
             }
             if (typeof json?.availableCredits === "number") {
                 const nextHeld = Math.max(0, Number(rawUserCredits || 0) - Number(json.availableCredits));
@@ -249,9 +313,10 @@ export const AuctionModal = ({
             setBidAmount("");
             ToastBus.bidSuccess(amount);
         } catch (e) {
-            const message = (e as { message?: string })?.message || String(e);
+            const fallback = "Nao conseguimos registrar seu lance agora. Tente novamente em instantes.";
+            const message = (e as { message?: string })?.message || fallback;
             console.error("[AuctionModal] Insert bid error:", message);
-            ToastBus.bidFailed(message || "Tente novamente.");
+            ToastBus.bidFailed(message || fallback);
         } finally {
             setIsSubmitting(false);
         }
@@ -315,22 +380,10 @@ export const AuctionModal = ({
             });
             const json = await res.json().catch(() => ({}));
             if (!res.ok) {
-                if (res.status === 402) {
-                    ToastBus.bidInsufficientCredits(buyNowAmount);
-                    setConfirmBuyNowOpen(false);
-                    return;
-                }
-                if (res.status === 409) {
-                    ToastBus.bidFailed(String(json?.error || 'Outra ação está em processamento. Tente novamente.'));
-                    setConfirmBuyNowOpen(false);
-                    return;
-                }
-                if (res.status === 400) {
-                    ToastBus.bidFailed(String(json?.error || 'Parâmetros inválidos'));
-                    setConfirmBuyNowOpen(false);
-                    return;
-                }
-                throw new Error(json?.error || "Falha ao comprar já");
+                const { handled, message } = handleBidErrorResponse(json, res.status, buyNowAmount);
+                setConfirmBuyNowOpen(false);
+                if (handled) return;
+                throw new Error(message || "Nao foi possivel concluir a compra agora.");
             }
             if (typeof json?.availableCredits === "number") {
                 const nextHeld = Math.max(0, Number(rawUserCredits || 0) - Number(json.availableCredits));
@@ -343,9 +396,10 @@ export const AuctionModal = ({
             try { useRealtimeStore.getState().removeAuctionById(auctionId); } catch { }
             setConfirmBuyNowOpen(false);
         } catch (e) {
-            const message = (e as { message?: string })?.message || String(e);
+            const fallback = "Nao conseguimos finalizar a compra agora. Tente novamente em instantes.";
+            const message = (e as { message?: string })?.message || fallback;
             console.error("[AuctionModal] BuyNow error:", message);
-            ToastBus.bidFailed(message || "Tente novamente.");
+            ToastBus.bidFailed(message || fallback);
         } finally {
             setIsSubmitting(false);
         }
