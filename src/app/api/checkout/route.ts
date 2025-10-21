@@ -51,6 +51,8 @@ export async function POST(request: Request) {
         const checkoutData = {
             billingTypes: ['PIX'],
             chargeTypes: ['DETACHED'],
+            name: 'Growth Hub - compra de creditos',
+            description: `Pagamento originado no Growth Hub - compra de ${credits.toLocaleString('pt-BR')} creditos`,
             customer: customerId ?? undefined,
             dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             externalReference: externalReference,
@@ -62,8 +64,8 @@ export async function POST(request: Request) {
             },
             items: [
                 {
-                    name: `Créditos Alpha Growth Hub`,
-                    description: `Compra de ${credits.toLocaleString()} créditos`,
+                    name: 'Creditos Alpha Growth Hub',
+                    description: `Compra de ${credits.toLocaleString('pt-BR')} creditos (origem Growth Hub)`,
                     quantity: 1,
                     value: amount
                 }
