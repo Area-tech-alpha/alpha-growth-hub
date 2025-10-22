@@ -5,7 +5,6 @@ export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
     const asaasToken = request.headers.get("asaas-access-token");
-
     if (asaasToken !== process.env.ASAAS_WEBHOOK_SECRET) {
         console.warn('[Webhook Asaas] Tentativa de acesso com token inválido.');
         return NextResponse.json({ error: 'Acesso não autorizado' }, { status: 401 });
@@ -17,20 +16,16 @@ export async function POST(request: Request) {
         const body = JSON.parse(rawBody);
         const { event, payment } = body;
 
-        // Validação Mínima: Garante que é um payload válido do Asaas
         if (!event || !payment?.id) {
             console.warn('[Webhook Asaas] Payload com estrutura mínima inválida:', body);
             return NextResponse.json({ error: 'Payload com estrutura mínima inválida' }, { status: 400 });
         }
 
-        // --- ALTERAÇÃO PRINCIPAL AQUI ---
-        // Verifica se o pagamento veio da nossa aplicação (através do checkoutSession).
-        // Se não tiver, é de outra origem. Ignoramos e retornamos 200 OK.
+        // ignore pagamentos que não vieram do seu checkout
         if (!payment.checkoutSession) {
             console.log(`[Webhook Asaas] Ignorando pagamento de outra origem. Evento: ${event}, Payment ID: ${payment.id}`);
             return NextResponse.json({ status: 'ignored', reason: 'Pagamento de outra origem' }, { status: 200 });
         }
-        // ---------------------------------
 
         const asaasPaymentId: string = payment.id;
         const checkoutSessionId: string = payment.checkoutSession;
@@ -40,11 +35,8 @@ export async function POST(request: Request) {
             select: { user_id: true, internal_checkout_id: true },
         });
 
-        // Se tem checkoutSession mas não achamos no DB, é um erro real da nossa aplicação.
         if (!sessionMapping?.user_id) {
             console.error(`[Webhook Asaas CRÍTICO] Não foi possível encontrar o usuário para o checkoutSessionId: ${checkoutSessionId}. Pagamento: ${asaasPaymentId}`);
-            // Retornamos 200 aqui também para evitar que o Asaas reenvie um webhook que nunca vai funcionar.
-            // O erro crítico já foi logado para investigação.
             return NextResponse.json({ status: 'error', message: 'Usuário correspondente não encontrado, webhook ignorado.' }, { status: 200 });
         }
 
@@ -66,6 +58,46 @@ export async function POST(request: Request) {
             return NextResponse.json({ status: 'ignored', event }, { status: 200 });
         }
 
+        // === NOVO: atualiza a cobrança no Asaas com a descrição/origem ===
+        try {
+            const credits = Math.floor(Number(payment.value ?? 0));
+            const desc =
+                `Pagamento originado no Growth Hub — compra de ${credits.toLocaleString('pt-BR')} créditos ` +
+                `(checkout ${internalCheckoutId} • uid ${userId})`;
+
+            const payloadUpdate: {
+                description: string;
+                externalReference?: string;
+            } = {
+                description: desc,
+            };
+
+            // opcional: garantir externalReference também na cobrança
+            // se você quer propagar seu id interno aqui
+            payloadUpdate.externalReference = `ck:${internalCheckoutId}|uid:${userId}`;
+
+            const resUpdate = await fetch(`${process.env.ASAAS_API_URL}/payments/${asaasPaymentId}`, {
+                method: 'PUT',
+                headers: {
+                    'accept': 'application/json',
+                    'content-type': 'application/json',
+                    'access_token': process.env.ASAAS_API_KEY as string,
+                },
+                body: JSON.stringify(payloadUpdate),
+            });
+
+            if (!resUpdate.ok) {
+                const errJson = await safeJson(resUpdate);
+                console.warn('[Webhook Asaas] Falha ao atualizar descrição do payment:', resUpdate.status, errJson);
+                // segue o fluxo mesmo assim — não bloqueia crédito
+            }
+        } catch (e) {
+            console.warn('[Webhook Asaas] Exceção ao atualizar cobrança (description/externalReference):', e);
+            // segue o fluxo mesmo assim
+        }
+        // === FIM NOVO ===
+
+        // idempotência: se já processou, só marca processed e sai
         const alreadyProcessed = await prisma.credit_transactions.findUnique({
             where: { asaas_payment_id: asaasPaymentId }
         });
@@ -122,4 +154,9 @@ export async function POST(request: Request) {
         console.error('[Webhook Asaas] Erro inesperado no processamento do webhook:', error);
         return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
     }
+}
+
+// util para não quebrar o fluxo se o JSON vier inválido
+async function safeJson(r: Response) {
+    try { return await r.json(); } catch { return { raw: await r.text() }; }
 }
