@@ -38,7 +38,7 @@ export async function GET(request: Request) {
         const heldAgg = await prisma.users.aggregate({ _sum: { credit_balance: true } })
 
         // Segmentar por origem (tenta usar coluna `source`; se falhar, usa fallback no metadata)
-        type GroupRow = { derived_source: string | null; amount_paid_sum: unknown; credits_sum: unknown }
+        type GroupRow = { derived_source: string | null; amount_paid_sum: unknown; credits_sum: unknown; tx_count: unknown }
         let bySourceRows: GroupRow[] = []
         try {
             const where = createdAtWhere ? { created_at: createdAtWhere } : undefined
@@ -46,11 +46,13 @@ export async function GET(request: Request) {
                 by: ['source'],
                 where,
                 _sum: { amount_paid: true, credits_purchased: true },
+                _count: { _all: true },
             })
             bySourceRows = grouped.map(g => ({
                 derived_source: g.source as unknown as string,
                 amount_paid_sum: g._sum.amount_paid ?? 0,
                 credits_sum: g._sum.credits_purchased ?? 0,
+                tx_count: g._count?._all ?? 0,
             }))
         } catch {
             const start = createdAtWhere?.gte ?? null
@@ -69,7 +71,8 @@ export async function GET(request: Request) {
                 )
                 SELECT derived_source,
                        COALESCE(SUM(amount_paid),0) AS amount_paid_sum,
-                       COALESCE(SUM(credits_purchased),0) AS credits_sum
+                       COALESCE(SUM(credits_purchased),0) AS credits_sum,
+                       COUNT(*) AS tx_count
                 FROM filtered
                 GROUP BY derived_source
                 `,
@@ -84,8 +87,8 @@ export async function GET(request: Request) {
         const held = heldAgg._sum.credit_balance ? Number(heldAgg._sum.credit_balance) : 0
 
         // Mapear resultado para estrutura amigável
-        const base = { amountPaid: 0, credits: 0 }
-        const bySource: Record<string, { amountPaid: number, credits: number }> = {
+        const base = { amountPaid: 0, credits: 0, count: 0 }
+        const bySource: Record<string, { amountPaid: number, credits: number, count: number }> = {
             monetary: { ...base },
             reward: { ...base },
             adjustment: { ...base },
@@ -95,9 +98,11 @@ export async function GET(request: Request) {
             const key = (r.derived_source || 'unknown') as keyof typeof bySource
             const amountPaid = Number(r.amount_paid_sum || 0)
             const credits = Number(r.credits_sum || 0)
-            if (!bySource[key]) bySource[key] = { amountPaid: 0, credits: 0 }
+            const count = Number(r.tx_count || 0)
+            if (!bySource[key]) bySource[key] = { amountPaid: 0, credits: 0, count: 0 }
             bySource[key].amountPaid += amountPaid
             bySource[key].credits += credits
+            bySource[key].count += count
         }
 
         return NextResponse.json({ total, pix, card, held, bySource })

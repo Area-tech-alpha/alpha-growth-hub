@@ -15,8 +15,8 @@ type CloseAuctionWonBody = {
     lead: LeadsModel
     winningBidId: string
 }
-type CloseAuctionAlreadyClosedBody = { outcome: 'already_closed'; error: string }
-type CloseAuctionErrorBody = { error: string }
+type CloseAuctionAlreadyClosedBody = { outcome: 'already_closed'; error: string; code: string; meta?: Record<string, unknown> }
+type CloseAuctionErrorBody = { error: string; code: string; meta?: Record<string, unknown> }
 type CloseAuctionResultBody =
     | CloseAuctionExpiredBody
     | CloseAuctionWonBody
@@ -27,13 +27,19 @@ type TransactionResult = { status: 200 | 404 | 409; body: CloseAuctionResultBody
 const isExpiredNoBids = (body: CloseAuctionResultBody): body is CloseAuctionExpiredBody =>
     'outcome' in body && body.outcome === 'expired_no_bids'
 
+const buildError = (code: string, message: string, meta?: Record<string, unknown>): CloseAuctionErrorBody => ({
+    error: message,
+    code,
+    ...(meta ? { meta } : {})
+})
+
 export async function POST(
     _request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
     const { id: auctionId } = await params
     if (!auctionId) {
-        return NextResponse.json({ error: 'Missing auction id' }, { status: 400 })
+        return NextResponse.json(buildError('MISSING_AUCTION_ID', 'Envie o identificador do leilao.'), { status: 400 })
     }
 
     try {
@@ -55,7 +61,7 @@ export async function POST(
 
             if (!auction) {
                 console.warn('[close-auction] auction not found', { auctionId })
-                return { status: 404 as const, body: { error: 'Auction not found' } }
+                return { status: 404 as const, body: buildError('AUCTION_NOT_FOUND', 'Nao encontramos esse leilao.') }
             }
 
             const topBid = await tx.bids.findFirst({
@@ -74,7 +80,13 @@ export async function POST(
                 })
                 if (lock.count === 0) {
                     console.warn('[close-auction] already closed, skipping duplicate expiration', { auctionId })
-                    return { status: 409 as const, body: { error: 'Auction already closed', outcome: 'already_closed' as const } }
+                    return {
+                        status: 409 as const,
+                        body: {
+                            outcome: 'already_closed' as const,
+                            ...buildError('AUCTION_ALREADY_PROCESSED', 'Esse leilao ja foi encerrado antes desta requisicao.', { auctionId })
+                        }
+                    }
                 }
 
                 const updatedLead = await tx.leads.update({
@@ -101,7 +113,13 @@ export async function POST(
             })
             if (lock.count === 0) {
                 console.warn('[close-auction] already closed, skipping duplicate win processing', { auctionId })
-                return { status: 409 as const, body: { error: 'Auction already closed', outcome: 'already_closed' as const } }
+                return {
+                    status: 409 as const,
+                    body: {
+                        outcome: 'already_closed' as const,
+                        ...buildError('AUCTION_ALREADY_PROCESSED', 'Esse leilao ja foi processado anteriormente.', { auctionId })
+                    }
+                }
             }
 
             const [updatedAuction, updatedLead] = await Promise.all([
@@ -167,7 +185,13 @@ export async function POST(
         return NextResponse.json(result.body, { status: result.status })
     } catch (error: unknown) {
         console.error('[close-auction] error:', error)
-        return NextResponse.json({ error: 'Internal error', details: String(error) }, { status: 500 })
+        return NextResponse.json(
+            {
+                ...buildError('UNEXPECTED_ERROR', 'Nao conseguimos finalizar esse leilao agora. Tente novamente em instantes.'),
+                details: String(error)
+            },
+            { status: 500 }
+        )
     }
 }
 

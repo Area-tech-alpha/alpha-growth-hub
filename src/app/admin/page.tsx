@@ -9,9 +9,23 @@ export default async function AdminDashboardPage() {
         return <div>Acesso restrito. Faça login.</div>
     }
 
-    const me = await prisma.users.findUnique({ where: { id: session.user.id }, select: { role: true } })
-    if (!me || me.role !== 'admin') {
-        return <div>403 - Acesso negado</div>
+    // Prefira usar o papel vindo da sessão (evita quebra quando o DB está indisponível)
+    const sessionRole = (session.user as unknown as { role?: string })?.role
+    if (sessionRole !== 'admin') {
+        try {
+            const me = await prisma.users.findUnique({ where: { id: session.user.id }, select: { role: true } })
+            if (!me || me.role !== 'admin') {
+                return <div>403 - Acesso negado</div>
+            }
+        } catch (e) {
+            console.warn(e)
+            return (
+                <div className="p-6 space-y-2">
+                    <div className="text-red-600 font-semibold">Serviço de banco indisponível</div>
+                    <div className="text-sm text-muted-foreground">Não foi possível validar permissão admin no momento. Tente novamente em instantes.</div>
+                </div>
+            )
+        }
     }
 
     return (

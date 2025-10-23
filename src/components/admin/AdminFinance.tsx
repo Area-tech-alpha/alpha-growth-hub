@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 type FinanceData = { total: number; pix: number; card: number; held: number }
-type BySource = { [k: string]: { amountPaid: number; credits: number } }
+type BySource = { [k: string]: { amountPaid: number; credits: number; count?: number } }
 
 function SkeletonCard({ title }: { title: string }) {
     return (
@@ -191,7 +191,6 @@ export default function AdminFinance() {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-semibold">{formatBRL(data.bySource?.monetary?.amountPaid || 0)}</div>
-                                <div className="mt-1 text-xs text-muted-foreground">créditos: {(data.bySource?.monetary?.credits || 0).toLocaleString('pt-BR')}</div>
                             </CardContent>
                         </Card>
                         <Card>
@@ -200,16 +199,14 @@ export default function AdminFinance() {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-semibold">{(data.bySource?.reward?.credits || 0).toLocaleString('pt-BR')}</div>
-                                <div className="mt-1 text-xs text-muted-foreground">recebido: {formatBRL(data.bySource?.reward?.amountPaid || 0)}</div>
                             </CardContent>
                         </Card>
                         <Card>
                             <CardHeader className="space-y-1">
-                                <CardTitle className="text-sm text-muted-foreground">Ajuste (créditos)</CardTitle>
+                                <CardTitle className="text-sm text-muted-foreground">Estorno (créditos)</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-semibold">{(data.bySource?.adjustment?.credits || 0).toLocaleString('pt-BR')}</div>
-                                <div className="mt-1 text-xs text-muted-foreground">recebido: {formatBRL(data.bySource?.adjustment?.amountPaid || 0)}</div>
                             </CardContent>
                         </Card>
                         <Card>
@@ -218,12 +215,13 @@ export default function AdminFinance() {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-semibold">{(data.bySource?.unknown?.credits || 0).toLocaleString('pt-BR')}</div>
-                                <div className="mt-1 text-xs text-muted-foreground">recebido: {formatBRL(data.bySource?.unknown?.amountPaid || 0)}</div>
                             </CardContent>
                         </Card>
                     </div>
                 )}
             </div>
+
+            
 
             <div className="space-y-4">
                 <div className="flex items-center gap-2">
@@ -267,5 +265,3 @@ export default function AdminFinance() {
         </div>
     )
 }
-
-

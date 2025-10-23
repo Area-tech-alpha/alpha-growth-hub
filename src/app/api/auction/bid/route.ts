@@ -4,13 +4,44 @@ import { authOptions } from '../../../../../auth'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 
+type BidErrorBody = {
+    error: string
+    code: string
+    meta?: Record<string, unknown>
+}
+
+type BidSuccessBody = {
+    bid: { id: string; auction_id: string; user_id: string; amount: number }
+    availableCredits: number
+}
+
+type BidResult =
+    | { status: 201; body: BidSuccessBody }
+    | { status: 400 | 401 | 402 | 404 | 409; body: BidErrorBody }
+
+const buildErrorPayload = (code: string, message: string, meta?: Record<string, unknown>): BidErrorBody => ({
+    error: message,
+    code,
+    ...(meta ? { meta } : {})
+})
+
+const buildErrorResult = <S extends BidResult['status']>(
+    status: S,
+    code: string,
+    message: string,
+    meta?: Record<string, unknown>
+): Extract<BidResult, { status: S }> => ({
+    status,
+    body: buildErrorPayload(code, message, meta)
+}) as Extract<BidResult, { status: S }>
+
 export const runtime = 'nodejs'
 
 export async function POST(request: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session?.user?.id) {
-            return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+            return NextResponse.json(buildErrorPayload('NOT_AUTHENTICATED', 'Faca login para enviar lances.'), { status: 401 })
         }
         const userId = session.user.id
 
@@ -22,10 +53,10 @@ export async function POST(request: Request) {
         const bodyKey = typeof (body as { idempotency_key?: string }).idempotency_key === 'string' ? (body as { idempotency_key?: string }).idempotency_key as string : ''
         const idemKey = (headerKey || bodyKey).trim()
         if (!auctionId || !Number.isFinite(amount)) {
-            return NextResponse.json({ error: 'Parâmetros inválidos' }, { status: 400 })
+            return NextResponse.json(buildErrorPayload('INVALID_PAYLOAD', 'Envie o identificador do leilao e o valor do lance.'), { status: 400 })
         }
 
-        const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        const result = await prisma.$transaction<BidResult>(async (tx: Prisma.TransactionClient) => {
             const toNum = (v: unknown): number => {
                 if (v == null) return 0;
                 const anyV = v as { toNumber?: () => number };
@@ -49,17 +80,22 @@ export async function POST(request: Request) {
                 try {
                     const inserted = await tx.$executeRawUnsafe(`insert into public.request_keys(key) values ('${idemKey.replace(/'/g, "''")}') on conflict (key) do nothing`);
                     if (!inserted) {
-                        return { status: 409 as const, body: { error: 'Requisição duplicada. Tente novamente.' } }
+                        return buildErrorResult(409, 'DUPLICATE_REQUEST', 'Detectamos um envio duplicado. Aguarde e atualize o leilao.')
                     }
                 } catch { /* ignore if table is missing */ }
             }
 
             const auction = await tx.auctions.findUnique({ where: { id: auctionId } })
             if (!auction) {
-                return { status: 404 as const, body: { error: 'Leilão não encontrado' } }
+                return buildErrorResult(404, 'AUCTION_NOT_FOUND', 'Nao encontramos esse leilao. Ele pode ter sido encerrado ou removido.')
             }
             if (auction.status !== 'open' || new Date(auction.expired_at).getTime() <= Date.now()) {
-                return { status: 409 as const, body: { error: 'Leilão encerrado' } }
+                return buildErrorResult(
+                    409,
+                    'AUCTION_CLOSED',
+                    'Esse leilao ja foi encerrado. Atualize a lista de leiloes antes de tentar novamente.',
+                    { status: auction.status, expiredAt: auction.expired_at }
+                )
             }
 
             const topBid = await tx.bids.findFirst({
@@ -71,13 +107,18 @@ export async function POST(request: Request) {
             const nextMinFromTop = currentTop > 0 ? Math.ceil(currentTop * 1.10) : 0
             const requiredMin = Math.max(minimumBid, nextMinFromTop)
             if (!Number.isFinite(amount)) {
-                return { status: 400 as const, body: { error: 'Valor inválido' } }
+                return buildErrorResult(400, 'INVALID_AMOUNT', 'Valor de lance invalido. Informe um numero valido.')
             }
             // Server-side buy-now price
             const serverBuyNowPrice = Math.ceil(requiredMin * 1.5)
             if (!buyNow) {
                 if (amount < requiredMin) {
-                    return { status: 400 as const, body: { error: `Lance mínimo é ${requiredMin}` } }
+                    return buildErrorResult(
+                        400,
+                        'BID_TOO_LOW',
+                        `Seu lance deve ser de pelo menos R$ ${requiredMin}.`,
+                        { minimumAmount: requiredMin }
+                    )
                 }
             }
 
@@ -99,7 +140,15 @@ export async function POST(request: Request) {
             const availableExcludingThis = creditBalance - (totalActiveHolds - existingHoldAmount)
             const deltaNeeded = effectiveAmount - existingHoldAmount
             if (availableExcludingThis < deltaNeeded) {
-                return { status: 402 as const, body: { error: 'Créditos insuficientes' } }
+                return buildErrorResult(
+                    402,
+                    'INSUFFICIENT_CREDITS',
+                    `Voce precisa de pelo menos R$ ${effectiveAmount} em creditos livres para enviar esse lance.`,
+                    {
+                        availableCredits: creditBalance - totalActiveHolds,
+                        requiredCredits: effectiveAmount
+                    }
+                )
             }
 
             const bid = await tx.bids.create({
@@ -175,14 +224,27 @@ export async function POST(request: Request) {
             const totalHoldsAfter = holdsAfter.reduce((sum, h) => sum + toNum(h.amount as unknown), 0)
             const availableCredits = Math.max(0, effectiveBalance - totalHoldsAfter)
 
-            return { status: 201 as const, body: { bid: { id: bid.id, auction_id: auctionId, user_id: userId, amount: toNum(bid.amount as unknown) }, availableCredits } }
+            return {
+                status: 201,
+                body: {
+                    bid: { id: bid.id, auction_id: auctionId, user_id: userId, amount: toNum(bid.amount as unknown) },
+                    availableCredits
+                }
+            }
         })
 
         return NextResponse.json(result.body, { status: result.status })
     } catch (error: unknown) {
         console.error('[bid] error:', error)
-        return NextResponse.json({ error: 'Erro interno', details: String(error) }, { status: 500 })
+        return NextResponse.json(
+            {
+                ...buildErrorPayload('UNEXPECTED_ERROR', 'Nao conseguimos registrar seu lance agora. Tente novamente em instantes.'),
+                details: String(error)
+            },
+            { status: 500 }
+        )
     }
 }
+
 
 
