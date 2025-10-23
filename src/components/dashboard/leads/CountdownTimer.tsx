@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface CountdownTimerProps {
   expiresAt: string;
@@ -15,31 +15,46 @@ export const CountdownTimer = ({
   className,
   isHot = false,
 }: CountdownTimerProps) => {
-  const expirationTime = new Date(expiresAt).getTime();
-  const [timeLeft, setTimeLeft] = useState(expirationTime - Date.now());
+  const computeInitial = () => {
+    const diff = new Date(expiresAt).getTime() - Date.now();
+    return Number.isFinite(diff) ? diff : 0;
+  };
+  const [timeLeft, setTimeLeft] = useState<number>(computeInitial);
+  const hasEmittedExpireRef = useRef(false);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const remaining = expirationTime - Date.now();
-      if (remaining <= 1000) {
-        clearInterval(interval);
+    hasEmittedExpireRef.current = false;
+
+    const tick = () => {
+      const target = new Date(expiresAt).getTime();
+      const remaining = Number.isFinite(target) ? target - Date.now() : 0;
+
+      if (remaining <= 0) {
         setTimeLeft(0);
-        onExpire();
-      } else {
-        setTimeLeft(remaining);
+        if (!hasEmittedExpireRef.current) {
+          hasEmittedExpireRef.current = true;
+          onExpire();
+        }
+        return;
       }
-    }, 1000);
 
-    return () => clearInterval(interval);
-  }, [expiresAt, onExpire, expirationTime]);
+      setTimeLeft(remaining);
+    };
 
-  const minutes = Math.floor(timeLeft / 1000 / 60);
-  const seconds = Math.floor((timeLeft / 1000) % 60);
+    tick(); // Ensure UI updates immediately when expiresAt changes
+    const intervalId = window.setInterval(tick, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [expiresAt, onExpire]);
+
+  const safeTimeLeft = Math.max(0, timeLeft);
+  const minutes = Math.floor(safeTimeLeft / 1000 / 60);
+  const seconds = Math.floor((safeTimeLeft / 1000) % 60);
 
   const getTimeColor = () => {
     if (isHot) return "";
-    if (timeLeft <= 60 * 1000) return "text-red-500 dark:text-red-400";
-    if (timeLeft <= 180 * 1000) return "text-yellow-600 dark:text-yellow-400";
+    if (safeTimeLeft <= 60 * 1000) return "text-red-500 dark:text-red-400";
+    if (safeTimeLeft <= 180 * 1000) return "text-yellow-600 dark:text-yellow-400";
     return "text-foreground";
   };
 
@@ -67,7 +82,7 @@ export const CountdownTimer = ({
           isHot ? "hot-timer-animation" : ""
         } ${className}`}
       >
-        {timeLeft > 0
+        {safeTimeLeft > 0
           ? `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
               2,
               "0"
