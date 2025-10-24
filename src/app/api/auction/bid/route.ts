@@ -208,6 +208,15 @@ export async function POST(request: Request) {
                     where: { id: auctionId },
                     data: { minimum_bid: new Prisma.Decimal(nextMinimum) }
                 })
+                // Libera os credit holds dos demais participantes
+                await tx.credit_holds.updateMany({
+                    where: {
+                        auction_id: auctionId,
+                        status: 'active',
+                        user_id: { not: userId }
+                    },
+                    data: { status: 'released', updated_at: new Date() as unknown as Date }
+                })
             }
 
             if (!buyNow) {
