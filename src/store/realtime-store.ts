@@ -224,7 +224,7 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
         }
 
         const channelName = `leads_user_${userId}`;
-        leadsChannel = supabase
+        const channel = supabase
             .channel(channelName)
             .on(
                 'postgres_changes',
@@ -250,8 +250,21 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
                             : [updated, ...state.purchasedLeads]
                     }));
                 }
-            )
-            .subscribe();
+            );
+
+        void channel.subscribe((status, err) => {
+            if (status === 'SUBSCRIBED') {
+                console.log('[Realtime] Leads channel subscribed', { userId });
+            } else if (status === 'CHANNEL_ERROR') {
+                console.log('[Realtime] Leads channel error', { userId, err });
+            } else if (status === 'TIMED_OUT') {
+                console.log('[Realtime] Leads channel timed out', { userId });
+            } else if (status === 'CLOSED') {
+                console.log('[Realtime] Leads channel closed', { userId });
+            }
+        });
+
+        leadsChannel = channel;
         leadsSubscribedKey = nextKey;
     },
 
@@ -284,7 +297,7 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
         }
 
         const channelName = `users-credits-id-${userId}`;
-        userCreditsChannel = supabase
+        const channel = supabase
             .channel(channelName)
             .on(
                 'postgres_changes',
@@ -298,8 +311,21 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
                         userCredits: Math.max(0, Number(next) - Number(state.heldCredits || 0))
                     }));
                 }
-            )
-            .subscribe();
+            );
+
+        void channel.subscribe((status, err) => {
+            if (status === 'SUBSCRIBED') {
+                console.log('[Realtime] Credits channel subscribed', { userId });
+            } else if (status === 'CHANNEL_ERROR') {
+                console.log('[Realtime] Credits channel error', { userId, err });
+            } else if (status === 'TIMED_OUT') {
+                console.log('[Realtime] Credits channel timed out', { userId });
+            } else if (status === 'CLOSED') {
+                console.log('[Realtime] Credits channel closed', { userId });
+            }
+        });
+
+        userCreditsChannel = channel;
         subscribedKey = nextKey;
 
         supabase
@@ -348,7 +374,7 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
         }
 
         const channelName = `credit_holds_user_${userId}`;
-        creditHoldsChannel = supabase
+        const channel = supabase
             .channel(channelName)
             .on(
                 'postgres_changes',
@@ -370,8 +396,21 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
                 () => {
                     get().fetchAndSetUserActiveHoldsTotal(userId);
                 }
-            )
-            .subscribe();
+            );
+
+        void channel.subscribe((status, err) => {
+            if (status === 'SUBSCRIBED') {
+                console.log('[Realtime] Credit holds channel subscribed', { userId });
+            } else if (status === 'CHANNEL_ERROR') {
+                console.log('[Realtime] Credit holds channel error', { userId, err });
+            } else if (status === 'TIMED_OUT') {
+                console.log('[Realtime] Credit holds channel timed out', { userId });
+            } else if (status === 'CLOSED') {
+                console.log('[Realtime] Credit holds channel closed', { userId });
+            }
+        });
+
+        creditHoldsChannel = channel;
         holdsSubscribedKey = nextKey;
 
         get().fetchAndSetUserActiveHoldsTotal(userId);
@@ -466,7 +505,7 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
         }
 
         const channelName = `credit_transactions_user_${userId}`;
-        purchasesChannel = supabase
+        const channel = supabase
             .channel(channelName)
             .on(
                 'postgres_changes',
@@ -478,8 +517,21 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
                     if (current.some(p => p.id === row.id)) return;
                     set({ userPurchases: [row as { id: string | number; created_at: string;[key: string]: unknown }, ...current] });
                 }
-            )
-            .subscribe();
+            );
+
+        void channel.subscribe((status, err) => {
+            if (status === 'SUBSCRIBED') {
+                console.log('[Realtime] Purchases channel subscribed', { userId });
+            } else if (status === 'CHANNEL_ERROR') {
+                console.log('[Realtime] Purchases channel error', { userId, err });
+            } else if (status === 'TIMED_OUT') {
+                console.log('[Realtime] Purchases channel timed out', { userId });
+            } else if (status === 'CLOSED') {
+                console.log('[Realtime] Purchases channel closed', { userId });
+            }
+        });
+
+        purchasesChannel = channel;
         purchasesSubscribedKey = nextKey;
     },
 

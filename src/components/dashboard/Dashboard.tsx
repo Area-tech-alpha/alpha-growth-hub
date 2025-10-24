@@ -207,17 +207,38 @@ export default function Dashboard({
           };
         }) => {
           const newRow = payload.new;
-          const { data: leadData } = await supabase
+          console.log("[Dashboard] Auction INSERT payload received", {
+            id: newRow.id,
+            status: newRow.status,
+            expired_at: newRow.expired_at,
+            lead_id: newRow.lead_id,
+          });
+          const { data: leadData, error } = await supabase
             .from("leads")
             .select("*")
             .eq("id", newRow.lead_id)
             .single();
-          if (!leadData) return;
+          if (error) {
+            console.log("[Dashboard] Auction INSERT lead fetch failed", {
+              leadId: newRow.lead_id,
+              message: error.message,
+            });
+            return;
+          }
+          if (!leadData) {
+            console.log("[Dashboard] Auction INSERT no lead data returned", {
+              leadId: newRow.lead_id,
+            });
+            return;
+          }
           upsertAuctionWithLead({
             id: newRow.id,
             status: newRow.status,
             expired_at: newRow.expired_at,
-            minimum_bid: typeof newRow.minimum_bid === 'string' ? parseFloat(newRow.minimum_bid) : (newRow.minimum_bid ?? undefined),
+            minimum_bid:
+              typeof newRow.minimum_bid === "string"
+                ? parseFloat(newRow.minimum_bid)
+                : newRow.minimum_bid ?? undefined,
             leads: {
               ...(leadData as Lead),
               expires_at: newRow.expired_at,
@@ -239,13 +260,22 @@ export default function Dashboard({
           };
         }) => {
           const updated = payload.new;
+          console.log("[Dashboard] Auction UPDATE payload received", {
+            id: updated.id,
+            status: updated.status,
+            expired_at: updated.expired_at,
+            winning_bid_id: updated.winning_bid_id,
+          });
           if (updated.status !== "open") {
             removeAuctionById(updated.id);
           } else {
             updateAuctionFields(updated.id, {
               status: updated.status,
               expired_at: updated.expired_at,
-              minimum_bid: typeof updated.minimum_bid === 'string' ? parseFloat(updated.minimum_bid) : (updated.minimum_bid ?? undefined),
+              minimum_bid:
+                typeof updated.minimum_bid === "string"
+                  ? parseFloat(updated.minimum_bid)
+                  : updated.minimum_bid ?? undefined,
             });
           }
 
@@ -268,7 +298,12 @@ export default function Dashboard({
                     if (data?.id) {
                       addPurchasedLeadIfMissing(data as unknown as Lead);
                     }
-                  } catch { }
+                  } catch {
+                    console.log(
+                      "[Dashboard] Auction UPDATE winner lead fetch failed",
+                      { leadId: updated.lead_id }
+                    );
+                  }
                 })();
               } else if (auctionBids.some((b) => b.userId === currentUserId)) {
                 ToastBus.notifyAuctionLost(updated.id);
@@ -289,6 +324,11 @@ export default function Dashboard({
           };
         }) => {
           const row = payload.new;
+          console.log("[Dashboard] Bid INSERT payload received", {
+            id: row.id,
+            auction_id: row.auction_id,
+            user_id: row.user_id,
+          });
           const amount =
             typeof row.amount === "string"
               ? parseFloat(row.amount)
@@ -310,8 +350,19 @@ export default function Dashboard({
             ].slice(0, 100);
           }
         }
-      )
-      .subscribe();
+      );
+
+    void channel.subscribe((status, err) => {
+      if (status === "SUBSCRIBED") {
+        console.log("[Dashboard] Channel subscribed");
+      } else if (status === "CHANNEL_ERROR") {
+        console.log("[Dashboard] Channel error", err);
+      } else if (status === "TIMED_OUT") {
+        console.log("[Dashboard] Channel timed out");
+      } else if (status === "CLOSED") {
+        console.log("[Dashboard] Channel closed");
+      }
+    });
 
     return () => {
       supabase.removeChannel(channel);
