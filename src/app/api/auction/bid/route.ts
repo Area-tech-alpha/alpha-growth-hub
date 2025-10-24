@@ -132,9 +132,9 @@ export async function POST(request: Request) {
             let effectiveBalance = creditBalance
 
             const existingHold = await tx.credit_holds.findFirst({
-                where: { user_id: userId, auction_id: auctionId, status: 'active' }
+                where: { user_id: userId, auction_id: auctionId }
             })
-            const existingHoldAmount = toNum(existingHold?.amount as unknown)
+            const existingHoldAmount = existingHold?.status === 'active' ? toNum(existingHold.amount as unknown) : 0
 
             const holds = await tx.credit_holds.findMany({
                 where: { user_id: userId, status: 'active', auctions: { status: 'open' } },
@@ -167,7 +167,12 @@ export async function POST(request: Request) {
             if (existingHold) {
                 await tx.credit_holds.update({
                     where: { id: existingHold.id },
-                    data: { amount: bid.amount, bid_id: bid.id, status: 'active', updated_at: new Date() as unknown as Date }
+                    data: {
+                        amount: bid.amount,
+                        bid_id: bid.id,
+                        status: 'active',
+                        updated_at: new Date() as unknown as Date
+                    }
                 })
             } else {
                 await tx.credit_holds.create({
