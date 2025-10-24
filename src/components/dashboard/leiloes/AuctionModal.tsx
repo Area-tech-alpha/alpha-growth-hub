@@ -80,21 +80,28 @@ export const AuctionModal = ({
     const [userMaskedEmails, setUserMaskedEmails] = useState<Record<string, string>>({});
     const userEmailsRef = useRef<Record<string, string>>({});
     const auctionFromStore = activeAuctions.find((a: AuctionWithLead) => a.id === auctionId);
+    const isHotLead = (lead.status || '').toLowerCase() === 'hot';
     const auctionMinimumBid = auctionFromStore?.minimum_bid;
     let requiredMin = Math.max(
         Number.isFinite(auctionMinimumBid as number) ? (auctionMinimumBid as number) : 0,
         (currentBid ?? 0) + 1,
         lead.minimum_value || 0
     );
-    let buyNowPrice = Math.ceil(requiredMin * 1.5);
-    // Regras específicas para DEMO: mínimos fixos iniciais e progressão 1.1x/1.5x do último lance fake
+    const buyNowMultiplier = isHotLead ? 1.2 : 1.5;
+    const buyNowMultiplierLabel = buyNowMultiplier.toLocaleString("pt-BR", {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+    });
+    let buyNowPrice = Math.ceil(requiredMin * buyNowMultiplier);
+    // Regras específicas para DEMO: mínimos fixos iniciais, progressão 1.1x do último lance fake
+    // e multiplicador de compra agora ajustado conforme status do lead.
     if (isDemoAuction) {
         const baseline = lead.status === 'hot' ? 800 : 400;
         const last = Number(currentBid || 0);
         const nextMinFromLast = last > 0 ? Math.ceil(last * 1.10) : baseline;
         requiredMin = Math.max(baseline, nextMinFromLast);
         const baseForBuy = last > 0 ? last : baseline;
-        buyNowPrice = Math.ceil(baseForBuy * 1.5);
+        buyNowPrice = Math.ceil(baseForBuy * buyNowMultiplier);
     }
     const [confirmBuyNowOpen, setConfirmBuyNowOpen] = useState(false);
     const handleBidAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -545,14 +552,14 @@ export const AuctionModal = ({
                                             </TooltipTrigger>
                                             {/* Esconde tooltip em mobile (sm:hidden) */}
                                             <TooltipContent className="hidden sm:block max-w-xs">
-                                                Encerrar o leilão agora pagando 1,5× do lance mínimo. O lead é transferido imediatamente e os créditos são debitados.
+                                                {`Encerrar o leilão agora pagando ${buyNowMultiplierLabel}× do lance mínimo. O lead é transferido imediatamente e os créditos são debitados.`}
                                             </TooltipContent>
                                         </Tooltip>
                                         <div>
                                             <span className="mr-1">Comprar já:</span>
                                             <strong className="text-yellow-600">{formatCurrency(buyNowPrice)}</strong>
-                                            <span className="hidden sm:inline"> (1,5× do lance mínimo)</span>
-                                            <span className="block sm:hidden text-muted-foreground/90">(1,5× do lance mínimo)</span>
+                                            <span className="hidden sm:inline"> ({buyNowMultiplierLabel}× do lance mínimo)</span>
+                                            <span className="block sm:hidden text-muted-foreground/90">({buyNowMultiplierLabel}× do lance mínimo)</span>
                                         </div>
                                     </div>
                                 </TooltipProvider>
@@ -561,7 +568,7 @@ export const AuctionModal = ({
                                         onClick={handleBuyNow}
                                         disabled={isSubmitting}
                                         className="bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-black font-bold shadow w-full mb-6"
-                                        title={`Comprar já! (${formatCurrency(buyNowPrice)} = 1,5× do lance mínimo)`}
+                                        title={`Comprar já! (${formatCurrency(buyNowPrice)} = ${buyNowMultiplierLabel}× do lance mínimo)`}
                                     >
                                         Comprar já!
                                     </Button>
