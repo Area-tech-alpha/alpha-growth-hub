@@ -106,11 +106,16 @@ export async function POST(request: Request) {
             const minimumBid = toNum(auction.minimum_bid as unknown)
             const nextMinFromTop = currentTop > 0 ? Math.ceil(currentTop * 1.10) : 0
             const requiredMin = Math.max(minimumBid, nextMinFromTop)
+            const lead = auction.lead_id
+                ? await tx.leads.findUnique({ where: { id: auction.lead_id }, select: { status: true } })
+                : null
+            const leadStatus = typeof lead?.status === 'string' ? lead.status.toLowerCase() : ''
+            const buyNowMultiplier = leadStatus === 'hot' ? 1.2 : 1.5
             if (!Number.isFinite(amount)) {
                 return buildErrorResult(400, 'INVALID_AMOUNT', 'Valor de lance invalido. Informe um numero valido.')
             }
             // Server-side buy-now price
-            const serverBuyNowPrice = Math.ceil(requiredMin * 1.5)
+            const serverBuyNowPrice = Math.ceil(requiredMin * buyNowMultiplier)
             if (!buyNow) {
                 if (amount < requiredMin) {
                     return buildErrorResult(
