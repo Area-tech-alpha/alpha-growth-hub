@@ -27,8 +27,8 @@ export default function Dashboard({
   initialPurchasedLeads: LeadForAuction[];
 }) {
   const supabase = createClient();
-  const { data: session } = useSession();
-  const userId = session?.user?.id;
+  const { data: session, status } = useSession();
+  const userId = status === "authenticated" ? session?.user?.id : undefined;
   const [tabValue, setTabValue] = useState<string>("creditos");
   const userIdRef = useRef<string | undefined>(undefined);
   const [demoLead, setDemoLead] = useState<LeadForAuction | null>(null);
@@ -94,13 +94,17 @@ export default function Dashboard({
   }, [userId]);
 
   useEffect(() => {
+    console.log(userId)
+  }, [userId])
+
+  useEffect(() => {
     if (session?.user?.id) {
       subscribeToUserCredits(session.user.id);
       subscribeToUserCreditHolds(session.user.id);
       fetchLatestUserPurchases({ userId: session?.user?.id, limit: 5 });
       subscribeToUserPurchases({ userId: session?.user?.id });
     }
-  }, [session?.user?.id, subscribeToUserCredits, subscribeToUserCreditHolds, fetchLatestUserPurchases, subscribeToUserPurchases]);
+  }, [session?.user?.id, subscribeToUserCredits, subscribeToUserCreditHolds, fetchLatestUserPurchases, subscribeToUserPurchases, session]);
 
   const normalizedInitialAuctions: AuctionWithLead[] = useMemo(() => {
     const mapped = (initialAuctions || []).map((auction) => ({
@@ -324,7 +328,11 @@ export default function Dashboard({
   ]);
   useEffect(() => {
     if (!userId) {
-      console.warn("[Dashboard] Skip leads realtime: no userId");
+      if (status === "authenticated") {
+        console.warn(
+          "[Dashboard] Skip leads realtime: authenticated session without userId"
+        );
+      }
       return;
     }
     fetchUserLeads(userId, 200);
@@ -332,7 +340,13 @@ export default function Dashboard({
     return () => {
       unsubscribeFromUserLeads();
     };
-  }, [userId, fetchUserLeads, subscribeToUserLeads, unsubscribeFromUserLeads]);
+  }, [
+    userId,
+    status,
+    fetchUserLeads,
+    subscribeToUserLeads,
+    unsubscribeFromUserLeads,
+  ]);
   return (
     <TermsGate>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
