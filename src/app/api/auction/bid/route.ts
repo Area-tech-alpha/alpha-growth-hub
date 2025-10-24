@@ -186,6 +186,14 @@ export async function POST(request: Request) {
                 })
             }
 
+            if (topBid?.user_id && topBid.user_id !== userId) {
+                // Previous leader was outbid: release their hold so credits return immediately
+                await tx.credit_holds.updateMany({
+                    where: { bid_id: topBid.id, status: 'active' },
+                    data: { status: 'released', updated_at: new Date() as unknown as Date }
+                })
+            }
+
             if (buyNow) {
                 // Fecha imediatamente
                 await tx.auctions.update({ where: { id: auctionId }, data: { status: 'closed_won', winning_bid_id: bid.id, expired_at: new Date() as unknown as Date } })
