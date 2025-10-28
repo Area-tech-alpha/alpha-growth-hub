@@ -9,4 +9,3 @@ WHERE (metadata ? 'motivo') AND NOT (metadata ? 'reason');
 UPDATE credit_transactions
 SET metadata = metadata - 'motivo'
 WHERE (metadata ? 'motivo');
-

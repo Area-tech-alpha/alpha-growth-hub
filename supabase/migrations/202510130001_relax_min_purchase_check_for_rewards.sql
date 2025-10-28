@@ -23,4 +23,3 @@ CHECK (
     AND amount_paid >= 0.00
   )
 );
-

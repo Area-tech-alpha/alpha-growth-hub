@@ -42,4 +42,3 @@ DROP TRIGGER IF EXISTS trg_ledger_entries_fill_credit_source ON public.ledger_en
 CREATE TRIGGER trg_ledger_entries_fill_credit_source
 BEFORE INSERT ON public.ledger_entries
 FOR EACH ROW EXECUTE FUNCTION public.ledger_entries_fill_credit_source();
-

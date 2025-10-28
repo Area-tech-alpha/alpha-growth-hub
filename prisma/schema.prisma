@@ -49,10 +49,13 @@ model auctions {
   lead_id                            String         @db.Uuid
   minimum_bid                        Decimal        @db.Decimal(10, 2)
   status                             String         @default("open") @db.VarChar(20)
+  type                               auction_type_enum @default(single)
+  batch_auction_id                   String?        @unique @db.Uuid
   winning_bid_id                     String?        @unique @db.Uuid
   expired_at                         DateTime       @db.Timestamptz(6)
   created_at                         DateTime?      @default(now()) @db.Timestamptz(6)
   leads                              leads          @relation(fields: [lead_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  batch_auction                      batch_auctions? @relation("BatchAuctionAuction", fields: [batch_auction_id], references: [id], onDelete: SetNull)
   bids_auctions_winning_bid_idTobids bids?          @relation("auctions_winning_bid_idTobids", fields: [winning_bid_id], references: [id], onUpdate: NoAction, map: "fk_winning_bid")
   bids_bids_auction_idToauctions     bids[]         @relation("bids_auction_idToauctions")
   credit_holds                       credit_holds[]
@@ -117,13 +120,20 @@ model leads {
   contract_value       Float?
   call_url             String?
   contract_time        String?
+  contract_installments Int?
   briefing_url         String?
+  batched_at           DateTime?  @db.Timestamptz(6)
+  batch_auction_id     String?    @db.Uuid
+  batch_result         String?    @db.VarChar(50)
   auctions             auctions[]
   users                users?     @relation(fields: [owner_id], references: [id], onUpdate: NoAction)
+  current_batch        batch_auctions?        @relation("LeadCurrentBatch", fields: [batch_auction_id], references: [id], onDelete: SetNull)
+  batch_history        batch_auction_leads[]
 
   @@index([owner_id])
   @@index([status])
   @@index([owner_id], map: "idx_leads_owner_id")
+  @@index([batch_auction_id], map: "leads_batch_auction_id_idx")
 }
 
 model ledger_entries {
@@ -206,6 +216,53 @@ model credit_holds {
   @@index([status], map: "idx_credit_holds_status")
 }
 
+model batch_auction_settings {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  low_frozen_threshold Int
+  auto_trigger_enabled Boolean   @default(true)
+  lead_unit_price      Decimal   @default(225.00) @db.Decimal(10, 2)
+  created_at           DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime? @default(now()) @db.Timestamptz(6)
+  updated_by           String?
+}
+
+model batch_auctions {
+  id             String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  total_leads    Int
+  lead_unit_price Decimal                   @db.Decimal(10, 2)
+  minimum_bid    Decimal                    @db.Decimal(10, 2)
+  status         batch_auction_status_enum  @default(open)
+  result         batch_auction_result_enum  @default(pending)
+  trigger_reason batch_auction_trigger_enum @default(auto)
+  created_at     DateTime?                  @default(now()) @db.Timestamptz(6)
+  expired_at     DateTime?                  @db.Timestamptz(6)
+  closed_at      DateTime?                  @db.Timestamptz(6)
+  metadata       Json?
+
+  entries         batch_auction_leads[]
+  auction         auctions?                 @relation("BatchAuctionAuction")
+  current_assignments leads[]               @relation("LeadCurrentBatch")
+
+  @@index([status], map: "batch_auctions_status_idx")
+  @@index([result], map: "batch_auctions_result_idx")
+}
+
+model batch_auction_leads {
+  batch_auction_id   String    @db.Uuid
+  lead_id            String    @db.Uuid
+  included_at        DateTime? @default(now()) @db.Timestamptz(6)
+  status_before_batch String
+  final_status       String?
+  sold_at            DateTime? @db.Timestamptz(6)
+
+  batch batch_auctions @relation(fields: [batch_auction_id], references: [id], onDelete: Cascade)
+  lead  leads          @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+
+  @@id([batch_auction_id, lead_id])
+  @@unique([lead_id], map: "batch_auction_leads_lead_id_key")
+  @@index([lead_id], map: "batch_auction_leads_lead_id_idx")
+}
+
 model request_keys {
   key        String    @id
   created_at DateTime? @default(now()) @db.Timestamptz(6)
@@ -257,4 +314,27 @@ enum credit_hold_status_enum {
 enum user_role {
   user
   admin
+}
+
+enum auction_type_enum {
+  single
+  batch
+}
+
+enum batch_auction_status_enum {
+  open
+  running
+  completed
+  cancelled
+}
+
+enum batch_auction_result_enum {
+  pending
+  sold
+  expired
+}
+
+enum batch_auction_trigger_enum {
+  auto
+  manual
 }

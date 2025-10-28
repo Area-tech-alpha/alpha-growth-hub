@@ -34,4 +34,3 @@ WHERE le.transaction_id = ct.id;
 --   VALUES (..., v_source_text::credit_source_enum, ...);
 --   INSERT INTO ledger_entries (..., credit_source, ...)
 --   VALUES (..., v_source_text::credit_source_enum, ...);
-
