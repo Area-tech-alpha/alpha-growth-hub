@@ -89,6 +89,10 @@ export async function POST(request: Request) {
             if (!auction) {
                 return buildErrorResult(404, 'AUCTION_NOT_FOUND', 'Nao encontramos esse leilao. Ele pode ter sido encerrado ou removido.')
             }
+            const isBatchAuction = auction.type === 'batch'
+            if (isBatchAuction && buyNow) {
+                return buildErrorResult(400, 'BUY_NOW_NOT_AVAILABLE', 'Lotes em grupo nao suportam compra imediata.')
+            }
             if (auction.status !== 'open' || new Date(auction.expired_at).getTime() <= Date.now()) {
                 return buildErrorResult(
                     409,

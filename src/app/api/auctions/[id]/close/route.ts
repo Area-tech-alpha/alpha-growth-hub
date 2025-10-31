@@ -63,6 +63,7 @@ export async function POST(
                 console.warn('[close-auction] auction not found', { auctionId })
                 return { status: 404 as const, body: buildError('AUCTION_NOT_FOUND', 'Nao encontramos esse leilao.') }
             }
+            const isBatchAuction = auction.type === 'batch'
 
             const topBid = await tx.bids.findFirst({
                 where: { auction_id: auctionId },
@@ -71,7 +72,7 @@ export async function POST(
 
             if (!topBid) {
                 const currentLeadStatus = auction.leads?.status || 'cold'
-                const nextLeadStatus = currentLeadStatus === 'hot' ? 'high_frozen' : 'low_frozen'
+                const nextLeadStatus = isBatchAuction ? 'low_frozen' : currentLeadStatus === 'hot' ? 'high_frozen' : 'low_frozen'
 
                 // Idempotency guard: only transition from open -> closed_expired once
                 const lock = await tx.auctions.updateMany({
@@ -87,6 +88,25 @@ export async function POST(
                             ...buildError('AUCTION_ALREADY_PROCESSED', 'Esse leilao ja foi encerrado antes desta requisicao.', { auctionId })
                         }
                     }
+                }
+
+                if (isBatchAuction && auction.batch_auction_id) {
+                    const batchLeadIds = await tx.batch_auction_leads.findMany({
+                        where: { batch_auction_id: auction.batch_auction_id },
+                        select: { lead_id: true }
+                    })
+                    const ids = batchLeadIds.map(b => b.lead_id)
+                    if (ids.length > 0) {
+                        await tx.leads.updateMany({
+                            where: { id: { in: ids } },
+                            data: { status: 'low_frozen', owner_id: null, batched_at: null, batch_auction_id: null, batch_result: null }
+                        })
+                        await tx.batch_auction_leads.deleteMany({ where: { batch_auction_id: auction.batch_auction_id } })
+                    }
+                    await tx.batch_auctions.update({
+                        where: { id: auction.batch_auction_id },
+                        data: { status: 'completed', result: 'expired', closed_at: new Date() }
+                    })
                 }
 
                 const updatedLead = await tx.leads.update({
@@ -154,6 +174,28 @@ export async function POST(
             const winnerBalance = toNum(winner?.credit_balance as unknown)
             const nextBalance = new Prisma.Decimal(winnerBalance).minus(new Prisma.Decimal(winningAmount))
             await tx.users.update({ where: { id: topBid.user_id }, data: { credit_balance: nextBalance } })
+
+            if (isBatchAuction && auction.batch_auction_id) {
+                const batchLeadIds = await tx.batch_auction_leads.findMany({
+                    where: { batch_auction_id: auction.batch_auction_id },
+                    select: { lead_id: true }
+                })
+                const ids = batchLeadIds.map(b => b.lead_id)
+                if (ids.length > 0) {
+                    await tx.leads.updateMany({
+                        where: { id: { in: ids } },
+                        data: { status: 'sold', owner_id: topBid.user_id, batch_result: 'sold' }
+                    })
+                    await tx.batch_auction_leads.updateMany({
+                        where: { batch_auction_id: auction.batch_auction_id },
+                        data: { final_status: 'sold', sold_at: new Date() }
+                    })
+                }
+                await tx.batch_auctions.update({
+                    where: { id: auction.batch_auction_id },
+                    data: { status: 'completed', result: 'sold', closed_at: new Date() }
+                })
+            }
 
             return { status: 200 as const, body: { auction: updatedAuction, lead: updatedLead, outcome: 'won' as const, winningBidId: topBid.id } }
         }, { timeout: 15000 })

@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 const AdminOverview = dynamic(() => import('@/components/admin/AdminOverview'), { ssr: false })
 const AdminFinance = dynamic(() => import('@/components/admin/AdminFinance'), { ssr: false })
 const AdminCredits = dynamic(() => import('@/components/admin/AdminCredits'), { ssr: false })
+const AdminBatchAuctions = dynamic(() => import('@/components/admin/AdminBatchAuctions'), { ssr: false })
 
 export default function AdminDashboardTabs() {
     return (
@@ -13,6 +14,7 @@ export default function AdminDashboardTabs() {
                 <TabsTrigger value="overview">Visão geral</TabsTrigger>
                 <TabsTrigger value="finance">Financeiro</TabsTrigger>
                 <TabsTrigger value="credits">Créditos</TabsTrigger>
+                <TabsTrigger value="batches">Lotes</TabsTrigger>
             </TabsList>
             <TabsContent value="overview" className="mt-4">
                 <AdminOverview />
@@ -22,6 +24,9 @@ export default function AdminDashboardTabs() {
             </TabsContent>
             <TabsContent value="credits" className="mt-4">
                 <AdminCredits />
+            </TabsContent>
+            <TabsContent value="batches" className="mt-4">
+                <AdminBatchAuctions />
             </TabsContent>
         </Tabs>
     )

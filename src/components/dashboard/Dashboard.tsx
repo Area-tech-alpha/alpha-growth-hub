@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useSession } from "next-auth/react";
 import { ToastBus } from "@/lib/toastBus";
@@ -13,7 +13,14 @@ import { FiShoppingBag, FiInfo } from "react-icons/fi";
 import type { Lead } from "./leads/types";
 import { useRealtimeStore } from "@/store/realtime-store";
 import type { RealtimeState } from "@/store/realtime-store";
-import type { Bid, AuctionWithLead, AuctionRecord, LeadForAuction } from "./leiloes/types";
+import type {
+  Bid,
+  AuctionWithLead,
+  AuctionRecord,
+  LeadForAuction,
+  BatchAuctionSummary,
+  AuctionKind,
+} from "./leiloes/types";
 import LeiloesPanel from "./LeiloesPanel";
 import InfoPanel from "./InfoPanel";
 import { TermsGate } from "@/components/TermsGate";
@@ -31,6 +38,7 @@ export default function Dashboard({
   const userId = status === "authenticated" ? session?.user?.id : undefined;
   const [tabValue, setTabValue] = useState<string>("creditos");
   const userIdRef = useRef<string | undefined>(undefined);
+  const pendingBatchFetches = useRef<Set<string>>(new Set());
   const [demoLead, setDemoLead] = useState<LeadForAuction | null>(null);
   // demoLead is passed to MeusLeadsPanel
   const bidsByAuctionRef = useRef<
@@ -56,6 +64,9 @@ export default function Dashboard({
   );
   const updateAuctionStatsFromBid = useRealtimeStore(
     (s: RealtimeState) => s.updateAuctionStatsFromBid
+  );
+  const setBatchSummary = useRealtimeStore(
+    (s: RealtimeState) => (s as unknown as { setBatchSummary: (id: string, summary: BatchAuctionSummary | null) => void }).setBatchSummary
   );
   const addPurchasedLeadIfMissing = useRealtimeStore(
     (s: RealtimeState) => s.addPurchasedLeadIfMissing
@@ -93,6 +104,70 @@ export default function Dashboard({
     userIdRef.current = userId;
   }, [userId]);
 
+  const fetchBatchSummary = useCallback(async (auctionId: string) => {
+    if (!auctionId || pendingBatchFetches.current.has(auctionId)) return;
+    pendingBatchFetches.current.add(auctionId);
+    try {
+      const res = await fetch(`/api/auction/${auctionId}/batch`, { cache: "no-store" });
+      if (!res.ok) return;
+      const payload = await res.json();
+      const leads = Array.isArray(payload?.leads)
+        ? payload.leads.map((lead: Partial<Lead>): LeadForAuction => ({
+          id: lead.id ?? "",
+          name: lead.name ?? (lead.company_name as string) ?? "",
+          description: lead.description ?? "",
+          status: (lead.status as Lead["status"]) ?? "cold",
+          expires_at: "",
+          channel: lead.channel ?? "",
+          revenue: lead.revenue ?? "",
+          marketing_investment: lead.marketing_investment ?? "",
+          company_name: lead.company_name ?? "",
+          contact_name: lead.contact_name ?? "",
+          cnpj: lead.cnpj ?? "",
+          state: lead.state ?? "",
+          city: lead.city ?? "",
+          phone: lead.phone ?? "",
+          email: lead.email ?? "",
+          maskedCompanyName: (lead as { maskedCompanyName?: string }).maskedCompanyName ?? lead.company_name ?? "",
+          niche: lead.niche ?? "",
+          maskedContactName: (lead as { maskedContactName?: string }).maskedContactName ?? lead.contact_name ?? "",
+          maskedPhone: (lead as { maskedPhone?: string }).maskedPhone ?? lead.phone ?? "",
+          maskedEmail: (lead as { maskedEmail?: string }).maskedEmail ?? lead.email ?? "",
+          currentBid: typeof lead.currentBid === "number" ? lead.currentBid : 0,
+          owner_id: lead.owner_id,
+          bidders: typeof lead.bidders === "number" ? lead.bidders : 0,
+          minimum_value: Number(lead.minimum_value ?? 0),
+          category: lead.category ?? "",
+          document_url: lead.document_url ?? "",
+          contract_url: lead.contract_url ?? "",
+          contract_time: lead.contract_time ?? "",
+          contract_value: Number(lead.contract_value ?? 0),
+          contract_installments: lead.contract_installments != null ? Number(lead.contract_installments) : null,
+          cal_url: lead.cal_url ?? "",
+          briefing_url: lead.briefing_url ?? "",
+          tags: Array.isArray(lead.tags) ? (lead.tags as string[]) : [],
+          batched_at: lead.batched_at ?? null,
+          batch_auction_id: lead.batch_auction_id ?? null,
+          batch_result: lead.batch_result ?? null,
+        }))
+        : [];
+      const summary: BatchAuctionSummary = {
+        id: payload.id,
+        totalLeads: Number(payload.totalLeads ?? leads.length),
+        leadUnitPrice: Number(payload.leadUnitPrice ?? 0),
+        minimumBid: Number(payload.minimumBid ?? 0),
+        status: payload.status,
+        result: payload.result,
+        leads,
+      };
+      setBatchSummary(auctionId, summary);
+    } catch (error) {
+      console.warn("[Dashboard] Failed to fetch batch summary", error);
+    } finally {
+      pendingBatchFetches.current.delete(auctionId);
+    }
+  }, [setBatchSummary]);
+
   useEffect(() => {
     console.log(userId)
   }, [userId])
@@ -107,16 +182,24 @@ export default function Dashboard({
   }, [session?.user?.id, subscribeToUserCredits, subscribeToUserCreditHolds, fetchLatestUserPurchases, subscribeToUserPurchases, session]);
 
   const normalizedInitialAuctions: AuctionWithLead[] = useMemo(() => {
-    const mapped = (initialAuctions || []).map((auction) => ({
-      id: auction.id,
-      status: auction.status,
-      expired_at: auction.expired_at,
-      minimum_bid: typeof auction.minimum_bid === 'string' ? parseFloat(auction.minimum_bid) : (auction.minimum_bid ?? undefined),
-      leads: {
-        ...(auction.leads as Lead),
-        expires_at: auction.expired_at,
-      } as LeadForAuction,
-    }));
+    const mapped = (initialAuctions || []).map((auction) => {
+      const rawType = (auction as AuctionRecord & { type?: string }).type ?? "single";
+      const auctionType: AuctionKind = rawType === "batch" ? "batch" : "single";
+      return {
+        id: auction.id,
+        status: auction.status,
+        expired_at: auction.expired_at,
+        type: auctionType,
+        minimum_bid:
+          typeof auction.minimum_bid === "string"
+            ? parseFloat(auction.minimum_bid)
+            : auction.minimum_bid ?? undefined,
+        leads: {
+          ...(auction.leads as Lead),
+          expires_at: auction.expired_at,
+        } as LeadForAuction,
+      };
+    });
     return mapped;
   }, [initialAuctions]);
 
@@ -131,6 +214,14 @@ export default function Dashboard({
     setInitialAuctions,
     setInitialPurchasedLeads,
   ]);
+
+  useEffect(() => {
+    normalizedInitialAuctions
+      .filter((auction) => auction.type === "batch")
+      .forEach((auction) => {
+        void fetchBatchSummary(auction.id);
+      });
+  }, [normalizedInitialAuctions, fetchBatchSummary]);
 
   // Choose default tab based on initial auctions on first load
   useEffect(() => {
@@ -204,6 +295,8 @@ export default function Dashboard({
             expired_at: string;
             lead_id: string;
             minimum_bid?: number | string | null;
+            type?: string | null;
+            batch_auction_id?: string | null;
           };
         }) => {
           const newRow = payload.new;
@@ -235,6 +328,7 @@ export default function Dashboard({
             id: newRow.id,
             status: newRow.status,
             expired_at: newRow.expired_at,
+            type: newRow.type === "batch" ? "batch" : "single",
             minimum_bid:
               typeof newRow.minimum_bid === "string"
                 ? parseFloat(newRow.minimum_bid)
@@ -244,6 +338,9 @@ export default function Dashboard({
               expires_at: newRow.expired_at,
             } as LeadForAuction,
           });
+          if (newRow.type === "batch") {
+            void fetchBatchSummary(newRow.id);
+          }
         }
       )
       .on(
@@ -376,6 +473,7 @@ export default function Dashboard({
     addBidForAuction,
     addPurchasedLeadIfMissing,
     setBidsForAuction,
+    fetchBatchSummary,
   ]);
   useEffect(() => {
     if (!userId) {

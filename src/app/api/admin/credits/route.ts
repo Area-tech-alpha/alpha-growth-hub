@@ -77,34 +77,68 @@ export async function POST(request: Request) {
         // If refund is linked to a specific lead, pre-validate and compute refund amount
         let computedRefund: { amount: number; leadId?: string; auctionId?: string; bidId?: string } | null = null
         if (mode === 'refund' && leadId) {
-            const lead = await prisma.leads.findUnique({ where: { id: leadId }, select: { id: true, owner_id: true, status: true, contract_url: true } })
+            const lead = await prisma.leads.findUnique({
+                where: { id: leadId },
+                select: { id: true, owner_id: true, status: true, contract_url: true, batch_auction_id: true }
+            })
             if (!lead) return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 })
             if (lead.owner_id !== user.id || lead.status !== 'sold') {
                 return NextResponse.json({ error: 'Lead não pertence ao usuário informado ou não está vendido' }, { status: 409 })
             }
-            const auction = await prisma.auctions.findFirst({
-                where: { lead_id: lead.id, winning_bid_id: { not: null } },
-                select: {
-                    id: true,
-                    status: true,
-                    winning_bid_id: true,
-                    minimum_bid: true,
-                    expired_at: true,
-                    bids_auctions_winning_bid_idTobids: { select: { id: true, user_id: true, amount: true } },
-                },
-            })
-            if (!auction || !auction.winning_bid_id || !auction.bids_auctions_winning_bid_idTobids) {
-                return NextResponse.json({ error: 'Leilão/venda do lead não encontrado' }, { status: 409 })
+            if (lead.batch_auction_id) {
+                const batchAuction = await prisma.auctions.findFirst({
+                    where: { batch_auction_id: lead.batch_auction_id, winning_bid_id: { not: null } },
+                    select: {
+                        id: true,
+                        winning_bid_id: true,
+                        bids_auctions_winning_bid_idTobids: { select: { id: true, user_id: true, amount: true } },
+                    },
+                })
+                if (!batchAuction || !batchAuction.winning_bid_id || !batchAuction.bids_auctions_winning_bid_idTobids) {
+                    return NextResponse.json({ error: 'Leilão do lote não encontrado' }, { status: 409 })
+                }
+                const batchMeta = await prisma.batch_auctions.findUnique({
+                    where: { id: lead.batch_auction_id },
+                    select: { total_leads: true }
+                })
+                const totalLeads = batchMeta?.total_leads || 0
+                if (totalLeads <= 0) {
+                    return NextResponse.json({ error: 'Não foi possível calcular valor por lead do lote' }, { status: 409 })
+                }
+                const wb = batchAuction.bids_auctions_winning_bid_idTobids
+                if (wb.user_id !== user.id) {
+                    return NextResponse.json({ error: 'Inconsistência: vencedor diferente do usuário do estorno' }, { status: 409 })
+                }
+                const perLeadAmount = Number(wb.amount as unknown as number) / totalLeads
+                if (!Number.isFinite(perLeadAmount) || perLeadAmount <= 0) {
+                    return NextResponse.json({ error: 'Valor do estorno inválido para o lote' }, { status: 400 })
+                }
+                computedRefund = { amount: perLeadAmount, leadId: lead.id, auctionId: batchAuction.id, bidId: wb.id }
+            } else {
+                const auction = await prisma.auctions.findFirst({
+                    where: { lead_id: lead.id, winning_bid_id: { not: null } },
+                    select: {
+                        id: true,
+                        status: true,
+                        winning_bid_id: true,
+                        minimum_bid: true,
+                        expired_at: true,
+                        bids_auctions_winning_bid_idTobids: { select: { id: true, user_id: true, amount: true } },
+                    },
+                })
+                if (!auction || !auction.winning_bid_id || !auction.bids_auctions_winning_bid_idTobids) {
+                    return NextResponse.json({ error: 'Leilão/venda do lead não encontrado' }, { status: 409 })
+                }
+                const wb = auction.bids_auctions_winning_bid_idTobids
+                if (wb.user_id !== user.id) {
+                    return NextResponse.json({ error: 'Inconsistência: vencedor diferente do usuário do estorno' }, { status: 409 })
+                }
+                const refundAmount = Number(wb.amount as unknown as number)
+                if (!Number.isFinite(refundAmount) || refundAmount <= 0) {
+                    return NextResponse.json({ error: 'Valor do estorno inválido' }, { status: 400 })
+                }
+                computedRefund = { amount: refundAmount, leadId: lead.id, auctionId: auction.id, bidId: wb.id }
             }
-            const wb = auction.bids_auctions_winning_bid_idTobids
-            if (wb.user_id !== user.id) {
-                return NextResponse.json({ error: 'Inconsistência: vencedor diferente do usuário do estorno' }, { status: 409 })
-            }
-            const refundAmount = Number(wb.amount as unknown as number)
-            if (!Number.isFinite(refundAmount) || refundAmount <= 0) {
-                return NextResponse.json({ error: 'Valor do estorno inválido' }, { status: 400 })
-            }
-            computedRefund = { amount: refundAmount, leadId: lead.id, auctionId: auction.id, bidId: wb.id }
         }
 
         const result = await prisma.$transaction(async (tx) => {

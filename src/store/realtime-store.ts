@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AuctionWithLead, Bid, LeadForAuction } from '@/components/dashboard/leiloes/types';
+import type { AuctionWithLead, BatchAuctionSummary, Bid, LeadForAuction } from '@/components/dashboard/leiloes/types';
 import type { Lead } from '@/components/dashboard/leads/types';
 import { createClient } from '@/utils/supabase/client';
 
@@ -38,6 +38,7 @@ export interface RealtimeState {
     addBidForAuction: (auctionId: string, bid: Bid) => void;
     setBidsForAuction: (auctionId: string, bids: Bid[]) => void;
     updateAuctionStatsFromBid: (auctionId: string, amount: number) => void;
+    setBatchSummary: (auctionId: string, summary: BatchAuctionSummary | null) => void;
 
     addPurchasedLeadIfMissing: (lead: Lead) => void;
     fetchUserLeads: (userId: string, limit?: number) => Promise<void>;
@@ -109,7 +110,14 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
         const exists = state.activeAuctions.some(a => a.id === auction.id);
         return {
             activeAuctions: exists
-                ? state.activeAuctions.map(a => a.id === auction.id ? { ...a, ...auction } : a)
+                ? state.activeAuctions.map(a => {
+                    if (a.id !== auction.id) return a;
+                    const next: AuctionWithLead = { ...a, ...auction };
+                    if (auction.batchSummary === undefined) {
+                        next.batchSummary = a.batchSummary;
+                    }
+                    return next;
+                })
                 : [auction, ...state.activeAuctions]
         };
     }),
@@ -119,6 +127,9 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
             activeAuctions: state.activeAuctions.map(a => {
                 if (a.id !== auctionId) return a;
                 const next: AuctionWithLead = { ...a, ...fields } as AuctionWithLead;
+                if (!('batchSummary' in fields)) {
+                    next.batchSummary = a.batchSummary;
+                }
                 // Se o expired_at mudar, refletimos no leads.expires_at para o CountdownTimer
                 if (typeof fields.expired_at === 'string' && (a as { leads?: { expires_at?: string } }).leads) {
                     next.leads = { ...(a.leads as Record<string, unknown>), expires_at: fields.expired_at } as unknown as typeof a.leads;
@@ -138,6 +149,9 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
             demoAuctions: state.demoAuctions.map(a => {
                 if (a.id !== auctionId) return a;
                 const next: AuctionWithLead = { ...a, ...fields } as AuctionWithLead;
+                if (!('batchSummary' in fields)) {
+                    next.batchSummary = a.batchSummary;
+                }
                 if (typeof fields.expired_at === 'string' && (a as { leads?: { expires_at?: string } }).leads) {
                     next.leads = { ...(a.leads as Record<string, unknown>), expires_at: fields.expired_at } as unknown as typeof a.leads;
                 }
@@ -177,6 +191,14 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
                 const nextCurrent = Math.max(a.leads.currentBid || 0, amount || 0);
                 const nextBidders = (a.leads.bidders || 0) + 1;
                 return { ...a, leads: { ...a.leads, currentBid: nextCurrent, bidders: nextBidders } };
+            })
+        };
+    }),
+    setBatchSummary: (auctionId: string, summary: BatchAuctionSummary | null) => set((state: RealtimeState) => {
+        return {
+            activeAuctions: state.activeAuctions.map(a => {
+                if (a.id !== auctionId) return a;
+                return { ...a, batchSummary: summary ?? undefined };
             })
         };
     }),

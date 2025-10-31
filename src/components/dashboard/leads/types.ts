@@ -2,7 +2,7 @@ export interface Lead {
     id: string;
     name: string;
     description: string;
-    status: 'hot' | "high_frozen" | "low_frozen" | 'cold' | 'sold';
+    status: 'hot' | "high_frozen" | "low_frozen" | 'cold' | 'sold' | 'batch';
     expires_at: string;
     channel: string;
     revenue: string;
@@ -28,9 +28,13 @@ export interface Lead {
     contract_url: string;
     contract_time: string;
     contract_value: number;
+    contract_installments?: number | null;
     cal_url?: string;
     briefing_url?: string;
     tags: string[];
+    batched_at?: string | Date | null;
+    batch_auction_id?: string | null;
+    batch_result?: string | null;
     [key: string]: unknown;
 }
 

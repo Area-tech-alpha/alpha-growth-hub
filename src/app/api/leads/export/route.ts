@@ -46,6 +46,7 @@ export async function GET() {
             "Contrato (URL)",
             "Valor do Contrato",
             "Tempo de Contrato",
+            "Parcelas do Contrato",
             "Briefing (URL)",
             "Gravacao (URL)",
         ];
@@ -71,6 +72,7 @@ export async function GET() {
                 escapeCsvCell((rec["contract_url"] as string) ?? null),
                 escapeCsvCell((rec["contract_value"] as number | string | undefined) as unknown as string),
                 escapeCsvCell((rec["contract_time"] as string) ?? null),
+                escapeCsvCell((rec["contract_installments"] as number | string | undefined) as unknown as string),
                 escapeCsvCell((rec["briefing_url"] as string) ?? null),
                 escapeCsvCell((rec["cal_url"] as string) ?? null),
             ].join(",");

@@ -8,6 +8,7 @@ import {
   DollarSign,
   Megaphone,
   Clock,
+  ListOrdered,
   Download,
   User,
   MapPin,
@@ -36,6 +37,13 @@ export const PurchasedLeadCard = ({
   purchasePrice,
 }: PurchasedLeadCardProps) => {
   const [isExporting, setIsExporting] = useState(false);
+  const rawContractInstallments = lead.contract_installments as number | string | null | undefined;
+  const contractInstallments =
+    typeof rawContractInstallments === "number"
+      ? rawContractInstallments
+      : rawContractInstallments != null && rawContractInstallments !== ""
+        ? Number(rawContractInstallments)
+        : null;
 
   const formatCurrency = (value: number | undefined | null) => {
     const numericValue = typeof value === "number" && !isNaN(value) ? value : 0;
@@ -186,6 +194,13 @@ export const PurchasedLeadCard = ({
                 icon={Clock}
                 label="Tempo de Contrato"
                 value={String(lead.contract_time)}
+              />
+            )}
+            {lead.status === "hot" && typeof contractInstallments === "number" && contractInstallments > 0 && (
+              <InfoRow
+                icon={ListOrdered}
+                label="Parcelas do Contrato"
+                value={String(contractInstallments)}
               />
             )}
           </div>

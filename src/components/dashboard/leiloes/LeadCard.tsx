@@ -11,6 +11,8 @@ import {
   Hash,
   MapPin,
   Clock,
+  Layers,
+  ListOrdered,
 } from "lucide-react";
 import {
   Card,
@@ -20,17 +22,21 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { CountdownTimer } from "../leads/CountdownTimer";
 import { Lead } from "../leads/types";
+import type { BatchAuctionSummary } from "../leiloes/types";
 import { maskName, maskPhone } from "@/lib/mask";
 
 interface LeadCardProps {
   lead: Lead;
+  auctionType?: "single" | "batch";
+  batchSummary?: BatchAuctionSummary;
   onSelect?: () => void;
   onExpire: () => void;
 }
 
-export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
+export const LeadCard = ({ lead, auctionType = "single", batchSummary, onSelect, onExpire }: LeadCardProps) => {
   const formatCurrency = (value: number | undefined | null) => {
     const numericValue = typeof value === "number" && !isNaN(value) ? value : 0;
     return new Intl.NumberFormat("pt-BR", {
@@ -50,8 +56,19 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
   const contractUrl = (lead as unknown as { contract_url?: string })?.contract_url;
   const contractValue = (lead as unknown as { contract_value?: number })?.contract_value;
   const contractTime = (lead as unknown as { contract_time?: string })?.contract_time;
+  const rawContractInstallments = (lead as unknown as { contract_installments?: number | string | null })?.contract_installments;
+  const contractInstallments =
+    typeof rawContractInstallments === "number"
+      ? rawContractInstallments
+      : rawContractInstallments != null && rawContractInstallments !== ""
+        ? Number(rawContractInstallments)
+        : null;
   const briefingUrl = (lead as unknown as { briefing_url?: string })?.briefing_url;
   const calUrl = lead.cal_url as string | undefined;
+
+  const isBatchAuction = auctionType === "batch";
+  const summary = batchSummary;
+  const previewLeads = isBatchAuction && summary ? summary.leads.slice(0, 3) : [];
 
 
   return (
@@ -82,15 +99,34 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
       >
         <CardHeader className="pb-3">
           <div className="flex justify-between items-start gap-4">
-            <div className="flex-1 flex items-center gap-3 min-w-0">
-              {isHot && (
+            <div className="flex-1 flex items-center gap-3 min-w-0 flex-wrap">
+              {isHot && !isBatchAuction && (
                 <div className="flex items-center gap-1.5 bg-red-600 text-white pl-2 pr-3 py-1 rounded-full text-sm font-bold shadow-lg z-10 flex-shrink-0">
                   <Flame size={16} />
                   <span>HOT</span>
                 </div>
               )}
-              <CardTitle className="text-lg font-bold text-yellow-600 truncate flex-1" title={maskName(lead.company_name)}>
-                {lead.company_name}
+              {isBatchAuction && (
+                <Badge variant="secondary" className="flex items-center gap-1 text-xs uppercase">
+                  <Layers className="h-3 w-3" />
+                  <span>Lote</span>
+                </Badge>
+              )}
+              <CardTitle
+                className="text-lg font-bold text-yellow-600 truncate flex-1"
+                title={
+                  isBatchAuction
+                    ? summary
+                      ? `Lote com ${summary.totalLeads} leads`
+                      : "Lote aguardando composição"
+                    : maskName(lead.company_name)
+                }
+              >
+                {isBatchAuction
+                  ? summary
+                    ? `Lote com ${summary.totalLeads} leads`
+                    : "Lote em preparação"
+                  : lead.company_name}
               </CardTitle>
             </div>
             <div className="flex-shrink-0">
@@ -114,88 +150,157 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
         <CardContent className="flex-grow flex flex-col space-y-4">
           <div className="space-y-3 p-3 bg-muted rounded-lg">
             <h4 className="font-semibold text-foreground text-sm mb-2">
-              Informações do Lead (Prévia)
+              {isBatchAuction ? "Informações do lote" : "Informações do Lead (Prévia)"}
             </h4>
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-3 w-3 text-yellow-600" />
-                <div>
-                  <div className="text-muted-foreground">Faturamento</div>
-                  <div className="font-semibold">
-                    {String(lead.revenue)}
-                  </div>
+            {isBatchAuction && !summary ? (
+              <div className="text-xs text-muted-foreground">Carregando composição do lote...</div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  {isBatchAuction && summary ? (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="h-3 w-3 text-yellow-600" />
+                        <div>
+                          <div className="text-muted-foreground">Preço por lead</div>
+                          <div className="font-semibold">
+                            {formatCurrency(summary.leadUnitPrice)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="h-3 w-3 text-yellow-600" />
+                        <div>
+                          <div className="text-muted-foreground">Lance mínimo</div>
+                          <div className="font-semibold">
+                            {formatCurrency(summary.minimumBid)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Layers className="h-3 w-3 text-yellow-600" />
+                        <div>
+                          <div className="text-muted-foreground">Leads no lote</div>
+                          <div className="font-semibold">
+                            {summary.totalLeads}
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="h-3 w-3 text-yellow-600" />
+                        <div>
+                          <div className="text-muted-foreground">Faturamento</div>
+                          <div className="font-semibold">
+                            {String(lead.revenue)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Megaphone className="h-3 w-3 text-yellow-600 " />
+                        <div>
+                          <div className="text-muted-foreground">Invest. Marketing</div>
+                          <div className="font-semibold">
+                            {String(lead.marketing_investment)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Building className="h-3 w-3 text-yellow-600" />
+                        <div>
+                          <div className="text-muted-foreground">Empresa</div>
+                          <div className="font-semibold">
+                            {lead.company_name}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <User className="h-3 w-3 text-yellow-600" />
+                        <div>
+                          <div className="text-muted-foreground">Contato</div>
+                          <div className="font-semibold">
+                            {maskName(lead.contact_name)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-3 w-3 text-yellow-600" />
+                        <div>
+                          <div className="text-muted-foreground">Telefone</div>
+                          <div className="font-semibold" data-value="masked">
+                            {maskPhone(lead.phone)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Hash className="h-3 w-3 text-yellow-600" />
+                        <div>
+                          <div className="text-muted-foreground">CNPJ</div>
+                          <div className="font-semibold">
+                            {(lead as unknown as { cnpj?: string })?.cnpj}
+                          </div>
+                        </div>
+                      </div>
+                      {typeof contractValue === "number" && !isNaN(contractValue) && (
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="h-3 w-3 text-yellow-600" />
+                          <div>
+                            <div className="text-muted-foreground">Valor do Contrato</div>
+                            <div className="font-semibold">
+                              {formatCurrency(contractValue)}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {contractTime && (
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-3 w-3 text-yellow-600" />
+                          <div>
+                            <div className="text-muted-foreground">Tempo de Contrato</div>
+                            <div className="font-semibold">
+                              {contractTime}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {isHot && typeof contractInstallments === "number" && contractInstallments > 0 && (
+                        <div className="flex items-center gap-2">
+                          <ListOrdered className="h-3 w-3 text-yellow-600" />
+                          <div>
+                            <div className="text-muted-foreground">Parcelas do Contrato</div>
+                            <div className="font-semibold">
+                              {contractInstallments}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Megaphone className="h-3 w-3 text-yellow-600 " />
-                <div>
-                  <div className="text-muted-foreground">Invest. Marketing</div>
-                  <div className="font-semibold">
-                    {String(lead.marketing_investment)}
+                {isBatchAuction && summary && (
+                  <div className="space-y-2">
+                    <h5 className="text-xs font-semibold text-foreground">
+                      Prévia do lote
+                    </h5>
+                    {previewLeads.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">Nenhum lead disponível.</p>
+                    ) : (
+                      <ul className="space-y-1">
+                        {previewLeads.map((item) => (
+                          <li key={item.id} className="text-xs text-muted-foreground border rounded px-2 py-1 flex items-center justify-between gap-2">
+                            <span className="font-medium text-foreground truncate">{maskName(item.company_name)}</span>
+                            <span>{item.city ? `${item.city} - ${item.state || ""}` : item.state || "—"}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Building className="h-3 w-3 text-yellow-600" />
-                <div>
-                  <div className="text-muted-foreground">Empresa</div>
-                  <div className="font-semibold">
-                    {lead.company_name}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <User className="h-3 w-3 text-yellow-600" />
-                <div>
-                  <div className="text-muted-foreground">Contato</div>
-                  <div className="font-semibold">
-                    {maskName(lead.contact_name)}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Phone className="h-3 w-3 text-yellow-600" />
-                <div>
-                  <div className="text-muted-foreground">Telefone</div>
-                  <div className="font-semibold" data-value="masked">
-                    {maskPhone(lead.phone)}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Hash className="h-3 w-3 text-yellow-600" />
-                <div>
-                  <div className="text-muted-foreground">CNPJ</div>
-                  <div className="font-semibold">
-                    {(lead as unknown as { cnpj?: string })?.cnpj}
-                  </div>
-                </div>
-              </div>
-              {typeof contractValue === "number" && !isNaN(contractValue) && (
-                <div className="flex items-center gap-2">
-                  <DollarSign className="h-3 w-3 text-yellow-600" />
-                  <div>
-                    <div className="text-muted-foreground">Valor do Contrato</div>
-                    <div className="font-semibold">
-                      {formatCurrency(contractValue)}
-                    </div>
-                  </div>
-                </div>
-              )}
-              {contractTime && (
-                <div className="flex items-center gap-2">
-                  <Clock className="h-3 w-3 text-yellow-600" />
-                  <div>
-                    <div className="text-muted-foreground">Tempo de Contrato</div>
-                    <div className="font-semibold">
-                      {contractTime}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-            </div>
-            {isHot && (documentUrl || contractUrl || calUrl || briefingUrl) && (
+                )}
+              </>
+            )}
+            {!isBatchAuction && isHot && (documentUrl || contractUrl || calUrl || briefingUrl) && (
               <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {briefingUrl && (
                   <Button asChild variant="outline" size="sm" className="h-9 sm:h-7 px-3 sm:px-2.5 w-full">
@@ -228,7 +333,6 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
               </div>
             )}
           </div>
-
           <div className="grid grid-cols-2 gap-4 pt-2">
             <div className="text-center">
               <div className="text-lg font-bold text-yellow-600">

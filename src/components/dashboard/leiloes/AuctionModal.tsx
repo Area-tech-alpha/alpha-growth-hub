@@ -25,6 +25,7 @@ import {
     Info,
     Hash,
     Clock,
+    ListOrdered,
 } from "lucide-react";
 import { CountdownTimer } from "../leads/CountdownTimer";
 import { Lead } from "../leads/types";
@@ -331,6 +332,12 @@ export const AuctionModal = ({
 
     const contractValue = (lead as unknown as { contract_value?: number })?.contract_value;
     const contractTime = (lead as unknown as { contract_time?: string })?.contract_time;
+    const rawContractInstallments = (lead as unknown as { contract_installments?: number | string | null })?.contract_installments;
+    const contractInstallments = typeof rawContractInstallments === 'number'
+        ? rawContractInstallments
+        : rawContractInstallments != null && rawContractInstallments !== ''
+            ? Number(rawContractInstallments)
+            : null;
     const documentUrl = (lead as unknown as { document_url?: string })?.document_url;
     const contractUrl = (lead as unknown as { contract_url?: string })?.contract_url;
     const briefingUrl = (lead as unknown as { briefing_url?: string })?.briefing_url;
@@ -475,6 +482,17 @@ export const AuctionModal = ({
                                     </div>
                                     <div className="font-bold text-base sm:text-xl truncate" title={String(contractTime)}>
                                         {contractTime}
+                                    </div>
+                                </div>
+                            )}
+                            {isHotLead && typeof contractInstallments === "number" && contractInstallments > 0 && (
+                                <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <ListOrdered className="h-4 w-4" />
+                                        <span className="text-sm">Parcelas do Contrato</span>
+                                    </div>
+                                    <div className="font-bold text-base sm:text-xl truncate">
+                                        {contractInstallments}
                                     </div>
                                 </div>
                             )}

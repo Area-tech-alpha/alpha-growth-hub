@@ -173,14 +173,16 @@ export default function LeiloesPanel({ setDemoLead }: { setDemoLead: (lead: Lead
   };
 
   const user = { id: session?.user?.id, name: session?.user?.name || "Você" };
-  const totalValue = useMemo(
-    () =>
-      sortedAuctions.reduce(
-        (sum, auction) => sum + (auction.leads.currentBid || 0),
-        0
-      ),
-    [sortedAuctions]
-  );
+  const totalValue = useMemo(() => {
+    return sortedAuctions.reduce((sum, auction) => {
+      if (auction.type === "batch" && auction.batchSummary) {
+        const baseline = auction.batchSummary.minimumBid || 0;
+        const current = auction.leads.currentBid || 0;
+        return sum + Math.max(baseline, current);
+      }
+      return sum + (auction.leads.currentBid || 0);
+    }, 0);
+  }, [sortedAuctions]);
   const activeAuctionsCount = sortedAuctions.length;
   const isFiltered = (revFilter.min != null) || (revFilter.max != null) || ((revFilter.locationQuery || "").trim() !== "");
   const totalBidders = useMemo(
@@ -319,6 +321,8 @@ export default function LeiloesPanel({ setDemoLead }: { setDemoLead: (lead: Lead
           <LeadCard
             key={auction.id}
             lead={auction.leads}
+            auctionType={auction.type}
+            batchSummary={auction.batchSummary}
             onExpire={() => handleExpire(auction.id)}
             onSelect={() => setSelectedAuction(auction)}
           />
