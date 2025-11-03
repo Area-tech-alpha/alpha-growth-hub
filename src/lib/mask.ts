@@ -18,8 +18,22 @@ export const maskPhone = (phone: string | null | undefined): string => {
 
   if (cleaned.length < 10) return "(**) *****-****";
 
-  const ddd = cleaned.substring(0, 2);
-  const lastFour = cleaned.substring(cleaned.length - 4);
+  let localNumber = cleaned;
+
+  if (localNumber.length > 11) {
+    if (localNumber.startsWith("55") && (localNumber.length === 12 || localNumber.length === 13)) {
+      // Strip Brazilian country code when present
+      localNumber = localNumber.slice(2);
+    }
+    if (localNumber.length > 11) {
+      localNumber = localNumber.slice(-11);
+    }
+  }
+
+  if (localNumber.length < 10) return "(**) *****-****";
+
+  const ddd = localNumber.slice(0, 2);
+  const lastFour = localNumber.slice(-4);
 
   return `(${ddd}) *****-${lastFour}`;
 };
