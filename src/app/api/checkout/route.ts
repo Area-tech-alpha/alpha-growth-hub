@@ -135,8 +135,6 @@ export async function POST(request: Request) {
             }
         }
 
-        console.log("asaasResponse", asaasResponse)
-
         const payload = {
             success: true,
             checkoutUrl: asaasResponse.link,
