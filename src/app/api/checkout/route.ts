@@ -89,6 +89,8 @@ export async function POST(request: Request) {
 
         const asaasResponse = await response.json();
 
+        console.log("asaasResponse", asaasResponse)
+
         if (!asaasResponse?.id) {
             return NextResponse.json({ error: 'Resposta inválida do Asaas (sem id do checkout)' }, { status: 502 });
         }
@@ -142,6 +144,8 @@ export async function POST(request: Request) {
             amount: amount,
             credits: credits,
         };
+
+        console.log("payload", payload)
         return NextResponse.json(payload);
 
     } catch (error) {
