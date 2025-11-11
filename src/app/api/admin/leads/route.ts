@@ -44,6 +44,24 @@ const parseWeekRange = (value: string | null): DateRange | null => {
     return getWeekRange(base)
 }
 
+const getDayRange = (date: Date): DateRange => {
+    const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0))
+    const end = new Date(start)
+    end.setUTCDate(end.getUTCDate() + 1)
+    return { start, end }
+}
+
+const parseDayRange = (value: string | null): DateRange | null => {
+    if (!value) return null
+    const parts = value.split('-').map(Number)
+    if (parts.length !== 3) return null
+    const [yyyy, mm, dd] = parts
+    if (!yyyy || !mm || !dd || mm < 1 || mm > 12 || dd < 1 || dd > 31) return null
+    const base = new Date(Date.UTC(yyyy, mm - 1, dd, 0, 0, 0))
+    if (Number.isNaN(base.getTime())) return null
+    return getDayRange(base)
+}
+
 export async function GET(request: Request) {
     try {
         const url = new URL(request.url)
@@ -64,12 +82,14 @@ export async function GET(request: Request) {
         const monthParam = url.searchParams.get('month')
         const rangeParam = url.searchParams.get('range')
         const weekParam = url.searchParams.get('weekStart')
+        const dayParam = url.searchParams.get('day')
 
         const currentMonthRange = getMonthRange(now.getUTCFullYear(), now.getUTCMonth())
         const currentWeekRange = getWeekRange(now)
+        const currentDayRange = getDayRange(now)
 
         const explicitMonth = Boolean(monthParam)
-        const rangeModeInput = rangeParam === 'monthly' || rangeParam === 'weekly' ? rangeParam : 'all'
+        const rangeModeInput = rangeParam === 'monthly' || rangeParam === 'weekly' || rangeParam === 'daily' ? rangeParam : 'all'
         const rangeMode = rangeModeInput === 'all' && explicitMonth ? 'monthly' : rangeModeInput
 
         let createdAtWhere: { gte?: Date; lt?: Date } | undefined
@@ -79,6 +99,9 @@ export async function GET(request: Request) {
         } else if (rangeMode === 'weekly') {
             const weekRange = parseWeekRange(weekParam) ?? currentWeekRange
             createdAtWhere = { gte: weekRange.start, lt: weekRange.end }
+        } else if (rangeMode === 'daily') {
+            const dayRange = parseDayRange(dayParam) ?? currentDayRange
+            createdAtWhere = { gte: dayRange.start, lt: dayRange.end }
         }
 
         const leadsEntered = await prisma.leads.findMany({

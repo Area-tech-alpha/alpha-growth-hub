@@ -65,10 +65,35 @@ const parseWeekRange = (value: string | null): DateRange | null => {
   return getWeekRange(base)
 }
 
+const getDayRange = (date: Date): DateRange => {
+  const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0))
+  const end = new Date(start)
+  end.setUTCDate(end.getUTCDate() + 1)
+  return { start, end }
+}
+
+const parseDayRange = (value: string | null): DateRange | null => {
+  if (!value) return null
+  const parts = value.split('-').map(Number)
+  if (parts.length !== 3) return null
+  const [yyyy, mm, dd] = parts
+  if (!yyyy || !mm || !dd || mm < 1 || mm > 12 || dd < 1 || dd > 31) return null
+  const base = new Date(Date.UTC(yyyy, mm - 1, dd, 0, 0, 0))
+  if (Number.isNaN(base.getTime())) return null
+  return getDayRange(base)
+}
+
 const formatMonthLabel = (range: DateRange): string => {
   const monthIdx = range.start.getUTCMonth()
   const year = range.start.getUTCFullYear()
   return `${monthLabels[monthIdx] ?? String(monthIdx + 1).padStart(2, '0')}/${String(year).slice(-2)}`
+}
+
+const formatShortDate = (date: Date): string => {
+  const dd = String(date.getUTCDate()).padStart(2, '0')
+  const mm = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const yy = String(date.getUTCFullYear()).slice(-2)
+  return `${dd}/${mm}/${yy}`
 }
 
 const formatWeekLabel = (range: DateRange): string => {
@@ -78,12 +103,7 @@ const formatWeekLabel = (range: DateRange): string => {
   return `${start} - ${end}`
 }
 
-const formatShortDate = (date: Date): string => {
-  const dd = String(date.getUTCDate()).padStart(2, '0')
-  const mm = String(date.getUTCMonth() + 1).padStart(2, '0')
-  const yy = String(date.getUTCFullYear()).slice(-2)
-  return `${dd}/${mm}/${yy}`
-}
+const formatDayLabel = (range: DateRange): string => formatShortDate(range.start)
 
 const decimalToNumber = (value: unknown): number | null => {
   if (value === null || value === undefined) return null
@@ -128,22 +148,27 @@ export async function GET(request: Request) {
     const offset = (page - 1) * pageSize
 
     const rangeParam = url.searchParams.get('range')
-    const rangeMode = rangeParam === 'monthly' || rangeParam === 'weekly' ? rangeParam : 'all'
+    const rangeMode = rangeParam === 'monthly' || rangeParam === 'weekly' || rangeParam === 'daily' ? rangeParam : 'all'
     const monthParam = url.searchParams.get('month')
     const weekParam = url.searchParams.get('weekStart')
+    const dayParam = url.searchParams.get('day')
 
     const currentMonthRange = getMonthRange(now.getUTCFullYear(), now.getUTCMonth())
     const currentWeekRange = getWeekRange(now)
+    const currentDayRange = getDayRange(now)
 
     const parsedMonthRange = parseMonthRange(monthParam)
     const parsedWeekRange = parseWeekRange(weekParam)
+    const parsedDayRange = parseDayRange(dayParam)
 
     const activeRange =
       rangeMode === 'monthly'
         ? (parsedMonthRange ?? currentMonthRange)
         : rangeMode === 'weekly'
           ? (parsedWeekRange ?? currentWeekRange)
-          : undefined
+          : rangeMode === 'daily'
+            ? (parsedDayRange ?? currentDayRange)
+            : undefined
 
     const listWhere = buildWhere(activeRange)
 
@@ -241,7 +266,9 @@ export async function GET(request: Request) {
         ? formatMonthLabel(activeRange)
         : rangeMode === 'weekly' && activeRange
           ? formatWeekLabel(activeRange)
-          : 'Todos os registros'
+          : rangeMode === 'daily' && activeRange
+            ? formatDayLabel(activeRange)
+            : 'Todos os registros'
 
     return NextResponse.json({
       items,

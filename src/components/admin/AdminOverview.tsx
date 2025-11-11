@@ -35,6 +35,7 @@ type TimelineData = {
 }
 
 type WeekOption = { value: string; label: string }
+type RangeMode = 'all' | 'monthly' | 'weekly' | 'daily'
 
 const TIMELINE_PAGE_SIZE = 10
 
@@ -50,9 +51,6 @@ const pad = (value: number) => String(value).padStart(2, '0')
 
 const toIsoDate = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 
-const formatWeekWindow = (start: Date, end: Date) =>
-    `${pad(start.getDate())}/${pad(start.getMonth() + 1)} - ${pad(end.getDate())}/${pad(end.getMonth() + 1)}`
-
 const startOfLocalWeek = (date: Date) => {
     const clone = new Date(date)
     clone.setHours(0, 0, 0, 0)
@@ -61,6 +59,9 @@ const startOfLocalWeek = (date: Date) => {
     clone.setDate(clone.getDate() - diff)
     return clone
 }
+
+const formatWeekWindow = (start: Date, end: Date) =>
+    `${pad(start.getDate())}/${pad(start.getMonth() + 1)} - ${pad(end.getDate())}/${pad(end.getMonth() + 1)}`
 
 const buildWeekOptions = (slots = 8): WeekOption[] => {
     const base = startOfLocalWeek(new Date())
@@ -77,22 +78,30 @@ const buildWeekOptions = (slots = 8): WeekOption[] => {
 }
 
 const getCurrentWeekValue = () => toIsoDate(startOfLocalWeek(new Date()))
+const getCurrentDayValue = () => toIsoDate(new Date())
 
 export default function AdminOverview() {
     const weekOptions = useMemo(() => buildWeekOptions(10), [])
-    const [rangeMode, setRangeMode] = useState<'all' | 'monthly' | 'weekly'>('all')
+    const [rangeMode, setRangeMode] = useState<RangeMode>('all')
     const [selectedMonth, setSelectedMonth] = useState<string>('')
     const [selectedWeek, setSelectedWeek] = useState<string>(() => getCurrentWeekValue())
+    const [selectedDay, setSelectedDay] = useState<string>(() => getCurrentDayValue())
+    const [monthOptions, setMonthOptions] = useState<string[]>([])
     const [loading, setLoading] = useState<boolean>(true)
     const [counts, setCounts] = useState<{ entered: number; sold: number } | null>(null)
     const [topBuyers, setTopBuyers] = useState<Ranked[]>([])
     const [topBidders, setTopBidders] = useState<Ranked[]>([])
-    const [monthOptions, setMonthOptions] = useState<string[]>([])
     const [timelineData, setTimelineData] = useState<TimelineData | null>(null)
     const [timelineLoading, setTimelineLoading] = useState<boolean>(false)
     const [timelinePage, setTimelinePage] = useState<number>(1)
     const [timelineError, setTimelineError] = useState<string | null>(null)
     const [timelineReloadKey, setTimelineReloadKey] = useState<number>(0)
+    const formatMonthLabel = (yyyyMm: string) => {
+        const [yyyy, mm] = yyyyMm.split('-')
+        const monthNames = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
+        const idx = parseInt(mm, 10) - 1
+        return `${monthNames[idx] ?? mm}/${yyyy.slice(2)}`
+    }
 
     // Fetch available months from backend
     useEffect(() => {
@@ -126,8 +135,14 @@ export default function AdminOverview() {
     }, [rangeMode, selectedWeek])
 
     useEffect(() => {
+        if (rangeMode === 'daily' && !selectedDay) {
+            setSelectedDay(getCurrentDayValue())
+        }
+    }, [rangeMode, selectedDay])
+
+    useEffect(() => {
         setTimelinePage(1)
-    }, [rangeMode, selectedMonth, selectedWeek])
+    }, [rangeMode, selectedMonth, selectedWeek, selectedDay])
 
     const buildRangeParams = useCallback(() => {
         const params = new URLSearchParams()
@@ -137,9 +152,12 @@ export default function AdminOverview() {
         } else if (rangeMode === 'weekly') {
             params.set('range', 'weekly')
             if (selectedWeek) params.set('weekStart', selectedWeek)
+        } else if (rangeMode === 'daily') {
+            params.set('range', 'daily')
+            if (selectedDay) params.set('day', selectedDay)
         }
         return params
-    }, [rangeMode, selectedMonth, selectedWeek])
+    }, [rangeMode, selectedMonth, selectedWeek, selectedDay])
 
     useEffect(() => {
         let active = true
@@ -205,7 +223,7 @@ export default function AdminOverview() {
             active = false
             controller.abort()
         }
-    }, [buildRangeParams, rangeMode, selectedMonth, selectedWeek, timelinePage, timelineReloadKey])
+    }, [buildRangeParams, timelinePage, timelineReloadKey])
 
     useEffect(() => {
         let active = true
@@ -240,14 +258,7 @@ export default function AdminOverview() {
         }
         run()
         return () => { active = false; controller.abort() }
-    }, [buildRangeParams, rangeMode, selectedMonth, selectedWeek])
-
-    const formatMonthLabel = (yyyyMm: string) => {
-        const [yyyy, mm] = yyyyMm.split('-')
-        const monthNames = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
-        const idx = parseInt(mm, 10) - 1
-        return `${monthNames[idx] ?? mm}/${yyyy.slice(2)}`
-    }
+    }, [buildRangeParams])
 
     const handleRefresh = () => {
         setTimelineReloadKey(prev => prev + 1)
@@ -308,12 +319,13 @@ export default function AdminOverview() {
                     <select
                         className="h-9 rounded-md border px-2 text-sm bg-background text-foreground"
                         value={rangeMode}
-                        onChange={e => setRangeMode(e.target.value as 'all' | 'monthly' | 'weekly')}
+                        onChange={e => setRangeMode(e.target.value as RangeMode)}
                         disabled={loading}
                     >
                         <option value="all">Geral</option>
                         <option value="monthly">Mensal</option>
                         <option value="weekly">Semanal</option>
+                        <option value="daily">Diário</option>
                     </select>
                     {rangeMode === 'monthly' && (
                         <select
@@ -342,6 +354,15 @@ export default function AdminOverview() {
                                 <option key={option.value} value={option.value}>{option.label}</option>
                             ))}
                         </select>
+                    )}
+                    {rangeMode === 'daily' && (
+                        <input
+                            type="date"
+                            className="h-9 rounded-md border px-2 text-sm bg-background text-foreground"
+                            value={selectedDay || ''}
+                            onChange={e => setSelectedDay(e.target.value)}
+                            disabled={loading}
+                        />
                     )}
                     <button
                         onClick={handleRefresh}
