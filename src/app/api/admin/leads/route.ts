@@ -2,18 +2,56 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../../auth'
 import { prisma } from '@/lib/prisma'
-// import type { leads as LeadRow } from '@prisma/client'
+
+type DateRange = { start: Date; end: Date }
+
+const getMonthRange = (year: number, monthIndex: number): DateRange => {
+    const start = new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0))
+    const end = new Date(Date.UTC(year, monthIndex + 1, 1, 0, 0, 0))
+    return { start, end }
+}
+
+const parseMonthRange = (value: string | null): DateRange | null => {
+    if (!value) return null
+    const [yyyy, mm] = value.split('-').map(Number)
+    if (!yyyy || !mm || mm < 1 || mm > 12) return null
+    return getMonthRange(yyyy, mm - 1)
+}
+
+const startOfUtcWeek = (date: Date): Date => {
+    const clone = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0))
+    const day = clone.getUTCDay()
+    const diff = day === 0 ? 6 : day - 1
+    clone.setUTCDate(clone.getUTCDate() - diff)
+    return clone
+}
+
+const getWeekRange = (date: Date): DateRange => {
+    const start = startOfUtcWeek(date)
+    const end = new Date(start)
+    end.setUTCDate(end.getUTCDate() + 7)
+    return { start, end }
+}
+
+const parseWeekRange = (value: string | null): DateRange | null => {
+    if (!value) return null
+    const parts = value.split('-').map(Number)
+    if (parts.length !== 3) return null
+    const [yyyy, mm, dd] = parts
+    if (!yyyy || !mm || !dd) return null
+    const base = new Date(Date.UTC(yyyy, mm - 1, dd, 0, 0, 0))
+    if (Number.isNaN(base.getTime())) return null
+    return getWeekRange(base)
+}
 
 export async function GET(request: Request) {
     try {
         const url = new URL(request.url)
-        const monthParam = url.searchParams.get('month') // YYYY-MM
         const session = await getServerSession(authOptions)
         if (!session?.user?.id) {
             return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
         }
 
-        // enforce admin role (prefer role from session if available)
         const sessionRole = (session.user as unknown as { role?: string })?.role
         if (sessionRole !== 'admin') {
             const me = await prisma.users.findUnique({ where: { id: session.user.id }, select: { role: true } })
@@ -22,22 +60,35 @@ export async function GET(request: Request) {
             }
         }
 
-        // considerar apenas leads com status não-nulo (exclui registros com status NULL)
+        const now = new Date()
+        const monthParam = url.searchParams.get('month')
+        const rangeParam = url.searchParams.get('range')
+        const weekParam = url.searchParams.get('weekStart')
+
+        const currentMonthRange = getMonthRange(now.getUTCFullYear(), now.getUTCMonth())
+        const currentWeekRange = getWeekRange(now)
+
+        const explicitMonth = Boolean(monthParam)
+        const rangeModeInput = rangeParam === 'monthly' || rangeParam === 'weekly' ? rangeParam : 'all'
+        const rangeMode = rangeModeInput === 'all' && explicitMonth ? 'monthly' : rangeModeInput
+
         let createdAtWhere: { gte?: Date; lt?: Date } | undefined
-        if (monthParam) {
-            const [yyyy, mm] = monthParam.split('-').map(Number)
-            if (yyyy && mm && mm >= 1 && mm <= 12) {
-                const start = new Date(Date.UTC(yyyy, mm - 1, 1, 0, 0, 0))
-                const end = new Date(Date.UTC(yyyy, mm, 1, 0, 0, 0))
-                createdAtWhere = { gte: start, lt: end }
-            }
+        if (rangeMode === 'monthly') {
+            const monthRange = parseMonthRange(monthParam) ?? currentMonthRange
+            createdAtWhere = { gte: monthRange.start, lt: monthRange.end }
+        } else if (rangeMode === 'weekly') {
+            const weekRange = parseWeekRange(weekParam) ?? currentWeekRange
+            createdAtWhere = { gte: weekRange.start, lt: weekRange.end }
         }
 
-        const leadsEntered = await prisma.leads.findMany({ where: { status: { not: '' }, ...(createdAtWhere ? { created_at: createdAtWhere } : {}) } })
+        const leadsEntered = await prisma.leads.findMany({
+            where: { status: { not: '' }, ...(createdAtWhere ? { created_at: createdAtWhere } : {}) },
+        })
 
-        const leadsSold = await prisma.leads.findMany({ where: { status: 'sold', ...(createdAtWhere ? { created_at: createdAtWhere } : {}) } })
+        const leadsSold = await prisma.leads.findMany({
+            where: { status: 'sold', ...(createdAtWhere ? { created_at: createdAtWhere } : {}) },
+        })
 
-        // Top buyers (users who purchased the most leads)
         const buyersGroup = await prisma.leads.groupBy({
             by: ['owner_id'],
             where: { owner_id: { not: null }, status: 'sold', ...(createdAtWhere ? { created_at: createdAtWhere } : {}) },
@@ -54,7 +105,6 @@ export async function GET(request: Request) {
             return { userId: b.owner_id, count: b._count.owner_id, name: u?.name ?? null, email: u?.email ?? null, avatar_url: u?.avatar_url ?? null }
         })
 
-        // Top bidders (users who placed the most bids)
         const biddersGroup = await prisma.bids.groupBy({
             by: ['user_id'],
             where: createdAtWhere ? { created_at: createdAtWhere } : undefined,

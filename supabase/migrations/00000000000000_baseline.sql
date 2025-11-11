@@ -129,7 +129,7 @@ BEGIN
 
   -- Cria auction para lead 'cold' (apenas INSERT)
   ELSIF TG_OP = 'INSERT' AND NEW.status = 'cold' THEN
-    v_minimum_bid := 250;
+    v_minimum_bid := 180;
 
     INSERT INTO public.auctions (lead_id, minimum_bid, expired_at, created_at)
     VALUES (NEW.id, v_minimum_bid, v_expiration_time, v_current_time);
