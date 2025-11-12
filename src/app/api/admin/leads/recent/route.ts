@@ -3,11 +3,13 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../../../auth'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
+import { getLeadTypeFromRevenue, getRevenueBandByLabel, getRevenueLabelsForLeadType, LeadType } from '@/lib/revenueBands'
 
 type Row = {
   id: string
   company_name: string | null
   created_at: Date | null
+  revenue: string | null
   sold: boolean
   is_hot: boolean
   buyer_id: string | null
@@ -170,7 +172,33 @@ export async function GET(request: Request) {
             ? (parsedDayRange ?? currentDayRange)
             : undefined
 
-    const listWhere = buildWhere(activeRange)
+    const revenueBandFilters = url.searchParams.getAll('revenueBand')
+      .map(label => getRevenueBandByLabel(label)?.label)
+      .filter((label): label is string => Boolean(label))
+
+    const leadTypeParamRaw = url.searchParams.get('leadType')?.toUpperCase() ?? null
+    const leadTypeFilter = leadTypeParamRaw === 'A' || leadTypeParamRaw === 'B' || leadTypeParamRaw === 'C'
+      ? (leadTypeParamRaw as LeadType)
+      : null
+
+    let allowedRevenueLabels: string[] | null = revenueBandFilters.length ? revenueBandFilters : null
+    if (leadTypeFilter) {
+      const typeLabels = getRevenueLabelsForLeadType(leadTypeFilter)
+      allowedRevenueLabels = allowedRevenueLabels
+        ? allowedRevenueLabels.filter(label => typeLabels.includes(label))
+        : typeLabels
+    }
+
+    const extraClauses: Prisma.Sql[] = []
+    if (allowedRevenueLabels) {
+      if (allowedRevenueLabels.length === 0) {
+        extraClauses.push(Prisma.sql`1 = 0`)
+      } else {
+        extraClauses.push(Prisma.sql`l.revenue IN (${Prisma.join(allowedRevenueLabels)})`)
+      }
+    }
+
+    const listWhere = buildWhere(activeRange, extraClauses)
 
     const totalRows = await prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
       SELECT COUNT(*)::bigint as count
@@ -185,6 +213,7 @@ export async function GET(request: Request) {
         l.id,
         l.company_name,
         l.created_at,
+        l.revenue,
         (l.owner_id IS NOT NULL) AS sold,
         (l.contract_url IS NOT NULL) AS is_hot,
         u.id as buyer_id,
@@ -225,8 +254,8 @@ export async function GET(request: Request) {
     const selectedMonthRange = parsedMonthRange ?? currentMonthRange
     const selectedWeekRange = parsedWeekRange ?? currentWeekRange
 
-    const monthAvgWhere = buildWhere(selectedMonthRange, [Prisma.sql`l.owner_id IS NOT NULL`])
-    const weekAvgWhere = buildWhere(selectedWeekRange, [Prisma.sql`l.owner_id IS NOT NULL`])
+    const monthAvgWhere = buildWhere(selectedMonthRange, [Prisma.sql`l.owner_id IS NOT NULL`, ...extraClauses])
+    const weekAvgWhere = buildWhere(selectedWeekRange, [Prisma.sql`l.owner_id IS NOT NULL`, ...extraClauses])
 
     const monthAvgRows = await prisma.$queryRaw<{ avg_value: unknown | null }[]>(Prisma.sql`
       SELECT AVG(wb.amount)::numeric AS avg_value
@@ -252,12 +281,14 @@ export async function GET(request: Request) {
         id: r.id,
         company_name: r.company_name,
         created_at: r.created_at ? new Date(r.created_at).toISOString() : null,
+        revenue: r.revenue,
         sold: Boolean(r.sold),
         type: r.is_hot ? 'hot' : 'cold',
         buyer: r.sold ? { id: r.buyer_id, name: r.buyer_name, email: r.buyer_email } : null,
         price: r.sold ? priceNum : null,
         bids_count: r.bids_count ?? 0,
         minimum_bid: decimalToNumber(r.minimum_bid),
+        leadType: getLeadTypeFromRevenue(r.revenue),
       }
     })
 

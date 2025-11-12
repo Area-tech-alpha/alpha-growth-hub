@@ -4,6 +4,8 @@ export type RevenueBand = {
     max: number; // inclusive (use Infinity for open upper bound)
 };
 
+export type LeadType = 'A' | 'B' | 'C';
+
 export const REVENUE_BANDS: RevenueBand[] = [
     { label: 'Até 20 mil', min: 0, max: 20_000 },
     { label: 'De 20 mil até 40 mil', min: 20_000, max: 40_000 },
@@ -19,6 +21,12 @@ export const REVENUE_BANDS: RevenueBand[] = [
 ];
 
 const labelToBand = new Map<string, RevenueBand>(REVENUE_BANDS.map(b => [b.label, b]));
+
+const leadTypeMap: Record<LeadType, string[]> = {
+    A: REVENUE_BANDS.slice(3).map(b => b.label), // 60k+
+    B: REVENUE_BANDS.slice(1, 3).map(b => b.label), // 20k-60k
+    C: [REVENUE_BANDS[0].label], // até 20k
+};
 
 export function getRevenueBandByLabel(label: string | null | undefined): RevenueBand | undefined {
     if (!label) return undefined;
@@ -49,6 +57,19 @@ export function bandOverlapsRange(label: string, min?: number | null, max?: numb
     if (hasMin && !hasMax) return band.max >= (min as number);
     if (!hasMin && hasMax) return band.min <= (max as number);
     return band.max >= (min as number) && band.min <= (max as number);
+}
+
+export function getLeadTypeFromRevenue(label: string | null | undefined): LeadType | null {
+    const band = getRevenueBandByLabel(label);
+    if (!band) return null;
+    if (leadTypeMap.A.includes(band.label)) return 'A';
+    if (leadTypeMap.B.includes(band.label)) return 'B';
+    if (leadTypeMap.C.includes(band.label)) return 'C';
+    return null;
+}
+
+export function getRevenueLabelsForLeadType(type: LeadType): string[] {
+    return [...leadTypeMap[type]];
 }
 
 

@@ -1,14 +1,17 @@
 "use client";
 import StatsCards from '@/components/dashboard/leiloes/statsCards'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { LeadType, getLeadTypeFromRevenue, getRevenueLabelsForLeadType } from '@/lib/revenueBands'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 
 type Ranked = { userId: string | null; count: number; name?: string | null; email?: string | null }
 type RecentLead = {
     id: string;
     company_name: string | null;
     created_at: string | Date | null;
+    revenue: string | null;
     sold: boolean;
     type: 'hot' | 'cold';
+    leadType: LeadType | null;
     buyer: { id: string | null; name: string | null; email: string | null } | null;
     price: number | null;
     bids_count: number;
@@ -36,8 +39,10 @@ type TimelineData = {
 
 type WeekOption = { value: string; label: string }
 type RangeMode = 'all' | 'monthly' | 'weekly' | 'daily'
+type LeadTypeFilterValue = LeadType | ''
 
 const TIMELINE_PAGE_SIZE = 10
+const isLeadTypeValue = (value: unknown): value is LeadType => value === 'A' || value === 'B' || value === 'C'
 
 const formatCurrency = (value: number | null | undefined) =>
     typeof value === 'number'
@@ -86,6 +91,7 @@ export default function AdminOverview() {
     const [selectedMonth, setSelectedMonth] = useState<string>('')
     const [selectedWeek, setSelectedWeek] = useState<string>(() => getCurrentWeekValue())
     const [selectedDay, setSelectedDay] = useState<string>(() => getCurrentDayValue())
+    const [selectedFinanceFilter, setSelectedFinanceFilter] = useState<string>('')
     const [monthOptions, setMonthOptions] = useState<string[]>([])
     const [loading, setLoading] = useState<boolean>(true)
     const [counts, setCounts] = useState<{ entered: number; sold: number } | null>(null)
@@ -96,6 +102,35 @@ export default function AdminOverview() {
     const [timelinePage, setTimelinePage] = useState<number>(1)
     const [timelineError, setTimelineError] = useState<string | null>(null)
     const [timelineReloadKey, setTimelineReloadKey] = useState<number>(0)
+    const financeOptionGroups = useMemo(
+        () => (
+            ['A', 'B', 'C'] as LeadType[]
+        ).map(typeValue => ({
+            type: typeValue,
+            bands: getRevenueLabelsForLeadType(typeValue),
+        })),
+        [],
+    )
+    const activeLeadType = useMemo<LeadTypeFilterValue>(() => {
+        if (!selectedFinanceFilter) return ''
+        if (selectedFinanceFilter.startsWith('type:')) {
+            const candidate = selectedFinanceFilter.split(':')[1]
+            return isLeadTypeValue(candidate) ? candidate : ''
+        }
+        if (selectedFinanceFilter.startsWith('band:')) {
+            const label = selectedFinanceFilter.slice('band:'.length)
+            const derived = getLeadTypeFromRevenue(label)
+            return derived ?? ''
+        }
+        return ''
+    }, [selectedFinanceFilter])
+    const activeRevenueBand = useMemo(() => {
+        if (!selectedFinanceFilter) return ''
+        if (selectedFinanceFilter.startsWith('band:')) {
+            return selectedFinanceFilter.slice('band:'.length)
+        }
+        return ''
+    }, [selectedFinanceFilter])
     const formatMonthLabel = (yyyyMm: string) => {
         const [yyyy, mm] = yyyyMm.split('-')
         const monthNames = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
@@ -142,7 +177,7 @@ export default function AdminOverview() {
 
     useEffect(() => {
         setTimelinePage(1)
-    }, [rangeMode, selectedMonth, selectedWeek, selectedDay])
+    }, [rangeMode, selectedMonth, selectedWeek, selectedDay, selectedFinanceFilter])
 
     const buildRangeParams = useCallback(() => {
         const params = new URLSearchParams()
@@ -169,6 +204,8 @@ export default function AdminOverview() {
                 const params = buildRangeParams()
                 params.set('page', String(timelinePage))
                 params.set('pageSize', String(TIMELINE_PAGE_SIZE))
+                if (activeRevenueBand) params.append('revenueBand', activeRevenueBand)
+                if (activeLeadType) params.set('leadType', activeLeadType)
                 const query = params.toString()
                 const res = await fetch(`/api/admin/leads/recent?${query}`, { cache: 'no-store', signal: controller.signal })
                 if (!active) return
@@ -185,6 +222,8 @@ export default function AdminOverview() {
                         price: normalizeNumber(it.price),
                         minimum_bid: normalizeNumber(it.minimum_bid),
                         bids_count: typeof it.bids_count === 'number' && !Number.isNaN(it.bids_count) ? it.bids_count : 0,
+                        revenue: typeof it.revenue === 'string' ? it.revenue : null,
+                        leadType: isLeadTypeValue(it.leadType) ? it.leadType : null,
                     })),
                     pagination: {
                         page: Number(paginationRaw.page) || timelinePage,
@@ -223,7 +262,7 @@ export default function AdminOverview() {
             active = false
             controller.abort()
         }
-    }, [buildRangeParams, timelinePage, timelineReloadKey])
+    }, [buildRangeParams, timelinePage, timelineReloadKey, activeRevenueBand, activeLeadType])
 
     useEffect(() => {
         let active = true
@@ -437,6 +476,35 @@ export default function AdminOverview() {
                     <p className="text-sm text-muted-foreground">Os dados abaixo seguem o mesmo filtro aplicado na seção de visão geral.</p>
                 </div>
 
+                <div className="flex flex-col gap-3 md:flex-row md:items-end">
+                    <div className="flex flex-col gap-1 text-sm">
+                        <span className="text-xs uppercase text-muted-foreground">Tipo / faixa de faturamento</span>
+                        <select
+                            className="h-9 rounded-md border px-2 text-sm bg-background text-foreground"
+                            value={selectedFinanceFilter}
+                            onChange={e => setSelectedFinanceFilter(e.target.value)}
+                            disabled={timelineLoading}
+                        >
+                            <option value="">Todos os tipos e faixas</option>
+                            {financeOptionGroups.map(group => (
+                                <Fragment key={group.type}>
+                                    <option
+                                        value={`type:${group.type}`}
+                                        style={{ fontWeight: 'bold' }}
+                                    >
+                                        Tipo {group.type}
+                                    </option>
+                                    {group.bands.map(label => (
+                                        <option key={`${group.type}-${label}`} value={`band:${label}`}>
+                                            {`${label}`}
+                                        </option>
+                                    ))}
+                                </Fragment>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                     {showSummarySkeleton ? (
                         Array.from({ length: 4 }).map((_, idx) => (
@@ -507,6 +575,14 @@ export default function AdminOverview() {
                                         </div>
                                         <div className="text-xs text-muted-foreground">
                                             {item.created_at ? new Date(item.created_at).toLocaleString('pt-BR') : 'sem data'}
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                            <span>
+                                                Faturamento: <strong className="text-foreground">{item.revenue || 'Não informado'}</strong>
+                                            </span>
+                                            <span>
+                                                Tipo financeiro: <strong className="text-foreground">{item.leadType || '—'}</strong>
+                                            </span>
                                         </div>
                                         <div className="mt-1">
                                             {item.sold ? (
