@@ -73,12 +73,12 @@ export async function POST(request: Request) {
             } catch { }
             // Keep blocking lock as-is; optionally we could switch to try-lock here
             // Use executeRaw for functions that return void to avoid Prisma deserialization errors
-            await tx.$executeRawUnsafe(`select pg_advisory_xact_lock(hashtext('${auctionId.replace(/'/g, "''")}'))`);
+            await tx.$executeRaw`select pg_advisory_xact_lock(hashtext(${auctionId}))`;
 
             // Minimal idempotency if table exists
             if (idemKey) {
                 try {
-                    const inserted = await tx.$executeRawUnsafe(`insert into public.request_keys(key) values ('${idemKey.replace(/'/g, "''")}') on conflict (key) do nothing`);
+                    const inserted = await tx.$executeRaw`insert into public.request_keys(key) values (${idemKey}) on conflict (key) do nothing`;
                     if (!inserted) {
                         return buildErrorResult(409, 'DUPLICATE_REQUEST', 'Detectamos um envio duplicado. Aguarde e atualize o leilao.')
                     }

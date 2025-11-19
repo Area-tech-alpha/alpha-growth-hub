@@ -216,10 +216,12 @@ export async function POST(request: Request) {
             try {
                 const urlKey = parsedBody?.idempotencyKey
                 if (urlKey) {
-                    const rows = await prisma.$queryRawUnsafe<{ id: bigint }[]>(
-                        `SELECT id FROM credit_transactions WHERE (metadata->>'idempotency_key') = $1 LIMIT 1`,
-                        urlKey,
-                    )
+                    const rows = await prisma.$queryRaw<{ id: bigint }[]>`
+                        SELECT id
+                        FROM credit_transactions
+                        WHERE (metadata->>'idempotency_key') = ${urlKey}
+                        LIMIT 1
+                    `
                     if (rows.length > 0) {
                         return NextResponse.json({ ok: true, transactionId: String(rows[0].id) })
                     }
@@ -239,32 +241,39 @@ export async function GET(request: Request) {
         const limit = Math.min(parseInt(url.searchParams.get('limit') || '20', 10) || 20, 100)
 
         // Recompensas
-        const rewardRows = await prisma.$queryRawUnsafe<RawCreditRow[]>(
-            `
-            SELECT ct.id, ct.user_id, ct.credits_purchased, ct.amount_paid, ct.created_at, ct.metadata,
-                   u.email, u.name
+        const rewardRows = await prisma.$queryRaw<RawCreditRow[]>`
+            SELECT ct.id,
+                   ct.user_id,
+                   ct.credits_purchased,
+                   ct.amount_paid,
+                   ct.created_at,
+                   ct.metadata,
+                   u.email,
+                   u.name
             FROM credit_transactions ct
             JOIN users u ON u.id = ct.user_id
             WHERE ct.source = 'reward'::credit_source_enum
             ORDER BY ct.created_at DESC
-            LIMIT $1
-            `,
-            limit,
-        )
+            LIMIT ${limit}
+        `
 
         // Estornos (ajustes marcados como refund)
-        const refundRows = await prisma.$queryRawUnsafe<RawCreditRow[]>(
-            `
-            SELECT ct.id, ct.user_id, ct.credits_purchased, ct.amount_paid, ct.created_at, ct.metadata,
-                   u.email, u.name
+        const refundRows = await prisma.$queryRaw<RawCreditRow[]>`
+            SELECT ct.id,
+                   ct.user_id,
+                   ct.credits_purchased,
+                   ct.amount_paid,
+                   ct.created_at,
+                   ct.metadata,
+                   u.email,
+                   u.name
             FROM credit_transactions ct
             JOIN users u ON u.id = ct.user_id
-            WHERE ct.source = 'adjustment'::credit_source_enum AND (ct.metadata->>'adjustment_type') = 'refund'
+            WHERE ct.source = 'adjustment'::credit_source_enum
+              AND (ct.metadata->>'adjustment_type') = 'refund'
             ORDER BY ct.created_at DESC
-            LIMIT $1
-            `,
-            limit,
-        )
+            LIMIT ${limit}
+        `
 
         const mapRow = (r: RawCreditRow) => {
             const rawMd = (r.metadata ?? {}) as Record<string, unknown>
