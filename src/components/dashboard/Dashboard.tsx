@@ -7,9 +7,11 @@ import { ToastBus } from "@/lib/toastBus";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CreditosPanel from "@/components/dashboard/CreditosPanel";
 import MeusLeadsPanel from "@/components/dashboard/MeusLeadsPanel";
+import StatsPanel from "@/components/dashboard/StatsPanel";
 import { CiCreditCard1 } from "react-icons/ci";
 import { IoMdTrendingUp } from "react-icons/io";
 import { FiShoppingBag, FiInfo } from "react-icons/fi";
+import { BarChart3 } from "lucide-react";
 import type { Lead } from "./leads/types";
 import { useRealtimeStore } from "@/store/realtime-store";
 import type { RealtimeState } from "@/store/realtime-store";
@@ -421,6 +423,10 @@ export default function Dashboard({
                   </span>
                 )}
               </TabsTrigger>
+              <TabsTrigger value="estatisticas" className="flex items-center gap-2">
+                <BarChart3 className="size-4" />
+                Estatísticas
+              </TabsTrigger>
               <TabsTrigger value="info" className="flex items-center gap-2">
                 <FiInfo className="size-4" />
                 Como funciona
@@ -435,6 +441,9 @@ export default function Dashboard({
           </TabsContent>
           <TabsContent value="leiloes">
             <LeiloesPanel setDemoLead={setDemoLead} />
+          </TabsContent>
+          <TabsContent value="estatisticas">
+            <StatsPanel />
           </TabsContent>
           <TabsContent value="info">
             <InfoPanel />
