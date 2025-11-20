@@ -59,10 +59,10 @@ export async function GET(request: Request) {
             where: {
                 owner_id: { not: null },
                 status: 'sold',
-                price: { not: null }
+                contract_value: { not: null }
             },
-            _sum: { price: true },
-            orderBy: { _sum: { price: 'desc' } },
+            _sum: { contract_value: true },
+            orderBy: { _sum: { contract_value: 'desc' } },
             take: 10,
         })
 
@@ -78,7 +78,7 @@ export async function GET(request: Request) {
             const u = investorUsers.find(x => x.id === i.owner_id)
             return {
                 userId: i.owner_id,
-                totalInvested: i._sum.price ?? 0,
+                totalInvested: i._sum.contract_value ?? 0,
                 name: u?.name ?? null,
                 email: u?.email ?? null
             }
