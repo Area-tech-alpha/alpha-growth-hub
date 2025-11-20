@@ -53,20 +53,46 @@ export async function GET(request: Request) {
             }
         })
 
-        // Get top investors by total investment amount
-        const investorsData = await prisma.leads.groupBy({
-            by: ['owner_id'],
+        // Get top investors by total investment amount (winning bid amounts)
+        // Get all auctions with winning bids
+        const wonAuctions = await prisma.auctions.findMany({
             where: {
-                owner_id: { not: null },
-                status: 'sold',
-                contract_value: { not: null }
+                winning_bid_id: { not: null },
+                status: 'closed_won'
             },
-            _sum: { contract_value: true },
-            orderBy: { _sum: { contract_value: 'desc' } },
-            take: 10,
+            include: {
+                bids_auctions_winning_bid_idTobids: {
+                    select: {
+                        user_id: true,
+                        amount: true
+                    }
+                }
+            }
         })
 
-        const investorIds = investorsData.map(i => i.owner_id!).filter(Boolean)
+        // Aggregate investment by user
+        const investmentByUser = new Map<string, number>()
+        wonAuctions.forEach(auction => {
+            const winningBid = auction.bids_auctions_winning_bid_idTobids
+            if (winningBid) {
+                const userId = winningBid.user_id
+                const amount = typeof winningBid.amount === 'string'
+                    ? parseFloat(winningBid.amount)
+                    : Number(winningBid.amount)
+
+                const current = investmentByUser.get(userId) || 0
+                investmentByUser.set(userId, current + amount)
+            }
+        })
+
+        // Sort by total investment and take top 10
+        const sortedInvestors = Array.from(investmentByUser.entries())
+            .map(([userId, totalInvested]) => ({ userId, totalInvested }))
+            .sort((a, b) => b.totalInvested - a.totalInvested)
+            .slice(0, 10)
+
+        // Get user details for investors
+        const investorIds = sortedInvestors.map(i => i.userId)
         const investorUsers = investorIds.length
             ? await prisma.users.findMany({
                 where: { id: { in: investorIds } },
@@ -74,11 +100,11 @@ export async function GET(request: Request) {
             })
             : []
 
-        const topInvestors = investorsData.map(i => {
-            const u = investorUsers.find(x => x.id === i.owner_id)
+        const topInvestors = sortedInvestors.map(investor => {
+            const u = investorUsers.find(x => x.id === investor.userId)
             return {
-                userId: i.owner_id,
-                totalInvested: i._sum.contract_value ?? 0,
+                userId: investor.userId,
+                totalInvested: investor.totalInvested,
                 name: u?.name ?? null,
                 email: u?.email ?? null
             }
