@@ -20,7 +20,7 @@ export default function ConversionRate({ conversion, loading }: ConversionRatePr
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                        <TrendingUp className="h-5 w-5 text-blue-500" />
+                        <TrendingUp className="h-5 w-5 text-yellow-500" />
                         Taxa de Conversão
                     </CardTitle>
                 </CardHeader>
@@ -38,14 +38,14 @@ export default function ConversionRate({ conversion, loading }: ConversionRatePr
         <Card>
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5 text-blue-500" />
+                    <TrendingUp className="h-5 w-5 text-yellow-500" />
                     Taxa de Conversão de Leads
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
                 {/* Percentage display */}
                 <div className="text-center">
-                    <div className="text-5xl font-bold text-blue-600">
+                    <div className="text-5xl font-bold text-yellow-600">
                         {percentage.toFixed(1)}%
                     </div>
                     <p className="text-sm text-muted-foreground mt-2">
@@ -57,7 +57,7 @@ export default function ConversionRate({ conversion, loading }: ConversionRatePr
                 <div className="space-y-2">
                     <div className="h-3 w-full bg-gray-200 rounded-full overflow-hidden">
                         <div
-                            className="h-full bg-blue-500 transition-all duration-500"
+                            className="h-full bg-yellow-500 transition-all duration-500"
                             style={{ width: `${Math.min(percentage, 100)}%` }}
                         />
                     </div>
