@@ -74,9 +74,9 @@ export default function StatsPanel() {
         <div className="space-y-6">
             {/* Header */}
             <div>
-                <h2 className="text-2xl font-bold">Estatísticas do Marketplace</h2>
+                <h2 className="text-2xl font-bold">Estatísticas do Growth Hub</h2>
                 <p className="text-muted-foreground">
-                    Veja o desempenho geral do marketplace de leads
+                    Veja o desempenho geral do Growth Hub
                 </p>
             </div>
 

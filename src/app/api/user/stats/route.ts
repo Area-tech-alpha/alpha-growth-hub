@@ -31,8 +31,7 @@ export async function GET(request: Request) {
                 status: 'sold'
             },
             _count: { owner_id: true },
-            orderBy: { _count: { owner_id: 'desc' } },
-            take: 10,
+            orderBy: { _count: { owner_id: 'desc' } }
         })
 
         const buyerIds = buyersGroup.map(b => b.owner_id!).filter(Boolean)
@@ -85,11 +84,10 @@ export async function GET(request: Request) {
             }
         })
 
-        // Sort by total investment and take top 10
+        // Sort by total investment (show all)
         const sortedInvestors = Array.from(investmentByUser.entries())
             .map(([userId, totalInvested]) => ({ userId, totalInvested }))
             .sort((a, b) => b.totalInvested - a.totalInvested)
-            .slice(0, 10)
 
         // Get user details for investors
         const investorIds = sortedInvestors.map(i => i.userId)
