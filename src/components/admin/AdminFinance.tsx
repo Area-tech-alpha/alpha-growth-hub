@@ -1,7 +1,6 @@
 "use client";
 import StatsCards from '@/components/dashboard/leiloes/statsCards'
 import AdminInvestorsList from './AdminInvestorsList'
-import AdminLeadsByType from './AdminLeadsByType'
 import AdminLeadsByStatus from './AdminLeadsByStatus'
 import AdminSoldSummary from './AdminSoldSummary'
 import { useEffect, useState } from 'react'

@@ -96,7 +96,6 @@ export default function AdminOverview() {
     const [loading, setLoading] = useState<boolean>(true)
     const [counts, setCounts] = useState<{ entered: number; sold: number } | null>(null)
     const [topBuyers, setTopBuyers] = useState<Ranked[]>([])
-    const [topBidders, setTopBidders] = useState<Ranked[]>([])
     const [timelineData, setTimelineData] = useState<TimelineData | null>(null)
     const [timelineLoading, setTimelineLoading] = useState<boolean>(false)
     const [timelinePage, setTimelinePage] = useState<number>(1)
@@ -277,20 +276,17 @@ export default function AdminOverview() {
                 if (!res.ok) {
                     setCounts({ entered: 0, sold: 0 })
                     setTopBuyers([])
-                    setTopBidders([])
                 } else {
                     const data = await res.json()
                     const entered = Array.isArray(data.leadsEntered) ? data.leadsEntered.length : 0
                     const sold = Array.isArray(data.leadsSold) ? data.leadsSold.length : 0
                     setCounts({ entered, sold })
                     setTopBuyers(Array.isArray(data.topBuyers) ? data.topBuyers : [])
-                    setTopBidders(Array.isArray(data.topBidders) ? data.topBidders : [])
                 }
             } catch {
                 if (!active) return
                 setCounts({ entered: 0, sold: 0 })
                 setTopBuyers([])
-                setTopBidders([])
             } finally {
                 if (active) setLoading(false)
             }
@@ -314,7 +310,6 @@ export default function AdminOverview() {
                     const sold = Array.isArray(data.leadsSold) ? data.leadsSold.length : 0
                     setCounts({ entered, sold })
                     setTopBuyers(Array.isArray(data.topBuyers) ? data.topBuyers : [])
-                    setTopBidders(Array.isArray(data.topBidders) ? data.topBidders : [])
                 }
             } catch {
                 // ignore
