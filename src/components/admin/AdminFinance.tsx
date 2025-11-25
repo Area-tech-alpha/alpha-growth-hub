@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import AdminFinanceTransactions from './AdminFinanceTransactions'
 import AdminBidPositions from './AdminBidPositions'
+// import AdminBidPositionList from './AdminBidPositionList'
 
 type FinanceData = { total: number; pix: number; card: number; held: number }
 type BySource = { [k: string]: { amountPaid: number; credits: number; count?: number } }
@@ -173,6 +174,7 @@ export default function AdminFinance() {
 
             <AdminFinanceTransactions month={selectedMonth} />
             <AdminBidPositions month={selectedMonth} />
+            {/* <AdminBidPositionList month={selectedMonth} /> */}
 
             {/* Por origem */}
             <div className="space-y-3">
