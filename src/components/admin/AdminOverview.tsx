@@ -449,25 +449,6 @@ export default function AdminOverview() {
                         )}
                     </ul>
                 </div>
-                <div className="space-y-2">
-                    <h2 className="text-base font-semibold">Top lances</h2>
-                    <ul className="divide-y rounded-md border">
-                        {loading ? (
-                            Array.from({ length: 6 }).map((_, i) => (
-                                <li key={`tl-sk-${i}`} className="p-3"><div className="h-4 w-1/2 bg-muted animate-pulse rounded" /></li>
-                            ))
-                        ) : (topBidders ?? []).length > 0 ? (
-                            (topBidders ?? []).map((b, idx) => (
-                                <li key={`bidder-${b.userId}-${idx}`} className="flex items-center justify-between p-3 text-sm">
-                                    <span className="truncate max-w-[70%]">{b.name || b.email || b.userId || '—'}</span>
-                                    <span className="font-medium">{b.count}</span>
-                                </li>
-                            ))
-                        ) : (
-                            <li className="p-3 text-sm text-muted-foreground">Sem dados</li>
-                        )}
-                    </ul>
-                </div>
             </div>
 
             <div className="space-y-4">
