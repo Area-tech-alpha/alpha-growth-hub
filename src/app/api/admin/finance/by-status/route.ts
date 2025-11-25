@@ -68,14 +68,16 @@ export async function GET(request: Request) {
 
         const hotCount = hot.length
         const coldCount = cold.length
-        const hotAvg = hotCount > 0 ? hot.reduce((s, v) => s + v, 0) / hotCount : 0
-        const coldAvg = coldCount > 0 ? cold.reduce((s, v) => s + v, 0) / coldCount : 0
+        const hotTotal = hot.reduce((s, v) => s + v, 0)
+        const coldTotal = cold.reduce((s, v) => s + v, 0)
+        const hotAvg = hotCount > 0 ? hotTotal / hotCount : 0
+        const coldAvg = coldCount > 0 ? coldTotal / coldCount : 0
         const hotMax = hotCount > 0 ? Math.max(...hot) : 0
         const coldMax = coldCount > 0 ? Math.max(...cold) : 0
 
         return NextResponse.json({
-            hot: { count: hotCount, avgSale: hotAvg, maxSale: hotMax },
-            cold: { count: coldCount, avgSale: coldAvg, maxSale: coldMax },
+            hot: { count: hotCount, avgSale: hotAvg, maxSale: hotMax, totalSale: hotTotal },
+            cold: { count: coldCount, avgSale: coldAvg, maxSale: coldMax, totalSale: coldTotal },
         })
     } catch (error: unknown) {
         console.error('[admin/finance/by-status] error:', error)

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-type StatusStats = { count: number; avgSale: number; maxSale: number }
+type StatusStats = { count: number; avgSale: number; maxSale: number; totalSale?: number }
 
 export default function AdminLeadsByStatus({ month }: { month?: string }) {
     const [loading, setLoading] = useState<boolean>(true)
@@ -61,6 +61,7 @@ export default function AdminLeadsByStatus({ month }: { month?: string }) {
                                 ) : stats && stats.count > 0 ? (
                                     <>
                                         <div><span className="font-medium">Vendidos:</span> {stats.count}</div>
+                                        <div><span className="font-medium">Valor total:</span> {formatBRL(stats.totalSale || 0)}</div>
                                         <div><span className="font-medium">Média venda:</span> {formatBRL(stats.avgSale)}</div>
                                         <div><span className="font-medium">Mais caro:</span> {formatBRL(stats.maxSale)}</div>
                                     </>

@@ -34,6 +34,7 @@ export async function GET(request: Request) {
         const soldLeads = await prisma.leads.findMany({
             where: { status: 'sold', ...(createdAtWhere ? { created_at: createdAtWhere } : {}) },
             select: {
+                contract_url: true,
                 auctions: {
                     where: { winning_bid_id: { not: null } },
                     select: {
@@ -46,11 +47,20 @@ export async function GET(request: Request) {
         })
 
         const salePrices: number[] = []
+        const salePricesHot: number[] = []
+        const salePricesCold: number[] = []
         for (const lead of soldLeads) {
+            const isHot = Boolean(lead.contract_url)
             for (const auction of lead.auctions) {
                 const winningBid = auction.bids_auctions_winning_bid_idTobids
                 if (winningBid) {
-                    salePrices.push(Number(winningBid.amount))
+                    const v = Number(winningBid.amount)
+                    salePrices.push(v)
+                    if (isHot) {
+                        salePricesHot.push(v)
+                    } else {
+                        salePricesCold.push(v)
+                    }
                 }
             }
         }
@@ -59,8 +69,17 @@ export async function GET(request: Request) {
         const total = count > 0 ? salePrices.reduce((s, v) => s + v, 0) : 0
         const avg = count > 0 ? total / count : 0
         const max = count > 0 ? Math.max(...salePrices) : 0
+        const totalHot = salePricesHot.reduce((s, v) => s + v, 0)
+        const totalCold = salePricesCold.reduce((s, v) => s + v, 0)
 
-        return NextResponse.json({ count, total, avg, max })
+        return NextResponse.json({
+            count,
+            total,
+            avg,
+            max,
+            totalHot,
+            totalCold,
+        })
     } catch (error: unknown) {
         console.error('[admin/finance/sold-summary] error:', error)
         return NextResponse.json({ error: 'Erro interno do servidor', details: String(error) }, { status: 500 })

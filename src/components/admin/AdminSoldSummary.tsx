@@ -1,7 +1,14 @@
 "use client";
 import { useEffect, useState } from 'react'
 
-type SummaryData = { count: number; total: number; avg: number; max: number }
+type SummaryData = {
+    count: number
+    total: number
+    avg: number
+    max: number
+    totalHot?: number
+    totalCold?: number
+}
 
 export default function AdminSoldSummary({ month }: { month?: string }) {
     const [loading, setLoading] = useState<boolean>(true)
@@ -50,6 +57,8 @@ export default function AdminSoldSummary({ month }: { month?: string }) {
                     <>
                         <li><span className="font-medium">Total vendidos:</span> {data.count}</li>
                         <li><span className="font-medium">Valor total:</span> {formatBRL(data.total)}</li>
+                        <li className="pl-3 text-muted-foreground"><span className="font-medium text-foreground">Total hot:</span> {formatBRL(data.totalHot || 0)}</li>
+                        <li className="pl-3 text-muted-foreground"><span className="font-medium text-foreground">Total cold:</span> {formatBRL(data.totalCold || 0)}</li>
                         <li><span className="font-medium">Média:</span> {formatBRL(data.avg)}</li>
                         <li><span className="font-medium">Mais caro:</span> {formatBRL(data.max)}</li>
                     </>
