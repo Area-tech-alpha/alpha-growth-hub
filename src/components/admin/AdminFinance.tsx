@@ -224,7 +224,7 @@ export default function AdminFinance() {
                 )}
             </div>
 
-            
+
 
             <div className="space-y-4">
                 <div className="flex items-center gap-2">
@@ -263,7 +263,7 @@ export default function AdminFinance() {
                 <AdminSoldSummary month={selectedMonth} />
             </div>
 
-            <AdminLeadsByType month={selectedMonth} />
+            {/* <AdminLeadsByType month={selectedMonth} /> */}
             <AdminLeadsByStatus month={selectedMonth} />
         </div>
     )
