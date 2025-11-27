@@ -346,7 +346,6 @@ export default function AdminOverview() {
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                 <div>
                     <h2 className="text-lg font-semibold">Visão geral</h2>
-                    <p className="text-sm text-muted-foreground">Aplique o mesmo filtro temporal para todos os indicadores da aba.</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                     <label className="text-sm text-muted-foreground">Período</label>

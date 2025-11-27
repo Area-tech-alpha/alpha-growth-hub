@@ -5,11 +5,16 @@ import { prisma } from '@/lib/prisma'
 
 type DateRange = { start: Date; end: Date }
 
-const getMonthRange = (year: number, monthIndex: number): DateRange => {
-    const start = new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0))
-    const end = new Date(Date.UTC(year, monthIndex + 1, 1, 0, 0, 0))
-    return { start, end }
-}
+const SAO_PAULO_OFFSET_HOURS = 3
+const SAO_PAULO_OFFSET_MS = SAO_PAULO_OFFSET_HOURS * 60 * 60 * 1000
+
+const buildBrazilMidnight = (year: number, monthIndex: number, day: number) =>
+    new Date(Date.UTC(year, monthIndex, day, SAO_PAULO_OFFSET_HOURS, 0, 0))
+
+const getMonthRange = (year: number, monthIndex: number): DateRange => ({
+    start: buildBrazilMidnight(year, monthIndex, 1),
+    end: buildBrazilMidnight(year, monthIndex + 1, 1),
+})
 
 const parseMonthRange = (value: string | null): DateRange | null => {
     if (!value) return null
@@ -18,16 +23,16 @@ const parseMonthRange = (value: string | null): DateRange | null => {
     return getMonthRange(yyyy, mm - 1)
 }
 
-const startOfUtcWeek = (date: Date): Date => {
-    const clone = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0))
-    const day = clone.getUTCDay()
+const startOfBrazilWeek = (date: Date): Date => {
+    const clone = buildBrazilMidnight(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
+    const day = clone.getUTCDay() // 0 dom ... 6 sab
     const diff = day === 0 ? 6 : day - 1
     clone.setUTCDate(clone.getUTCDate() - diff)
     return clone
 }
 
 const getWeekRange = (date: Date): DateRange => {
-    const start = startOfUtcWeek(date)
+    const start = startOfBrazilWeek(date)
     const end = new Date(start)
     end.setUTCDate(end.getUTCDate() + 7)
     return { start, end }
@@ -39,13 +44,13 @@ const parseWeekRange = (value: string | null): DateRange | null => {
     if (parts.length !== 3) return null
     const [yyyy, mm, dd] = parts
     if (!yyyy || !mm || !dd) return null
-    const base = new Date(Date.UTC(yyyy, mm - 1, dd, 0, 0, 0))
+    const base = buildBrazilMidnight(yyyy, mm - 1, dd)
     if (Number.isNaN(base.getTime())) return null
     return getWeekRange(base)
 }
 
 const getDayRange = (date: Date): DateRange => {
-    const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0))
+    const start = buildBrazilMidnight(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
     const end = new Date(start)
     end.setUTCDate(end.getUTCDate() + 1)
     return { start, end }
@@ -57,7 +62,7 @@ const parseDayRange = (value: string | null): DateRange | null => {
     if (parts.length !== 3) return null
     const [yyyy, mm, dd] = parts
     if (!yyyy || !mm || !dd || mm < 1 || mm > 12 || dd < 1 || dd > 31) return null
-    const base = new Date(Date.UTC(yyyy, mm - 1, dd, 0, 0, 0))
+    const base = buildBrazilMidnight(yyyy, mm - 1, dd)
     if (Number.isNaN(base.getTime())) return null
     return getDayRange(base)
 }
@@ -79,14 +84,15 @@ export async function GET(request: Request) {
         }
 
         const now = new Date()
+        const nowInBrazil = new Date(now.getTime() - SAO_PAULO_OFFSET_MS)
         const monthParam = url.searchParams.get('month')
         const rangeParam = url.searchParams.get('range')
         const weekParam = url.searchParams.get('weekStart')
         const dayParam = url.searchParams.get('day')
 
-        const currentMonthRange = getMonthRange(now.getUTCFullYear(), now.getUTCMonth())
-        const currentWeekRange = getWeekRange(now)
-        const currentDayRange = getDayRange(now)
+        const currentMonthRange = getMonthRange(nowInBrazil.getUTCFullYear(), nowInBrazil.getUTCMonth())
+        const currentWeekRange = getWeekRange(nowInBrazil)
+        const currentDayRange = getDayRange(nowInBrazil)
 
         const explicitMonth = Boolean(monthParam)
         const rangeModeInput = rangeParam === 'monthly' || rangeParam === 'weekly' || rangeParam === 'daily' ? rangeParam : 'all'
