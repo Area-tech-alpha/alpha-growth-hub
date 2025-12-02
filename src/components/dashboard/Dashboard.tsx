@@ -355,6 +355,7 @@ export default function Dashboard({
       );
 
     void channel.subscribe((status, err) => {
+      console.log(`[Realtime] dashboard-realtime status`, { status, err });
       if (status === "SUBSCRIBED") {
         console.log("[Dashboard] Channel subscribed");
       } else if (status === "CHANNEL_ERROR") {

@@ -253,6 +253,7 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
             );
 
         void channel.subscribe((status, err) => {
+            console.log(`[Realtime] ${channelName} status`, { status, err, userId });
             if (status === 'SUBSCRIBED') {
                 console.log('[Realtime] Leads channel subscribed', { userId });
             } else if (status === 'CHANNEL_ERROR') {
@@ -314,6 +315,7 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
             );
 
         void channel.subscribe((status, err) => {
+            console.log(`[Realtime] ${channelName} status`, { status, err, userId });
             if (status === 'SUBSCRIBED') {
                 console.log('[Realtime] Credits channel subscribed', { userId });
             } else if (status === 'CHANNEL_ERROR') {
@@ -399,6 +401,7 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
             );
 
         void channel.subscribe((status, err) => {
+            console.log(`[Realtime] ${channelName} status`, { status, err, userId });
             if (status === 'SUBSCRIBED') {
                 console.log('[Realtime] Credit holds channel subscribed', { userId });
             } else if (status === 'CHANNEL_ERROR') {
@@ -520,6 +523,7 @@ export const useRealtimeStore = create<RealtimeState>()((set, get) => ({
             );
 
         void channel.subscribe((status, err) => {
+            console.log(`[Realtime] ${channelName} status`, { status, err, userId });
             if (status === 'SUBSCRIBED') {
                 console.log('[Realtime] Purchases channel subscribed', { userId });
             } else if (status === 'CHANNEL_ERROR') {
