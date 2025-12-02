@@ -13,6 +13,7 @@ type BidErrorBody = {
 type BidSuccessBody = {
     bid: { id: string; auction_id: string; user_id: string; amount: number }
     availableCredits: number
+    nextExpiredAt?: string | null
 }
 
 type BidResult =
@@ -57,6 +58,7 @@ export async function POST(request: Request) {
         }
 
         const result = await prisma.$transaction<BidResult>(async (tx: Prisma.TransactionClient) => {
+            let nextExpiredAt: string | null = null
             const toNum = (v: unknown): number => {
                 if (v == null) return 0;
                 const anyV = v as { toNumber?: () => number };
@@ -222,19 +224,11 @@ export async function POST(request: Request) {
                     data: { minimum_bid: new Prisma.Decimal(nextMinimum) }
                 })
             }
-
             if (!buyNow) {
-                // Anti-sniping (sem alteração)
-                const nowMs = Date.now()
-                const expMs = new Date(auction.expired_at as unknown as string).getTime()
-                const remainingMs = expMs - nowMs
-                if (Number.isFinite(remainingMs) && remainingMs <= 60_000) {
-                    const extendToMs = remainingMs > 30_000 ? 60_000 : 30_000
-                    const newExpiry = new Date(nowMs + extendToMs) as unknown as Date
-                    await tx.auctions.update({
-                        where: { id: auctionId },
-                        data: { expired_at: newExpiry }
-                    })
+                // Anti-snipe now happens via DB trigger; fetch the updated expiry to return immediately
+                const refreshed = await tx.auctions.findUnique({ where: { id: auctionId }, select: { expired_at: true } })
+                if (refreshed?.expired_at) {
+                    nextExpiredAt = new Date(refreshed.expired_at as unknown as string).toISOString()
                 }
             }
 
@@ -246,7 +240,8 @@ export async function POST(request: Request) {
                 status: 201,
                 body: {
                     bid: { id: bid.id, auction_id: auctionId, user_id: userId, amount: toNum(bid.amount as unknown) },
-                    availableCredits
+                    availableCredits,
+                    nextExpiredAt
                 }
             }
         })
