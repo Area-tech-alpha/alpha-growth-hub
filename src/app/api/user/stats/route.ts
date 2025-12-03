@@ -10,14 +10,36 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
         }
 
+        const { searchParams } = new URL(request.url)
+        const month = searchParams.get('month') // YYYY-MM
+
+        let dateFilter: any = {}
+        if (month) {
+            const [year, monthStr] = month.split('-')
+            const startDate = new Date(parseInt(year), parseInt(monthStr) - 1, 1)
+            const endDate = new Date(parseInt(year), parseInt(monthStr), 0, 23, 59, 59, 999)
+            dateFilter = {
+                created_at: {
+                    gte: startDate,
+                    lte: endDate
+                }
+            }
+        }
+
         // Get all leads that have entered the system
         const totalLeads = await prisma.leads.count({
-            where: { status: { not: '' } }
+            where: {
+                status: { not: '' },
+                ...dateFilter
+            }
         })
 
         // Get all sold leads
         const soldLeads = await prisma.leads.count({
-            where: { status: 'sold' }
+            where: {
+                status: 'sold',
+                ...dateFilter
+            }
         })
 
         // Calculate conversion rate
@@ -28,7 +50,8 @@ export async function GET(request: Request) {
             by: ['owner_id'],
             where: {
                 owner_id: { not: null },
-                status: 'sold'
+                status: 'sold',
+                ...dateFilter
             },
             _count: { owner_id: true },
             orderBy: { _count: { owner_id: 'desc' } }
@@ -54,10 +77,18 @@ export async function GET(request: Request) {
 
         // Get top investors by total investment amount (winning bid amounts)
         // Get all auctions with winning bids
+        // Note: For auctions, we filter by auction creation date or winning bid date?
+        // Usually stats are based on when the event happened.
+        // If we filter by auction creation date:
+        const auctionDateFilter = month ? {
+            created_at: dateFilter.created_at
+        } : {}
+
         const wonAuctions = await prisma.auctions.findMany({
             where: {
                 winning_bid_id: { not: null },
-                status: 'closed_won'
+                status: 'closed_won',
+                ...auctionDateFilter
             },
             include: {
                 bids_auctions_winning_bid_idTobids: {
