@@ -3,6 +3,13 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../../auth'
 import { prisma } from '@/lib/prisma'
 
+type DateRangeFilter = {
+    created_at?: {
+        gte?: Date
+        lte?: Date
+    }
+}
+
 export async function GET(request: Request) {
     try {
         const session = await getServerSession(authOptions)
@@ -13,7 +20,7 @@ export async function GET(request: Request) {
         const { searchParams } = new URL(request.url)
         const month = searchParams.get('month') // YYYY-MM
 
-        let dateFilter: any = {}
+        let dateFilter: DateRangeFilter = {}
         if (month) {
             const [year, monthStr] = month.split('-')
             const startDate = new Date(parseInt(year), parseInt(monthStr) - 1, 1)

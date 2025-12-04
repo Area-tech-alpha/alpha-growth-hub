@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import PurchaseRanking from "./PurchaseRanking";
 import InvestmentRanking from "./InvestmentRanking";
 import ConversionRate from "./ConversionRate";
@@ -53,7 +53,7 @@ export default function StatsPanel() {
         fetchMonths();
     }, []);
 
-    const fetchStats = async () => {
+    const fetchStats = useCallback(async () => {
         try {
             setLoading(true);
             setError(null);
@@ -72,11 +72,11 @@ export default function StatsPanel() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [selectedMonth]);
 
     useEffect(() => {
         fetchStats();
-    }, [selectedMonth]);
+    }, [fetchStats]);
 
     const formatMonthLabel = (yyyyMm: string) => {
         const [yyyy, mm] = yyyyMm.split("-");
