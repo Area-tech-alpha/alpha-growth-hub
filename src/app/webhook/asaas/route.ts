@@ -59,41 +59,47 @@ export async function POST(request: Request) {
         }
 
         // === NOVO: atualiza a cobrança no Asaas com a descrição/origem ===
-        try {
-            const credits = Math.floor(Number(payment.value ?? 0));
-            const desc =
-                `Pagamento originado no Growth Hub — compra de ${credits.toLocaleString('pt-BR')} créditos ` +
-                `(checkout ${internalCheckoutId} • uid ${userId})`;
+        const asaasStatus = String(payment?.status ?? '').toUpperCase();
+        const canEditAsaasPayment = ['PENDING', 'OVERDUE'].includes(asaasStatus); // Asaas só permite editar nesses status
+        if (canEditAsaasPayment) {
+            try {
+                const credits = Math.floor(Number(payment.value ?? 0));
+                const desc =
+                    `Pagamento originado no Growth Hub — compra de ${credits.toLocaleString('pt-BR')} créditos ` +
+                    `(checkout ${internalCheckoutId} • uid ${userId})`;
 
-            const payloadUpdate: {
-                description: string;
-                externalReference?: string;
-            } = {
-                description: desc,
-            };
+                const payloadUpdate: {
+                    description: string;
+                    externalReference?: string;
+                } = {
+                    description: desc,
+                };
 
-            // opcional: garantir externalReference também na cobrança
-            // se você quer propagar seu id interno aqui
-            payloadUpdate.externalReference = `ck:${internalCheckoutId}|uid:${userId}`;
+                // opcional: garantir externalReference também na cobrança
+                // se você quer propagar seu id interno aqui
+                payloadUpdate.externalReference = `ck:${internalCheckoutId}|uid:${userId}`;
 
-            const resUpdate = await fetch(`${process.env.ASAAS_API_URL}/payments/${asaasPaymentId}`, {
-                method: 'PUT',
-                headers: {
-                    'accept': 'application/json',
-                    'content-type': 'application/json',
-                    'access_token': process.env.ASAAS_API_KEY as string,
-                },
-                body: JSON.stringify(payloadUpdate),
-            });
+                const resUpdate = await fetch(`${process.env.ASAAS_API_URL}/payments/${asaasPaymentId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'accept': 'application/json',
+                        'content-type': 'application/json',
+                        'access_token': process.env.ASAAS_API_KEY as string,
+                    },
+                    body: JSON.stringify(payloadUpdate),
+                });
 
-            if (!resUpdate.ok) {
-                const errJson = await safeJson(resUpdate);
-                console.warn('[Webhook Asaas] Falha ao atualizar descrição do payment:', resUpdate.status, errJson);
-                // segue o fluxo mesmo assim — não bloqueia crédito
+                if (!resUpdate.ok) {
+                    const errJson = await safeJson(resUpdate);
+                    console.warn('[Webhook Asaas] Falha ao atualizar descrição do payment:', resUpdate.status, errJson);
+                    // segue o fluxo mesmo assim — não bloqueia crédito
+                }
+            } catch (e) {
+                console.warn('[Webhook Asaas] Exceção ao atualizar cobrança (description/externalReference):', e);
+                // segue o fluxo mesmo assim
             }
-        } catch (e) {
-            console.warn('[Webhook Asaas] Exceção ao atualizar cobrança (description/externalReference):', e);
-            // segue o fluxo mesmo assim
+        } else {
+            console.log(`[Webhook Asaas] Pulando atualização da cobrança (status ${asaasStatus}) para evitar 400 do Asaas.`);
         }
         // === FIM NOVO ===
 
