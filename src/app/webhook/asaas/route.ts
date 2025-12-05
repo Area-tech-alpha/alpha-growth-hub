@@ -45,6 +45,7 @@ export async function POST(request: Request) {
         const eventKey = `checkout_status:${internalCheckoutId}`;
 
         const isPaidEvent = event === 'PAYMENT_RECEIVED' || event === 'PAYMENT_CONFIRMED';
+
         if (!isPaidEvent) {
             try {
                 await prisma.processed_webhooks.upsert({
@@ -53,51 +54,42 @@ export async function POST(request: Request) {
                     create: { event_key: eventKey, status: 'failed' },
                 });
             } catch (e) {
-                console.error('[Webhook Asaas] Falha ao registrar status failed em processed_webhooks:', e);
+                console.error('[Webhook Asaas] Falha ao registrar status failed:', e);
             }
             return NextResponse.json({ status: 'ignored', event }, { status: 200 });
         }
 
-        // === NOVO: atualiza a cobrança no Asaas com a descrição/origem ===
-        try {
-            const credits = Math.floor(Number(payment.value ?? 0));
-            const desc =
-                `Pagamento originado no Growth Hub — compra de ${credits.toLocaleString('pt-BR')} créditos ` +
-                `(checkout ${internalCheckoutId} • uid ${userId})`;
+        // === CORREÇÃO 1: Só atualiza descrição se PENDING ===
+        const statusUpper = String(payment.status || '').toUpperCase();
+        if (statusUpper === 'PENDING' || statusUpper === 'OVERDUE') {
+            try {
+                const credits = Math.floor(Number(payment.value ?? 0));
+                const desc = `Pagamento originado no Growth Hub — compra de ${credits.toLocaleString('pt-BR')} créditos (checkout ${internalCheckoutId})`;
 
-            const payloadUpdate: {
-                description: string;
-                externalReference?: string;
-            } = {
-                description: desc,
-            };
+                const payloadUpdate = {
+                    description: desc,
+                    externalReference: `ck:${internalCheckoutId}|uid:${userId}`
+                };
 
-            // opcional: garantir externalReference também na cobrança
-            // se você quer propagar seu id interno aqui
-            payloadUpdate.externalReference = `ck:${internalCheckoutId}|uid:${userId}`;
+                // Fetch sem await (fire and forget)
+                fetch(`${process.env.ASAAS_API_URL}/payments/${asaasPaymentId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'accept': 'application/json',
+                        'content-type': 'application/json',
+                        'access_token': process.env.ASAAS_API_KEY as string,
+                    },
+                    body: JSON.stringify(payloadUpdate),
+                }).then((res) => {
+                    if (!res.ok) console.warn('[Webhook Asaas] Aviso: Não foi possível atualizar descrição (Status ' + res.status + ')');
+                }).catch(err => console.warn('[Webhook Asaas] Erro de rede ao atualizar descrição:', err));
 
-            const resUpdate = await fetch(`${process.env.ASAAS_API_URL}/payments/${asaasPaymentId}`, {
-                method: 'PUT',
-                headers: {
-                    'accept': 'application/json',
-                    'content-type': 'application/json',
-                    'access_token': process.env.ASAAS_API_KEY as string,
-                },
-                body: JSON.stringify(payloadUpdate),
-            });
-
-            if (!resUpdate.ok) {
-                const errJson = await safeJson(resUpdate);
-                console.warn('[Webhook Asaas] Falha ao atualizar descrição do payment:', resUpdate.status, errJson);
-                // segue o fluxo mesmo assim — não bloqueia crédito
+            } catch (e) {
+                console.warn('[Webhook Asaas] Erro ao montar payload de atualização:', e);
             }
-        } catch (e) {
-            console.warn('[Webhook Asaas] Exceção ao atualizar cobrança (description/externalReference):', e);
-            // segue o fluxo mesmo assim
         }
-        // === FIM NOVO ===
 
-        // idempotência: se já processou, só marca processed e sai
+        // idempotência
         const alreadyProcessed = await prisma.credit_transactions.findUnique({
             where: { asaas_payment_id: asaasPaymentId }
         });
@@ -109,9 +101,7 @@ export async function POST(request: Request) {
                     update: { status: 'processed' },
                     create: { event_key: eventKey, status: 'processed' },
                 });
-            } catch (e) {
-                console.error('[Webhook Asaas] Falha ao registrar status processed (idempotente) em processed_webhooks:', e);
-            }
+            } catch { }
             return NextResponse.json({ status: 'already_processed' }, { status: 200 });
         }
 
@@ -132,10 +122,22 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Falha ao enfileirar job' }, { status: 500 });
         }
 
+        // === CORREÇÃO 2: Executa Worker e LÊ O RESULTADO ===
+        let workerResult: { status?: string; msg_id?: string; error?: string } | null = null;
         try {
-            await prisma.$queryRaw`SELECT public.process_credit_jobs_worker()`;
+            // Invoca o worker e captura o retorno para debug
+            const resultRaw = await prisma.$queryRaw<{ result: { status?: string; msg_id?: string; error?: string } }[]>`SELECT public.process_credit_jobs_worker() as result`;
+            workerResult = resultRaw[0]?.result;
+
+            if (workerResult?.status === 'failed') {
+                console.error('🔴 [Webhook Asaas CRÍTICO] O Worker falhou ao processar o job:', JSON.stringify(workerResult));
+            } else if (workerResult?.status === 'success') {
+                console.log('🟢 [Webhook Asaas] Worker processou crédito com sucesso:', workerResult);
+            } else {
+                console.log('🟡 [Webhook Asaas] Job enfileirado. Worker rodou mas não pegou este job:', workerResult);
+            }
         } catch (e) {
-            console.error('[Webhook Asaas] Erro ao executar worker imediato. O job ainda está na fila.', e);
+            console.error('[Webhook Asaas] Erro ao invocar a função do worker:', e);
         }
 
         try {
@@ -145,18 +147,18 @@ export async function POST(request: Request) {
                 create: { event_key: eventKey, status: 'processed' },
             });
         } catch (e) {
-            console.error('[Webhook Asaas] Falha ao registrar status processed em processed_webhooks:', e);
+            console.error('[Webhook Asaas] Falha ao registrar status processed:', e);
         }
 
-        return NextResponse.json({ status: 'success', queued: true, msgId: String(msgId) }, { status: 200 });
+        return NextResponse.json({
+            status: 'success',
+            queued: true,
+            msgId: String(msgId),
+            workerDebug: workerResult
+        }, { status: 200 });
 
     } catch (error) {
         console.error('[Webhook Asaas] Erro inesperado no processamento do webhook:', error);
         return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
     }
-}
-
-// util para não quebrar o fluxo se o JSON vier inválido
-async function safeJson(r: Response) {
-    try { return await r.json(); } catch { return { raw: await r.text() }; }
 }
