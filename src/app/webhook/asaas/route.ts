@@ -21,22 +21,48 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Payload com estrutura mínima inválida' }, { status: 400 });
         }
 
-        // ignore pagamentos que não vieram do seu checkout
-        if (!payment.checkoutSession) {
-            console.log(`[Webhook Asaas] Ignorando pagamento de outra origem. Evento: ${event}, Payment ID: ${payment.id}`);
+        const asaasPaymentId: string = payment.id;
+        const parsedExternal = typeof payment.externalReference === 'string'
+            ? parseExternalReference(payment.externalReference)
+            : null;
+        const checkoutSessionId: string | null = payment.checkoutSession ?? null;
+        if (!checkoutSessionId) {
+            console.log(`[Webhook Asaas] checkoutSession ausente; tentando fallback via externalReference. Evento: ${event}, Payment ID: ${asaasPaymentId}`);
+        }
+
+        if (!checkoutSessionId && !parsedExternal?.checkoutId) {
+            console.log(`[Webhook Asaas] Ignorando pagamento de outra origem. Evento: ${event}, Payment ID: ${asaasPaymentId}`);
             return NextResponse.json({ status: 'ignored', reason: 'Pagamento de outra origem' }, { status: 200 });
         }
 
-        const asaasPaymentId: string = payment.id;
-        const checkoutSessionId: string = payment.checkoutSession;
+        let sessionMapping = checkoutSessionId
+            ? await prisma.checkout_sessions.findFirst({
+                where: { asaas_checkout_id: checkoutSessionId },
+                select: { user_id: true, internal_checkout_id: true },
+            })
+            : null;
 
-        const sessionMapping = await prisma.checkout_sessions.findFirst({
-            where: { asaas_checkout_id: checkoutSessionId },
-            select: { user_id: true, internal_checkout_id: true },
-        });
+        // Fallback: alguns webhooks do Asaas nÇœo trazem checkoutSession. Tentamos usar externalReference.
+        if (!sessionMapping?.user_id && parsedExternal?.checkoutId) {
+            sessionMapping = await prisma.checkout_sessions.findFirst({
+                where: { internal_checkout_id: parsedExternal.checkoutId },
+                select: { user_id: true, internal_checkout_id: true },
+            });
+        }
+
+        // Se veio externalReference com uid mas ainda nÇœo achou, logamos o UID para investigaÇõÇœo.
+        if (!sessionMapping?.user_id && parsedExternal?.userId) {
+            const fallbackByUid = await prisma.checkout_sessions.findFirst({
+                where: { user_id: parsedExternal.userId },
+                select: { user_id: true, internal_checkout_id: true },
+            });
+            if (fallbackByUid) {
+                sessionMapping = fallbackByUid;
+            }
+        }
 
         if (!sessionMapping?.user_id) {
-            console.error(`[Webhook Asaas CRÍTICO] Não foi possível encontrar o usuário para o checkoutSessionId: ${checkoutSessionId}. Pagamento: ${asaasPaymentId}`);
+            console.error(`[Webhook Asaas CRÍTICO] Não foi possível encontrar o usuário (checkoutSessionId=${checkoutSessionId}, externalReference=${payment.externalReference}). Pagamento: ${asaasPaymentId}`);
             return NextResponse.json({ status: 'error', message: 'Usuário correspondente não encontrado, webhook ignorado.' }, { status: 200 });
         }
 
@@ -165,4 +191,16 @@ export async function POST(request: Request) {
 // util para não quebrar o fluxo se o JSON vier inválido
 async function safeJson(r: Response) {
     try { return await r.json(); } catch { return { raw: await r.text() }; }
+}
+
+function parseExternalReference(ref: string): { checkoutId?: string; userId?: string } | null {
+    // Formato definido na criação: "ck:{internalCheckoutId}|uid:{userId}"
+    if (!ref.includes('ck:') && !ref.includes('uid:')) return null;
+    const parts = ref.split('|').map(p => p.trim());
+    const out: { checkoutId?: string; userId?: string } = {};
+    for (const part of parts) {
+        if (part.startsWith('ck:')) out.checkoutId = part.slice(3);
+        if (part.startsWith('uid:')) out.userId = part.slice(4);
+    }
+    return out;
 }
