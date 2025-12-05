@@ -21,48 +21,22 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Payload com estrutura mínima inválida' }, { status: 400 });
         }
 
-        const asaasPaymentId: string = payment.id;
-        const parsedExternal = typeof payment.externalReference === 'string'
-            ? parseExternalReference(payment.externalReference)
-            : null;
-        const checkoutSessionId: string | null = payment.checkoutSession ?? null;
-        if (!checkoutSessionId) {
-            console.log(`[Webhook Asaas] checkoutSession ausente; tentando fallback via externalReference. Evento: ${event}, Payment ID: ${asaasPaymentId}`);
-        }
-
-        if (!checkoutSessionId && !parsedExternal?.checkoutId) {
-            console.log(`[Webhook Asaas] Ignorando pagamento de outra origem. Evento: ${event}, Payment ID: ${asaasPaymentId}`);
+        // ignore pagamentos que não vieram do seu checkout
+        if (!payment.checkoutSession) {
+            console.log(`[Webhook Asaas] Ignorando pagamento de outra origem. Evento: ${event}, Payment ID: ${payment.id}`);
             return NextResponse.json({ status: 'ignored', reason: 'Pagamento de outra origem' }, { status: 200 });
         }
 
-        let sessionMapping = checkoutSessionId
-            ? await prisma.checkout_sessions.findFirst({
-                where: { asaas_checkout_id: checkoutSessionId },
-                select: { user_id: true, internal_checkout_id: true },
-            })
-            : null;
+        const asaasPaymentId: string = payment.id;
+        const checkoutSessionId: string = payment.checkoutSession;
 
-        // Fallback: alguns webhooks do Asaas nÇœo trazem checkoutSession. Tentamos usar externalReference.
-        if (!sessionMapping?.user_id && parsedExternal?.checkoutId) {
-            sessionMapping = await prisma.checkout_sessions.findFirst({
-                where: { internal_checkout_id: parsedExternal.checkoutId },
-                select: { user_id: true, internal_checkout_id: true },
-            });
-        }
-
-        // Se veio externalReference com uid mas ainda nÇœo achou, logamos o UID para investigaÇõÇœo.
-        if (!sessionMapping?.user_id && parsedExternal?.userId) {
-            const fallbackByUid = await prisma.checkout_sessions.findFirst({
-                where: { user_id: parsedExternal.userId },
-                select: { user_id: true, internal_checkout_id: true },
-            });
-            if (fallbackByUid) {
-                sessionMapping = fallbackByUid;
-            }
-        }
+        const sessionMapping = await prisma.checkout_sessions.findFirst({
+            where: { asaas_checkout_id: checkoutSessionId },
+            select: { user_id: true, internal_checkout_id: true },
+        });
 
         if (!sessionMapping?.user_id) {
-            console.error(`[Webhook Asaas CRÍTICO] Não foi possível encontrar o usuário (checkoutSessionId=${checkoutSessionId}, externalReference=${payment.externalReference}). Pagamento: ${asaasPaymentId}`);
+            console.error(`[Webhook Asaas CRÍTICO] Não foi possível encontrar o usuário para o checkoutSessionId: ${checkoutSessionId}. Pagamento: ${asaasPaymentId}`);
             return NextResponse.json({ status: 'error', message: 'Usuário correspondente não encontrado, webhook ignorado.' }, { status: 200 });
         }
 
@@ -85,47 +59,41 @@ export async function POST(request: Request) {
         }
 
         // === NOVO: atualiza a cobrança no Asaas com a descrição/origem ===
-        const asaasStatus = String(payment?.status ?? '').toUpperCase();
-        const canEditAsaasPayment = ['PENDING', 'OVERDUE'].includes(asaasStatus); // Asaas só permite editar nesses status
-        if (canEditAsaasPayment) {
-            try {
-                const credits = Math.floor(Number(payment.value ?? 0));
-                const desc =
-                    `Pagamento originado no Growth Hub — compra de ${credits.toLocaleString('pt-BR')} créditos ` +
-                    `(checkout ${internalCheckoutId} • uid ${userId})`;
+        try {
+            const credits = Math.floor(Number(payment.value ?? 0));
+            const desc =
+                `Pagamento originado no Growth Hub — compra de ${credits.toLocaleString('pt-BR')} créditos ` +
+                `(checkout ${internalCheckoutId} • uid ${userId})`;
 
-                const payloadUpdate: {
-                    description: string;
-                    externalReference?: string;
-                } = {
-                    description: desc,
-                };
+            const payloadUpdate: {
+                description: string;
+                externalReference?: string;
+            } = {
+                description: desc,
+            };
 
-                // opcional: garantir externalReference também na cobrança
-                // se você quer propagar seu id interno aqui
-                payloadUpdate.externalReference = `ck:${internalCheckoutId}|uid:${userId}`;
+            // opcional: garantir externalReference também na cobrança
+            // se você quer propagar seu id interno aqui
+            payloadUpdate.externalReference = `ck:${internalCheckoutId}|uid:${userId}`;
 
-                const resUpdate = await fetch(`${process.env.ASAAS_API_URL}/payments/${asaasPaymentId}`, {
-                    method: 'PUT',
-                    headers: {
-                        'accept': 'application/json',
-                        'content-type': 'application/json',
-                        'access_token': process.env.ASAAS_API_KEY as string,
-                    },
-                    body: JSON.stringify(payloadUpdate),
-                });
+            const resUpdate = await fetch(`${process.env.ASAAS_API_URL}/payments/${asaasPaymentId}`, {
+                method: 'PUT',
+                headers: {
+                    'accept': 'application/json',
+                    'content-type': 'application/json',
+                    'access_token': process.env.ASAAS_API_KEY as string,
+                },
+                body: JSON.stringify(payloadUpdate),
+            });
 
-                if (!resUpdate.ok) {
-                    const errJson = await safeJson(resUpdate);
-                    console.warn('[Webhook Asaas] Falha ao atualizar descrição do payment:', resUpdate.status, errJson);
-                    // segue o fluxo mesmo assim — não bloqueia crédito
-                }
-            } catch (e) {
-                console.warn('[Webhook Asaas] Exceção ao atualizar cobrança (description/externalReference):', e);
-                // segue o fluxo mesmo assim
+            if (!resUpdate.ok) {
+                const errJson = await safeJson(resUpdate);
+                console.warn('[Webhook Asaas] Falha ao atualizar descrição do payment:', resUpdate.status, errJson);
+                // segue o fluxo mesmo assim — não bloqueia crédito
             }
-        } else {
-            console.log(`[Webhook Asaas] Pulando atualização da cobrança (status ${asaasStatus}) para evitar 400 do Asaas.`);
+        } catch (e) {
+            console.warn('[Webhook Asaas] Exceção ao atualizar cobrança (description/externalReference):', e);
+            // segue o fluxo mesmo assim
         }
         // === FIM NOVO ===
 
@@ -191,16 +159,4 @@ export async function POST(request: Request) {
 // util para não quebrar o fluxo se o JSON vier inválido
 async function safeJson(r: Response) {
     try { return await r.json(); } catch { return { raw: await r.text() }; }
-}
-
-function parseExternalReference(ref: string): { checkoutId?: string; userId?: string } | null {
-    // Formato definido na criação: "ck:{internalCheckoutId}|uid:{userId}"
-    if (!ref.includes('ck:') && !ref.includes('uid:')) return null;
-    const parts = ref.split('|').map(p => p.trim());
-    const out: { checkoutId?: string; userId?: string } = {};
-    for (const part of parts) {
-        if (part.startsWith('ck:')) out.checkoutId = part.slice(3);
-        if (part.startsWith('uid:')) out.userId = part.slice(4);
-    }
-    return out;
 }
