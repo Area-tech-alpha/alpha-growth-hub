@@ -105,6 +105,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ status: 'already_processed' }, { status: 200 });
         }
 
+        // ... (Logo após definir o jobPayload) ...
+
         const jobPayload = {
             event,
             payment,
@@ -113,50 +115,42 @@ export async function POST(request: Request) {
             enqueuedAt: new Date().toISOString(),
         };
 
-        let msgId: bigint | number;
-        try {
-            const result = await prisma.$queryRaw<{ msg_id: bigint }[]>`SELECT pgmq.send('credit_jobs_v2', ${JSON.stringify(jobPayload)}::jsonb) AS msg_id`;
-            msgId = result[0].msg_id;
-        } catch (e) {
-            console.error('[Webhook Asaas] Falha ao enfileirar job no PGMQ:', e);
-            return NextResponse.json({ error: 'Falha ao enfileirar job' }, { status: 500 });
-        }
+        let atomicResult: { enqueued_msg_id?: string; worker_result?: { status?: string; msg_id?: string; error?: string } } | null = null;
 
-        // === CORREÇÃO 2: Executa Worker e LÊ O RESULTADO ===
-        let workerResult: { status?: string; msg_id?: string; error?: string } | null = null;
         try {
-            // Invoca o worker e captura o retorno para debug
-            const resultRaw = await prisma.$queryRaw<{ result: { status?: string; msg_id?: string; error?: string } }[]>`SELECT public.process_credit_jobs_worker() as result`;
-            workerResult = resultRaw[0]?.result;
+            // CHAMADA ÚNICA: Envia e Processa junto
+            const resultRaw = await prisma.$queryRaw<{ result: { enqueued_msg_id?: string; worker_result?: { status?: string; msg_id?: string; error?: string } } }[]>`
+                SELECT public.enqueue_and_process_credit(${JSON.stringify(jobPayload)}::jsonb) as result
+            `;
 
-            if (workerResult?.status === 'failed') {
-                console.error('🔴 [Webhook Asaas CRÍTICO] O Worker falhou ao processar o job:', JSON.stringify(workerResult));
-            } else if (workerResult?.status === 'success') {
-                console.log('🟢 [Webhook Asaas] Worker processou crédito com sucesso:', workerResult);
+            // O retorno será: { enqueued_msg_id: 123, worker_result: { status: 'success', ... } }
+            atomicResult = resultRaw[0]?.result;
+
+            if (atomicResult?.worker_result?.status === 'success') {
+                console.log('🟢 [Webhook Asaas] Crédito processado com sucesso (Atômico):', atomicResult);
             } else {
-                console.log('🟡 [Webhook Asaas] Job enfileirado. Worker rodou mas não pegou este job:', workerResult);
+                console.error('🔴 [Webhook Asaas] Erro no processamento atômico:', atomicResult);
             }
+
         } catch (e) {
-            console.error('[Webhook Asaas] Erro ao invocar a função do worker:', e);
+            console.error('[Webhook Asaas] Falha fatal na chamada atômica:', e);
+            return NextResponse.json({ error: 'Falha no processamento' }, { status: 500 });
         }
 
+        // Marca como processado
         try {
             await prisma.processed_webhooks.upsert({
                 where: { event_key: eventKey },
                 update: { status: 'processed' },
                 create: { event_key: eventKey, status: 'processed' },
             });
-        } catch (e) {
-            console.error('[Webhook Asaas] Falha ao registrar status processed:', e);
-        }
+        } catch { }
 
         return NextResponse.json({
             status: 'success',
             queued: true,
-            msgId: String(msgId),
-            workerDebug: workerResult
+            debug: atomicResult
         }, { status: 200 });
-
     } catch (error) {
         console.error('[Webhook Asaas] Erro inesperado no processamento do webhook:', error);
         return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
