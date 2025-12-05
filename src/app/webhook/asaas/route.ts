@@ -115,7 +115,7 @@ export async function POST(request: Request) {
 
         let msgId: bigint | number;
         try {
-            const result = await prisma.$queryRaw<{ msg_id: bigint }[]>`SELECT pgmq.send('credit_jobs', ${JSON.stringify(jobPayload)}::jsonb) AS msg_id`;
+            const result = await prisma.$queryRaw<{ msg_id: bigint }[]>`SELECT pgmq.send('credit_jobs_v2', ${JSON.stringify(jobPayload)}::jsonb) AS msg_id`;
             msgId = result[0].msg_id;
         } catch (e) {
             console.error('[Webhook Asaas] Falha ao enfileirar job no PGMQ:', e);
