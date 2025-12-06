@@ -6,13 +6,33 @@ import { prisma } from '@/lib/prisma'
 type MonthRange = { start: Date; end: Date; label: string }
 
 const CASHBACK_TARGET = 10_000
+const BRASILIA_UTC_OFFSET_MS = 3 * 60 * 60 * 1000 // UTC-3
+const BLACK_NOVEMBER_YEAR = 2025
+const BLACK_NOVEMBER_MONTH = 11
+const BLACK_NOVEMBER_END_DAY = 5
+
+const makeUtcFromBrasilia = (
+  year: number,
+  month: number,
+  day: number,
+  hour = 0,
+  minute = 0,
+  second = 0,
+  ms = 0,
+) => {
+  const utcBase = Date.UTC(year, month - 1, day, hour, minute, second, ms)
+  return new Date(utcBase + BRASILIA_UTC_OFFSET_MS)
+}
 
 const parseMonth = (value: string | null): MonthRange | null => {
   if (!value) return null
   const [yyyy, mm] = value.split('-').map(Number)
   if (!yyyy || !mm || mm < 1 || mm > 12) return null
-  const start = new Date(Date.UTC(yyyy, mm - 1, 1, 0, 0, 0))
-  const end = new Date(Date.UTC(yyyy, mm, 1, 0, 0, 0))
+  const isBlackNovember = yyyy === BLACK_NOVEMBER_YEAR && mm === BLACK_NOVEMBER_MONTH
+  const start = makeUtcFromBrasilia(yyyy, mm, 1)
+  const end = isBlackNovember
+    ? makeUtcFromBrasilia(yyyy, mm + 1, BLACK_NOVEMBER_END_DAY + 1)
+    : makeUtcFromBrasilia(yyyy, mm + 1, 1)
   return {
     start,
     end,
@@ -21,11 +41,13 @@ const parseMonth = (value: string | null): MonthRange | null => {
 }
 
 const buildDefaultRange = (): MonthRange => {
-  const now = new Date()
-  const year = now.getUTCFullYear()
-  const start = new Date(Date.UTC(year, 10, 1, 0, 0, 0)) // November (0-indexed)
-  const end = new Date(Date.UTC(year, 11, 1, 0, 0, 0))
-  return { start, end, label: `11/${String(year).slice(-2)}` }
+  const start = makeUtcFromBrasilia(BLACK_NOVEMBER_YEAR, BLACK_NOVEMBER_MONTH, 1)
+  const end = makeUtcFromBrasilia(BLACK_NOVEMBER_YEAR, BLACK_NOVEMBER_MONTH + 1, BLACK_NOVEMBER_END_DAY + 1)
+  return {
+    start,
+    end,
+    label: `${String(BLACK_NOVEMBER_MONTH).padStart(2, '0')}/${String(BLACK_NOVEMBER_YEAR).slice(-2)}`,
+  }
 }
 
 export async function GET(request: Request) {
