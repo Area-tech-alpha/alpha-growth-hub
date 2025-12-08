@@ -15,7 +15,7 @@ export default function AdminDashboardTabs() {
         <TabsTrigger value="overview">Visão geral</TabsTrigger>
         <TabsTrigger value="finance">Financeiro</TabsTrigger>
         <TabsTrigger value="credits">Créditos</TabsTrigger>
-        <TabsTrigger value="black-november">Black November</TabsTrigger>
+        {/* <TabsTrigger value="black-november">Black November</TabsTrigger> */}
       </TabsList>
       <TabsContent value="overview" className="mt-4">
         <AdminOverview />
