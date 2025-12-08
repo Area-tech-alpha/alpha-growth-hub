@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 const AdminOverview = dynamic(() => import("@/components/admin/AdminOverview"), { ssr: false });
 const AdminFinance = dynamic(() => import("@/components/admin/AdminFinance"), { ssr: false });
 const AdminCredits = dynamic(() => import("@/components/admin/AdminCredits"), { ssr: false });
-const AdminBlackNovember = dynamic(() => import("@/components/admin/AdminBlackNovember"), { ssr: false });
+// const AdminBlackNovember = dynamic(() => import("@/components/admin/AdminBlackNovember"), { ssr: false });
 
 export default function AdminDashboardTabs() {
   return (
@@ -26,9 +26,9 @@ export default function AdminDashboardTabs() {
       <TabsContent value="credits" className="mt-4">
         <AdminCredits />
       </TabsContent>
-      <TabsContent value="black-november" className="mt-4">
+      {/* <TabsContent value="black-november" className="mt-4">
         <AdminBlackNovember />
-      </TabsContent>
+      </TabsContent> */}
     </Tabs>
   );
 }
