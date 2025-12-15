@@ -83,8 +83,18 @@ export default function AdminLeadsByStatus({ month }: { month?: string }) {
 
     const statuses = useMemo(
         () => [
-            { key: 'hot' as StatusKey, label: 'Hot (com contrato)', tone: 'bg-red-50 border-red-200', badge: 'bg-red-100 text-red-700' },
-            { key: 'cold' as StatusKey, label: 'Cold (sem contrato)', tone: 'bg-slate-50 border-slate-200', badge: 'bg-slate-100 text-slate-700' },
+            {
+                key: 'hot' as StatusKey,
+                label: 'Hot (com contrato)',
+                tone: 'bg-red-50 border-red-200 dark:bg-red-950/40 dark:border-red-800',
+                badge: 'bg-red-100 text-red-700 dark:bg-red-900/60 dark:text-red-200',
+            },
+            {
+                key: 'cold' as StatusKey,
+                label: 'Cold (sem contrato)',
+                tone: 'bg-slate-50 border-slate-200 dark:bg-slate-900 dark:border-slate-700',
+                badge: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
+            },
         ],
         [],
     )
@@ -183,7 +193,7 @@ export default function AdminLeadsByStatus({ month }: { month?: string }) {
                                                                                     href={contractLink}
                                                                                     target="_blank"
                                                                                     rel="noreferrer"
-                                                                                    className="text-blue-600 hover:underline"
+                                                                                    className="text-blue-600 hover:underline dark:text-blue-300"
                                                                                 >
                                                                                     Abrir
                                                                                 </a>
