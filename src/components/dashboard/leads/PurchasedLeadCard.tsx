@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Phone,
   Mail,
@@ -10,7 +10,8 @@ import {
   Clock,
   Download,
   User,
-  MapPin,
+  Instagram,
+  // MapPin,
 } from "lucide-react";
 import {
   Card,
@@ -56,6 +57,12 @@ export const PurchasedLeadCard = ({
       minute: "2-digit",
     }).format(date);
   };
+
+  const rawInstagram = (lead as unknown as { instagram?: string })?.instagram;
+  const instagramHandle = rawInstagram?.trim().replace(/^@+/, "");
+  const instagramUrl = instagramHandle
+    ? `https://instagram.com/${instagramHandle}`
+    : undefined;
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -107,7 +114,7 @@ export const PurchasedLeadCard = ({
   }: {
     icon: React.ElementType;
     label: string;
-    value: string | number;
+    value: ReactNode;
     valueClassName?: string;
   }) => (
     <div className="flex items-center gap-3 p-2 bg-background/50 rounded-md border border-border">
@@ -132,6 +139,7 @@ export const PurchasedLeadCard = ({
               <Building className="h-5 w-5" />
               {lead.company_name || "Nome da Empresa"}
             </CardTitle>
+            {/*
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
               <MapPin className="h-3.5 w-3.5" />
               <span>
@@ -140,6 +148,7 @@ export const PurchasedLeadCard = ({
                   : (lead.city || lead.state || "N/A")}
               </span>
             </div>
+            */}
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
               <Clock className="h-3 w-3" />
               <span>{formatDate(purchaseDate)}</span>
@@ -213,6 +222,22 @@ export const PurchasedLeadCard = ({
               value={lead.email || "N/A"}
               valueClassName="[overflow-wrap:anywhere]"
             />
+            {instagramHandle && instagramUrl && (
+              <InfoRow
+                icon={Instagram}
+                label="Instagram"
+                value={
+                  <a
+                    href={instagramUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-foreground hover:underline"
+                  >
+                    {`instagram.com/${instagramHandle}`}
+                  </a>
+                }
+              />
+            )}
           </div>
         </div>
 

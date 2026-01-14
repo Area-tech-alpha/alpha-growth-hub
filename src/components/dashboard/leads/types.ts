@@ -14,6 +14,7 @@ export interface Lead {
     city: string;
     phone: string;
     email: string;
+    instagram?: string;
     maskedCompanyName: string;
     niche: string;
     maskedContactName: string;

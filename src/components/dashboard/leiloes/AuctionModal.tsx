@@ -25,6 +25,7 @@ import {
     Info,
     Hash,
     Clock,
+    Instagram,
 } from "lucide-react";
 import { CountdownTimer } from "../leads/CountdownTimer";
 import { Lead } from "../leads/types";
@@ -335,6 +336,11 @@ export const AuctionModal = ({
     const contractUrl = (lead as unknown as { contract_url?: string })?.contract_url;
     const briefingUrl = (lead as unknown as { briefing_url?: string })?.briefing_url;
     const calUrl = lead.cal_url as string | undefined;
+    const rawInstagram = (lead as unknown as { instagram?: string })?.instagram;
+    const instagramHandle = rawInstagram?.trim().replace(/^@+/, "");
+    const instagramUrl = instagramHandle
+        ? `https://instagram.com/${instagramHandle}`
+        : undefined;
 
     const handleBuyNow = async () => {
         // Abre confirmação em vez de executar direto
@@ -525,6 +531,19 @@ export const AuctionModal = ({
                                     <Mail className="h-4 w-4 flex-shrink-0" />
                                     <span>{hasWon ? lead.email : maskEmail(lead.email)}</span>
                                 </div>
+                                {instagramHandle && instagramUrl && (
+                                    <div className="flex items-center gap-3">
+                                        <Instagram className="h-4 w-4 flex-shrink-0" />
+                                        <a
+                                            href={instagramUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-foreground hover:underline"
+                                        >
+                                            {`instagram.com/${instagramHandle}`}
+                                        </a>
+                                    </div>
+                                )}
                                 <div className="flex items-center gap-3">
                                     <Hash className="h-4 w-4 flex-shrink-0" />
                                     <span>{(lead as unknown as { cnpj?: string })?.cnpj}</span>

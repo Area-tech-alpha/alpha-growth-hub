@@ -8,9 +8,10 @@ import {
   Megaphone,
   DollarSign,
   Flame,
-  Hash,
-  MapPin,
   Clock,
+  Instagram,
+  // Hash,
+  // MapPin,
 } from "lucide-react";
 import {
   Card,
@@ -52,6 +53,11 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
   const contractTime = (lead as unknown as { contract_time?: string })?.contract_time;
   const briefingUrl = (lead as unknown as { briefing_url?: string })?.briefing_url;
   const calUrl = lead.cal_url as string | undefined;
+  const rawInstagram = (lead as unknown as { instagram?: string })?.instagram;
+  const instagramHandle = rawInstagram?.trim().replace(/^@+/, "");
+  const instagramUrl = instagramHandle
+    ? `https://instagram.com/${instagramHandle}`
+    : undefined;
 
 
   return (
@@ -101,6 +107,7 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
               />
             </div>
           </div>
+          {/*
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
             <MapPin className="h-3 w-3" />
             <span>
@@ -109,6 +116,7 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
                 : (lead.city || lead.state || "N/A")}
             </span>
           </div>
+          */}
         </CardHeader>
 
         <CardContent className="flex-grow flex flex-col space-y-4">
@@ -162,6 +170,25 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
                   </div>
                 </div>
               </div>
+              {instagramHandle && instagramUrl && (
+                <div className="flex items-center gap-2">
+                  <Instagram className="h-3 w-3 text-yellow-600" />
+                  <div>
+                    <div className="text-muted-foreground">Instagram</div>
+                    <div className="font-semibold">
+                      <a
+                        href={instagramUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-foreground hover:underline"
+                      >
+                        {`instagram.com/${instagramHandle}`}
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {/*
               <div className="flex items-center gap-2">
                 <Hash className="h-3 w-3 text-yellow-600" />
                 <div>
@@ -171,6 +198,7 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
                   </div>
                 </div>
               </div>
+              */}
               {typeof contractValue === "number" && !isNaN(contractValue) && (
                 <div className="flex items-center gap-2">
                   <DollarSign className="h-3 w-3 text-yellow-600" />

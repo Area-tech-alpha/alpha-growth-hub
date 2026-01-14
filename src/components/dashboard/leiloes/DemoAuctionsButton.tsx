@@ -42,6 +42,7 @@ export default function DemoAuctionsButton({
                 cnpj: "00.000.000/0000-00",
                 phone: "(11) 99999-9999",
                 email: "demo@empresa.com",
+                instagram: "@demoempresa",
                 maskedCompanyName: "",
                 niche: "Geral",
                 maskedContactName: "",
