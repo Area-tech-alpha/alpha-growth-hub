@@ -55,6 +55,7 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
   const calUrl = lead.cal_url as string | undefined;
   const rawInstagram = (lead as unknown as { instagram?: string })?.instagram;
   const instagramHandle = rawInstagram?.trim().replace(/^@+/, "");
+  const instagramLabel = instagramHandle ? `@${instagramHandle}` : undefined;
   const instagramUrl = instagramHandle
     ? `https://instagram.com/${instagramHandle}`
     : undefined;
@@ -176,13 +177,14 @@ export const LeadCard = ({ lead, onSelect, onExpire }: LeadCardProps) => {
                   <div>
                     <div className="text-muted-foreground">Instagram</div>
                     <div className="font-semibold">
+                      <div>{instagramLabel}</div>
                       <a
                         href={instagramUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-foreground hover:underline"
+                        className="text-xs font-medium text-foreground hover:underline"
                       >
-                        {`instagram.com/${instagramHandle}`}
+                        Visitar
                       </a>
                     </div>
                   </div>

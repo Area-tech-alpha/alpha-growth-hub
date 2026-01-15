@@ -60,6 +60,7 @@ export const PurchasedLeadCard = ({
 
   const rawInstagram = (lead as unknown as { instagram?: string })?.instagram;
   const instagramHandle = rawInstagram?.trim().replace(/^@+/, "");
+  const instagramLabel = instagramHandle ? `@${instagramHandle}` : undefined;
   const instagramUrl = instagramHandle
     ? `https://instagram.com/${instagramHandle}`
     : undefined;
@@ -227,14 +228,17 @@ export const PurchasedLeadCard = ({
                 icon={Instagram}
                 label="Instagram"
                 value={
-                  <a
-                    href={instagramUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-foreground hover:underline"
-                  >
-                    {`instagram.com/${instagramHandle}`}
-                  </a>
+                  <div className="flex flex-col">
+                    <span>{instagramLabel}</span>
+                    <a
+                      href={instagramUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-medium text-foreground hover:underline"
+                    >
+                      Visitar
+                    </a>
+                  </div>
                 }
               />
             )}

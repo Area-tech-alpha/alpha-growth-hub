@@ -338,6 +338,7 @@ export const AuctionModal = ({
     const calUrl = lead.cal_url as string | undefined;
     const rawInstagram = (lead as unknown as { instagram?: string })?.instagram;
     const instagramHandle = rawInstagram?.trim().replace(/^@+/, "");
+    const instagramLabel = instagramHandle ? `@${instagramHandle}` : undefined;
     const instagramUrl = instagramHandle
         ? `https://instagram.com/${instagramHandle}`
         : undefined;
@@ -534,14 +535,17 @@ export const AuctionModal = ({
                                 {instagramHandle && instagramUrl && (
                                     <div className="flex items-center gap-3">
                                         <Instagram className="h-4 w-4 flex-shrink-0" />
-                                        <a
-                                            href={instagramUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-foreground hover:underline"
-                                        >
-                                            {`instagram.com/${instagramHandle}`}
-                                        </a>
+                                        <div className="flex flex-col">
+                                            <span>{instagramLabel}</span>
+                                            <a
+                                                href={instagramUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-xs font-medium text-foreground hover:underline"
+                                            >
+                                                Visitar
+                                            </a>
+                                        </div>
                                     </div>
                                 )}
                                 <div className="flex items-center gap-3">
